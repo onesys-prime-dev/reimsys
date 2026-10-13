@@ -4,10 +4,11 @@ import { api, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { Empty, Icon } from '../ui';
 
 interface Data {
-  report: { id: number; format: string; status: string; from: string; to: string; createdAt: string; requestedBy: string };
+  report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; createdAt: string; requestedBy: string };
   rows: { docNo: string; refNo: string; date: string; payee: string; category: string; encoder: string; approvedAt: string; amount: number }[];
   total: number;
   byCategory: { category: string; count: number; total: number }[];
+  byPerson: { person: string; count: number; total: number }[];
 }
 
 export function ReportViewPage() {
@@ -15,7 +16,7 @@ export function ReportViewPage() {
   const q = useQuery({ queryKey: ['report-data', id], queryFn: () => api<Data>(`/reports/${id}/data`), refetchInterval: (x) => (x.state.data?.report.status === 'pending' ? 1500 : false) });
   if (q.isError) return <Empty title="Report not found">It may belong to someone else. <Link to="/reports" style={{ color: 'var(--accent)' }}>Back to reports</Link></Empty>;
   if (!q.data) return <div className="empty">Loading…</div>;
-  const { report: r, rows, total, byCategory } = q.data;
+  const { report: r, rows, total, byCategory, byPerson } = q.data;
   const ready = r.status === 'ready';
 
   return (
@@ -23,8 +24,8 @@ export function ReportViewPage() {
       <Link className="back" to="/reports"><Icon name="back" size={18} />Back to reports</Link>
       <div className="dh">
         <div className="ttl">
-          <h1>Liquidation report</h1>
-          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
+          <h1>Liquidation report{r.person ? ` · ${r.person}` : ''}</h1>
+          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}{r.category ? ` · ${r.category}` : ''}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
         </div>
         <div className="actionbar">
           {ready && <a className="btn" href={`/api/reports/${r.id}/file`}><Icon name="download" size={18} />Download {r.format.toUpperCase()}</a>}
@@ -37,6 +38,21 @@ export function ReportViewPage() {
         <div className="tile"><small>Records</small><b>{rows.length}</b></div>
         <div className="tile"><small>Average</small><b>{money(rows.length ? total / rows.length : 0)}</b></div>
       </div>
+
+      {byPerson.length > 1 && (
+        <section className="card" style={{ marginBottom: 16 }}>
+          <div className="card-h"><h3>By person</h3></div>
+          <div className="card-b">
+            {byPerson.map((p) => (
+              <div key={p.person} className="bar-row" style={{ gridTemplateColumns: 'minmax(110px,170px) 1fr auto' }}>
+                <span>{p.person} <small className="muted">({p.count})</small></span>
+                <span className="track"><span className="fill" style={{ width: `${total ? (p.total / total) * 100 : 0}%` }} /></span>
+                <b style={{ fontVariantNumeric: 'tabular-nums' }}>{money(p.total)}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {byCategory.length > 0 && (
         <section className="card" style={{ marginBottom: 16 }}>

@@ -6,7 +6,7 @@ import { useAuth } from '../auth';
 import type { Category } from '../types';
 import { Empty, Field, Icon, useToast } from '../ui';
 
-interface Report { id: number; format: string; status: string; from: string; to: string; rowCount: number | null; total: number | null; error: string | null; createdAt: string; requestedBy: string }
+interface Report { id: number; person: string | null; category: string | null; format: string; status: string; from: string; to: string; rowCount: number | null; total: number | null; error: string | null; createdAt: string; requestedBy: string }
 const firstOfMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString().slice(0, 10); };
 const endOfMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 0)).toISOString().slice(0, 10); };
 
@@ -18,17 +18,19 @@ export function ReportsPage() {
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(endOfMonth());
   const [categoryId, setCategoryId] = useState('');
+  const [personId, setPersonId] = useState('');
   const [format, setFormat] = useState<'pdf' | 'xlsx' | 'csv'>('pdf');
 
+  const people = useQuery({ queryKey: ['encoders'], queryFn: () => api<{ people: { id: number; name: string }[] }>('/receipts/encoders') });
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => api<{ categories: Category[] }>('/categories') });
-  const qs = new URLSearchParams({ from, to, ...(categoryId ? { categoryId } : {}) }).toString();
+  const qs = new URLSearchParams({ from, to, ...(categoryId ? { categoryId } : {}), ...(personId ? { encoderId: personId } : {}) }).toString();
   const preview = useQuery({ queryKey: ['report-preview', qs], enabled: !!from && !!to && from <= to, queryFn: () => api<{ count: number; total: number }>(`/reports/preview?${qs}`) });
   const list = useQuery({
     queryKey: ['reports'], queryFn: () => api<{ reports: Report[] }>('/reports'),
     refetchInterval: (q) => (q.state.data?.reports.some((r) => r.status === 'pending') ? 1500 : false),
   });
   const gen = useMutation({
-    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, categoryId: categoryId ? Number(categoryId) : null } }),
+    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, categoryId: categoryId ? Number(categoryId) : null, encoderId: personId ? Number(personId) : null } }),
     onSuccess: (d) => { toast('Report created.'); qc.invalidateQueries({ queryKey: ['reports'] }); nav(`/reports/${d.report.id}`); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
@@ -47,6 +49,9 @@ export function ReportsPage() {
             <div className="form">
               <Field label="From"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
               <Field label="To"><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+              {(people.data?.people.length ?? 0) > 1 && (
+                <Field label="Person" className="full"><select value={personId} onChange={(e) => setPersonId(e.target.value)}><option value="">Everyone</option>{people.data!.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+              )}
               <Field label="Category"><select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">All categories</option>{cats.data?.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
               <div className="f"><span>Format</span><div className="seg">{(['pdf', 'xlsx', 'csv'] as const).map((k) => <button key={k} type="button" className={format === k ? 'on' : ''} onClick={() => setFormat(k)}>{k.toUpperCase()}</button>)}</div></div>
             </div>
@@ -62,7 +67,7 @@ export function ReportsPage() {
           {shown.map((r) => (
             <div className="rep-row" key={r.id}>
               <div style={{ minWidth: 0 }}>
-                <b>{r.format.toUpperCase()} · {fmtDate(r.from)} to {fmtDate(r.to)}</b><br />
+                <b>{r.format.toUpperCase()} · {fmtDate(r.from)} to {fmtDate(r.to)}</b>{(r.person || r.category) && <span className="pill s-chk" style={{ marginLeft: 8 }}>{[r.person, r.category].filter(Boolean).join(' · ')}</span>}<br />
                 <small className="muted">
                   {r.status === 'ready' ? `${r.rowCount} record${r.rowCount === 1 ? '' : 's'} · ${money(r.total ?? 0)} · ` : r.status === 'failed' ? 'Failed · ' : 'Building… · '}
                   {fmtDateTime(r.createdAt)}{r.requestedBy ? ` · ${r.requestedBy}` : ''}

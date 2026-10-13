@@ -9,6 +9,14 @@ import { saveFile } from './storage.js';
 
 export interface ReportFilters { from: string; to: string; categoryId?: number | null; encoderId?: number | null; scope: Prisma.ReceiptWhereInput }
 
+/** Human description of the optional filters, e.g. "Person: Ana Reyes · Category: Medicine". Empty when nothing is filtered. */
+export async function filterLabel(f: { categoryId?: number | null; encoderId?: number | null }) {
+  const parts: string[] = [];
+  if (f.encoderId) { const u = await prisma.user.findUnique({ where: { id: f.encoderId }, select: { name: true } }); if (u) parts.push(`Person: ${u.name}`); }
+  if (f.categoryId) { const c = await prisma.category.findUnique({ where: { id: f.categoryId }, select: { name: true } }); if (c) parts.push(`Category: ${c.name}`); }
+  return parts.join(' · ');
+}
+
 /** Approved records only. This is enforced in the query, never in the UI. */
 export async function reportRows(f: ReportFilters) {
   const where: Prisma.ReceiptWhereInput = {
@@ -46,12 +54,12 @@ export async function buildCsv(rows: Row[], total: number) {
   return Buffer.from(toCsv([HEAD, ...rows.map(cells), ['', '', '', '', '', '', 'Total', total]]));
 }
 
-export async function buildXlsx(rows: Row[], f: { from: string; to: string }) {
+export async function buildXlsx(rows: Row[], f: { from: string; to: string; label?: string }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = config.orgName;
   const ws = wb.addWorksheet('Liquidation');
   ws.addRow([`${config.orgName} - Liquidation report`]).font = { bold: true, size: 14 };
-  ws.addRow([`Approved records from ${f.from} to ${f.to}`]).font = { color: { argb: 'FF546770' } };
+  ws.addRow([`Approved records from ${f.from} to ${f.to}${f.label ? ' · ' + f.label : ''}`]).font = { color: { argb: 'FF546770' } };
   ws.addRow([]);
   const head = ws.addRow(HEAD);
   head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -66,7 +74,7 @@ export async function buildXlsx(rows: Row[], f: { from: string; to: string }) {
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
-export function buildPdf(rows: Row[], total: number, f: { from: string; to: string }): Promise<Buffer> {
+export function buildPdf(rows: Row[], total: number, f: { from: string; to: string; label?: string }): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
     const chunks: Buffer[] = [];
@@ -79,7 +87,7 @@ export function buildPdf(rows: Row[], total: number, f: { from: string; to: stri
     const header = () => {
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#0c7480').text(config.orgName.toUpperCase(), L, 36);
       doc.font('Helvetica-Bold').fontSize(16).fillColor('#12232b').text('Liquidation Report', L, 50);
-      doc.font('Helvetica').fontSize(9).fillColor('#546770').text(`Approved records · ${f.from} to ${f.to} · ${rows.length} record${rows.length === 1 ? '' : 's'}`, L, 72);
+      doc.font('Helvetica').fontSize(9).fillColor('#546770').text(`Approved records · ${f.from} to ${f.to}${f.label ? ' · ' + f.label : ''} · ${rows.length} record${rows.length === 1 ? '' : 's'}`, L, 72);
       let x = L;
       const y = 94;
       doc.rect(L, y, W, 20).fill('#0c7480');
@@ -118,8 +126,9 @@ registerJob('report', async ({ reportId }: { reportId: number }) => {
   if (!rep) return;
   try {
     const f = JSON.parse(rep.filters) as ReportFilters;
+    const label = await filterLabel(f);
     const { rows, total } = await reportRows(f);
-    const buf = rep.format === 'pdf' ? await buildPdf(rows, total, f) : rep.format === 'xlsx' ? await buildXlsx(rows, f) : await buildCsv(rows, total);
+    const buf = rep.format === 'pdf' ? await buildPdf(rows, total, { ...f, label }) : rep.format === 'xlsx' ? await buildXlsx(rows, { ...f, label }) : await buildCsv(rows, total);
     const filePath = await saveFile('reports', rep.format, buf);
     await prisma.liquidationReport.update({ where: { id: rep.id }, data: { status: 'ready', filePath, rowCount: rows.length, total, finishedAt: new Date(), error: null } });
   } catch (err) {

@@ -50,6 +50,12 @@ receiptsRouter.get('/', async (req, res) => {
   res.json({ total, page: q.page, pageSize: q.pageSize, counts, items: rows.map(receiptBrief) });
 });
 
+/** People who have receipts this user can see. Used for the "person" filter on reports and lists. */
+receiptsRouter.get('/encoders', async (req, res) => {
+  const rows = await prisma.receipt.findMany({ where: visibleWhere(req.auth!), distinct: ['encoderId'], select: { encoder: { select: { id: true, name: true } } } });
+  res.json({ people: rows.map((r) => r.encoder).sort((a, b) => a.name.localeCompare(b.name)) });
+});
+
 receiptsRouter.get('/export', async (req, res) => {
   const format = req.query.format === 'xlsx' ? 'xlsx' : 'csv';
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
