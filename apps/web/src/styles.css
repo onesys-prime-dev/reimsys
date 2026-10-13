@@ -324,3 +324,16 @@ a.btn.sm{text-decoration:none}
   .tile{padding:12px 14px}
   .tile b{font-size:1.45rem}
 }
+
+/* email templates editor */
+.tpl-grid{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;align-items:start}
+.tpl-list{padding:6px;position:sticky;top:84px}
+.tpl-list button{display:block;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:10px 12px;color:var(--ink)}
+.tpl-list button:hover{background:var(--soft)}
+.tpl-list button.on{background:var(--accent-soft)}
+.tpl-list b{display:block;font-size:.92rem}
+.tpl-list small{display:block;color:var(--muted);margin-top:2px}
+.tpl-list .tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.tpl-frame{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;justify-content:center;overflow-x:auto}
+.tpl-frame iframe{border:0;border-radius:8px;background:#f4f7f8;max-width:100%}
+@media(max-width:900px){.tpl-grid{grid-template-columns:minmax(0,1fr)}.tpl-list{position:static}}

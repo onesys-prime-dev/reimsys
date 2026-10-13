@@ -85,7 +85,7 @@ function Activity() {
   );
 }
 
-interface EmailRow { id: number; to: string; template: string; subject: string; status: string; attempts: number; error: string | null; createdAt: string }
+interface EmailRow { id: number; to: string; template: string; subject: string; status: string; attempts: number; error: string | null; response: string | null; createdAt: string }
 
 function Emails() {
   const toast = useToast();
@@ -120,7 +120,7 @@ function Emails() {
       <section className="card">
         {data.data?.items.map((e) => (
           <div className="pref" style={{ padding: '12px 18px' }} key={e.id}>
-            <div style={{ minWidth: 0 }}><b>{e.subject}</b><br /><small className="muted">To {e.to} · {e.template} · {fmtDateTime(e.createdAt)}{e.error ? ` · ${e.error}` : ''}</small></div>
+            <div style={{ minWidth: 0 }}><b>{e.subject}</b><br /><small className="muted">To {e.to} · {e.template} · {fmtDateTime(e.createdAt)}{e.error ? ` · ${e.error}` : ''}</small>{e.response && <small className="muted" style={{ display: 'block' }}>{e.response}</small>}</div>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span className={`pill ${tone(e.status)}`}>{e.status}</span>{(e.status === 'failed' || e.status === 'logged') && <button className="btn sm" onClick={() => retry.mutate(e.id)}>Retry</button>}</span>
           </div>
         ))}

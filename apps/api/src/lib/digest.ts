@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { queueEmail, renderHtml } from './email.js';
+import { queueEmail } from './email.js';
+import { renderEmail } from './emailTemplates.js';
 
 const SEND_HOUR = 8;
 
@@ -33,10 +34,8 @@ async function digestLines(u: DigestUser): Promise<string[]> {
 async function queueDigest(u: DigestUser) {
   const lines = await digestLines(u);
   if (!lines.length) return false;
-  await queueEmail({
-    userId: u.id, to: u.email, template: 'digest', subject: `${config.orgName}: your daily summary`,
-    html: renderHtml(`Good morning, ${u.name.split(' ')[0]}`, lines, { url: config.webOrigin, label: 'Open REIMSIS' }),
-  });
+  const mail = await renderEmail({ key: 'digest', data: { recipientName: u.name.split(' ')[0], summary: lines.map((l) => `• ${l}`).join('\n') }, link: config.webOrigin });
+  await queueEmail({ userId: u.id, to: u.email, template: 'digest', subject: mail.subject, html: mail.html });
   return true;
 }
 

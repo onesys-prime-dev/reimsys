@@ -150,3 +150,4 @@ export interface MailSettingsView {
   source: 'database' | 'environment' | 'none';
   host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string; testRedirect: string;
 }
+export * from './emailTemplates';

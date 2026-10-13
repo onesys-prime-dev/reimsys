@@ -5,7 +5,8 @@ import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { config } from '../config.js';
-import { queueEmail, renderHtml } from '../lib/email.js';
+import { queueEmail } from '../lib/email.js';
+import { renderEmail } from '../lib/emailTemplates.js';
 import { resolveMail } from '../lib/mailSettings.js';
 import { sendDigestNow } from '../lib/digest.js';
 import { enqueue } from '../lib/jobs.js';
@@ -119,7 +120,7 @@ emailLogRouter.get('/', async (req, res) => {
     prisma.emailLog.count({ where }),
     prisma.emailLog.findMany({ where, orderBy: { id: 'desc' }, skip: (page - 1) * 25, take: 25 }),
   ]);
-  res.json({ total, page, pageSize: 25, items: rows.map((e) => ({ id: e.id, to: e.toEmail, template: e.template, subject: e.subject, status: e.status, attempts: e.attempts, error: e.error, createdAt: e.createdAt, sentAt: e.sentAt })) });
+  res.json({ total, page, pageSize: 25, items: rows.map((e) => ({ id: e.id, to: e.toEmail, template: e.template, subject: e.subject, status: e.status, attempts: e.attempts, error: e.error, createdAt: e.createdAt, sentAt: e.sentAt, response: e.response })) });
 });
 
 emailLogRouter.post('/:id/retry', async (req, res) => {
@@ -142,10 +143,8 @@ emailLogRouter.get('/status', async (_req, res) => {
 emailLogRouter.post('/test', async (req, res) => {
   const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw badRequest('Enter a valid email address.');
-  await queueEmail({
-    to, template: 'test', subject: `${config.orgName}: test email`,
-    html: renderHtml('Email is working', [`This is a test message from ${config.orgName}, sent by ${req.auth!.user.name}.`, 'If you can read this, receipt updates will reach you.'], { url: config.webOrigin, label: `Open ${config.orgName}` }),
-  });
+  const mail = await renderEmail({ key: 'test', data: { actorName: req.auth!.user.name }, link: config.webOrigin });
+  await queueEmail({ to, template: 'test', subject: mail.subject, html: mail.html });
   await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}` });
   res.status(202).json({ ok: true });
 });

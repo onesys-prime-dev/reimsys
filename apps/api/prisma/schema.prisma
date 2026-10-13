@@ -192,6 +192,8 @@ model EmailLog {
   status    String    @default("queued") @db.VarChar(10)
   attempts  Int       @default(0)
   error     String?   @db.VarChar(300)
+  /// What the mail server said when it took the message, for example "250 2.0.0 OK". Proof it was handed over.
+  response  String?   @db.VarChar(300)
   createdAt DateTime  @default(now())
   sentAt    DateTime?
 

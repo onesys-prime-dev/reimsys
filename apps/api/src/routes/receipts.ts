@@ -11,6 +11,7 @@ import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { enqueue } from '../lib/jobs.js';
+import { receiptData } from '../lib/emailTemplates.js';
 import { notify, usersWithPermission } from '../lib/notify.js';
 import { assertOwner, dateOnly, filterWhere, loadVisible, receiptBrief, receiptDetail, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { nextDocNo, nextReceiptRef } from '../lib/sequence.js';
@@ -283,14 +284,14 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   const who = auth.user.name;
   const ref = `${r.refNo} (${r.payee})`;
   const others = (ids: (number | null | undefined)[]) => ids.filter((x): x is number => !!x && x !== auth.user.id);
-  const mailLines = (head: string) => [head, ...(note ? [`Note: ${note}`] : []), `Amount: PHP ${Number(r.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`];
+  const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: r.category.name }, { actorName: who, note, docNo });
   if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
   if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });
-  if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${note}`, email: { template: 'returned', subject: `Receipt ${r.refNo} was returned`, heading: 'Your receipt needs a correction', lines: mailLines(`${who} returned ${ref}.`) } });
-  if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', subject: `Receipt ${r.refNo} was approved`, heading: 'Receipt approved', lines: mailLines(`${who} approved ${ref}. Reimbursement document ${docNo} has been created.`) } });
-  if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', subject: `Receipt ${r.refNo} was disapproved`, heading: 'Receipt disapproved', lines: mailLines(`${who} disapproved ${ref}.`) } });
-  if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', subject: `Receipt ${r.refNo} is on hold`, heading: 'Receipt on hold', lines: mailLines(`${who} put ${ref} on hold.`) } });
-  if (action === 'release') await notify({ userIds: [r.encoderId], type: 'receipt.released', receiptId: r.id, text: `The hold on ${ref} was released.`, email: { template: 'released', subject: `Hold released on ${r.refNo}`, heading: 'Hold released', lines: mailLines(`${who} released the hold on ${ref}. It is back in review.`), respectPref: 'reservationReleased' } });
+  if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${note}`, email: { template: 'returned', data: mail } });
+  if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
+  if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
+  if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });
+  if (action === 'release') await notify({ userIds: [r.encoderId], type: 'receipt.released', receiptId: r.id, text: `The hold on ${ref} was released.`, email: { template: 'released', data: mail, respectPref: 'reservationReleased' } });
 
   return receiptDetail(auth, await loadVisible(auth, r.id));
 }

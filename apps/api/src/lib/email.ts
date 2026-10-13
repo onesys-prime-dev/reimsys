@@ -22,19 +22,6 @@ export function isPublicLink(url: string) {
   }
 }
 
-export function renderHtml(heading: string, lines: string[], rawLink?: { url: string; label: string }) {
-  const link = rawLink && isPublicLink(rawLink.url) ? rawLink : undefined;
-  const body = rawLink && !link ? [...lines, `Sign in to ${config.orgName} to open it.`] : lines;
-  return `<!doctype html><html><body style="margin:0;background:#f4f7f8;font-family:Arial,Helvetica,sans-serif;color:#12232b">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e0e7ea;border-radius:10px">
-<tr><td style="padding:18px 24px;border-bottom:1px solid #e0e7ea;font-weight:700;color:#0c7480">${esc(config.orgName)}</td></tr>
-<tr><td style="padding:24px"><h2 style="margin:0 0 12px;font-size:18px">${esc(heading)}</h2>
-${body.map((l) => `<p style="margin:8px 0;line-height:1.5">${esc(l)}</p>`).join('')}
-${link ? `<p style="margin:20px 0 0"><a href="${esc(link.url)}" style="background:#0c7480;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;display:inline-block">${esc(link.label)}</a></p>` : ''}
-</td></tr></table></td></tr></table></body></html>`;
-}
-
 /** Plain-text twin of an HTML email. Mail that carries both versions is trusted more by spam filters. */
 export function htmlToText(html: string) {
   return html
@@ -112,8 +99,12 @@ registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
     const to = redirected ? mail.redirectTo! : row.toEmail;
     const subject = redirected ? `[TEST for ${row.toEmail}] ${row.subject}` : row.subject;
     const html = redirected ? row.body.replace('<td style="padding:24px">', `<td style="padding:24px"><p style="margin:0 0 14px;padding:8px 10px;background:#fbf0d3;color:#8a5a00;border-radius:6px;font-size:13px">Test mode: this email was meant for ${esc(row.toEmail)}.</p>`) : row.body;
-    await transportFor(mail.smtp).sendMail(buildMessage({ id: row.id, from: mail.from, to, subject, html }));
-    await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'sent', sentAt: new Date(), error: null } });
+    const info = await transportFor(mail.smtp).sendMail(buildMessage({ id: row.id, from: mail.from, to, subject, html }));
+    const accepted = (info.accepted ?? []).map(String), rejected = (info.rejected ?? []).map(String);
+    // The server can accept the connection and still refuse the recipient, so look at who was actually accepted.
+    if (!accepted.length) throw new Error(`The mail server refused every recipient (${rejected.join(', ') || 'none accepted'}). ${info.response ?? ''}`.trim());
+    const response = `Accepted for ${accepted.join(', ')}${rejected.length ? `; refused ${rejected.join(', ')}` : ''}. Server said: ${info.response ?? 'no reply'}`.slice(0, 300);
+    await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'sent', sentAt: new Date(), error: null, response } });
   } catch (err) {
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'failed', error: explainMailError(err).slice(0, 300) } });
     throw err;
