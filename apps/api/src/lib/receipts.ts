@@ -7,7 +7,8 @@ import type { AuthContext } from '../types.js';
 /** Which receipts this user may see. Driven by permissions, not role names. */
 export function visibleWhere(auth: AuthContext): Prisma.ReceiptWhereInput {
   const p = auth.permissions;
-  if (p.has('receipt.view_all')) return {};
+  // Drafts stay private to the person who is still writing them. Everything submitted is visible to people who can see all.
+  if (p.has('receipt.view_all')) return { OR: [{ status: { not: 'draft' } }, { encoderId: auth.user.id }] };
   const ors: Prisma.ReceiptWhereInput[] = [];
   if (p.has('receipt.create')) ors.push({ encoderId: auth.user.id });
   if (p.has('review.decide')) ors.push({ status: { in: ['checked', 'reserved', 'approved', 'disapproved'] } });

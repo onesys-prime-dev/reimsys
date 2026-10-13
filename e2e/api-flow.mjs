@@ -58,7 +58,7 @@ check('duplicate file rejected', (await ana.req('POST', `/receipts/${r.id}/evide
 r = up.data.receipt;
 check('mark cannot see ana receipt', (await mark.get(`/receipts/${r.id}`)).status === 404);
 check('approver cannot see submitted-stage receipt yet', (await paolo.get(`/receipts/${r.id}`)).status === 404);
-check('checker cannot submit', (await liza.post(`/receipts/${r.id}/submit`, { version: r.version })).status === 403);
+check('checker cannot see or submit someone else's draft', (await liza.get(`/receipts/${r.id}`)).status === 404 && (await liza.post(`/receipts/${r.id}/submit`, { version: r.version })).status === 404);
 let s = await ana.post(`/receipts/${r.id}/submit`, { version: r.version });
 check('submitted', s.status === 200 && s.data.receipt.status === 'submitted', JSON.stringify(s.data));
 r = s.data.receipt;

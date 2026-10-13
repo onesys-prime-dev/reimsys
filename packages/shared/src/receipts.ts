@@ -49,7 +49,7 @@ const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the date format 
 export const receiptInputSchema = z.object({
   payee: z.string().trim().min(2, 'Enter who was paid.').max(160),
   receiptDate: dateString.refine((s) => s <= new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), 'The receipt date cannot be in the future.'),
-  amount: z.coerce.number().positive('Enter an amount greater than zero.').max(9_999_999.99).transform((n) => Math.round(n * 100) / 100),
+  amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
   categoryId: z.coerce.number().int().positive('Choose a category.'),
   description: z.string().trim().max(500).nullish(),
 });

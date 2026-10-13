@@ -103,7 +103,7 @@ export function ReceiptFormPage() {
       <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Fill in the details, then attach a clear photo or PDF.</p></div></div>
       {rec?.status === 'returned' && rec.lastNote && <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b><span>{rec.lastNote}</span></div></div>}
       <section className="card">
-        <form className="card-b" onSubmit={(e) => { e.preventDefault(); void save(false); }}>
+        <form className="card-b" noValidate onSubmit={(e) => { e.preventDefault(); void save(false); }}>
           <div className="form">
             <Field label="Paid to" className="full" error={errors.payee}><input type="text" value={payee} onChange={(e) => { setPayee(e.target.value); clear('payee'); }} placeholder="Store or provider name" autoFocus /></Field>
             <Field label="Receipt date" error={errors.receiptDate}><input type="date" value={date} max={todayIso()} onChange={(e) => { setDate(e.target.value); clear('receiptDate'); }} /></Field>
