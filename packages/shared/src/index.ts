@@ -28,6 +28,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'role.manage', label: 'Manage roles and permissions', group: 'Administration' },
   { code: 'audit.view', label: 'Browse the audit log', group: 'Administration' },
   { code: 'category.manage', label: 'Manage receipt categories', group: 'Administration' },
+  { code: 'settings.manage', label: 'Manage email and system settings', group: 'Administration' },
 ];
 export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 
@@ -46,6 +47,7 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'role.manage': ['admin'],
   'audit.view': ['admin'],
   'category.manage': ['admin'],
+  'settings.manage': ['admin'],
 };
 
 /** Grants that can never be removed, so the system always has a review path and an administrator. */
@@ -54,6 +56,7 @@ export const LOCKED_GRANTS: { role: RoleCode; permission: string }[] = [
   { role: 'approver', permission: 'review.decide' },
   { role: 'admin', permission: 'user.manage' },
   { role: 'admin', permission: 'role.manage' },
+  { role: 'admin', permission: 'settings.manage' },
 ];
 export const isLockedGrant = (role: string, permission: string) =>
   LOCKED_GRANTS.some((g) => g.role === role && g.permission === permission);
@@ -128,3 +131,20 @@ export interface MeResponse {
   permissions: string[];
 }
 export * from './receipts';
+
+export const mailSettingsSchema = z.object({
+  host: z.string().trim().min(1, 'Enter the mail server address.').max(255).regex(/^[A-Za-z0-9.-]+$/, 'The server address should look like smtp.gmail.com.'),
+  port: z.coerce.number().int().min(1, 'Enter a port between 1 and 65535.').max(65535, 'Enter a port between 1 and 65535.'),
+  secure: z.boolean(),
+  user: z.string().trim().max(200).default(''),
+  /** Leave out or empty to keep the saved password. */
+  pass: z.string().max(500).optional(),
+  fromName: z.string().trim().max(80).default(''),
+  fromAddress: z.string().trim().toLowerCase().email('Enter the address emails are sent from.'),
+});
+export type MailSettingsInput = z.infer<typeof mailSettingsSchema>;
+
+export interface MailSettingsView {
+  source: 'database' | 'environment' | 'none';
+  host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string;
+}

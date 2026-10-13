@@ -13,6 +13,7 @@ import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
 import { meRouter } from './routes/me.js';
 import { rolesRouter } from './routes/roles.js';
+import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
 import { categoriesRouter, dashboardRouter, emailLogRouter, notificationsRouter } from './routes/misc.js';
 import { importsRouter } from './routes/imports.js';
@@ -70,6 +71,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/email-log', emailLogRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/api', (_req, res) => void res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found.' } }));
 
 // In production the API also serves the built web app, so one process and one origin is enough.

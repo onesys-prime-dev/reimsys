@@ -12,9 +12,24 @@ $env:SMTP_HOST="localhost"; $env:SMTP_PORT="1025"; pnpm dev:api
 
 Open any saved `.html` file to see the email. Nothing leaves your computer.
 
-## Send real email
+## Send real email (in the app)
 
-Put these in `apps/api/.env`, then restart the API:
+Sign in as the Super Admin and open **Access, Email**:
+
+1. Pick **Gmail**, **Microsoft 365 / Outlook**, or **Other**. The server and port fill in for you.
+2. Enter your **username** (usually your email address) and **password**.
+   - **Gmail:** use an **App password**, not your normal password. Turn on 2-step verification, then create one at https://myaccount.google.com/apppasswords.
+3. Enter the name and address emails should come from.
+4. Press **Test connection**. It signs in without sending anything and tells you in plain words if something is wrong (wrong password, wrong address, wrong port).
+5. Press **Save**, then use **Send a test email** to send one to yourself.
+
+The password is stored encrypted and is never shown again, not even to administrators. Every change is recorded in the audit log without it. Only people with the "Manage email and system settings" permission (the Super Admin by default) can see this page.
+
+Back up the `storage` folder together with the database: it holds the key that unlocks the saved password. To keep the key somewhere else, set `SETTINGS_KEY` in the server environment.
+
+## Send real email (server settings instead)
+
+Instead of the page above, you can put these in `apps/api/.env` and restart the API. An account saved in the app takes priority over these:
 
 ```
 SMTP_HOST=smtp.gmail.com

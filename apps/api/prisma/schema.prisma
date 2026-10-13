@@ -245,3 +245,11 @@ model Sequence {
   key   String @id @db.VarChar(40)
   value Int
 }
+
+/// Settings an administrator edits in the app (for example the mail account). Secrets inside are encrypted.
+model Setting {
+  key         String   @id @db.VarChar(60)
+  value       String   @db.Text
+  updatedAt   DateTime @updatedAt
+  updatedById Int?
+}

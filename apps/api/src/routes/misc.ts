@@ -6,6 +6,7 @@ import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { config } from '../config.js';
 import { queueEmail, renderHtml } from '../lib/email.js';
+import { resolveMail } from '../lib/mailSettings.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -131,8 +132,9 @@ emailLogRouter.post('/:id/retry', async (req, res) => {
   res.json({ ok: true });
 });
 
-emailLogRouter.get('/status', (_req, res) => {
-  res.json({ configured: !!config.smtp, host: config.smtp?.host ?? null, port: config.smtp?.port ?? null, from: config.mailFrom });
+emailLogRouter.get('/status', async (_req, res) => {
+  const mail = await resolveMail();
+  res.json({ configured: !!mail.smtp, source: mail.source, host: mail.smtp?.host ?? null, port: mail.smtp?.port ?? null, from: mail.from });
 });
 
 /** Sends a short message so an administrator can confirm the mail settings work. It goes through the same queue as real emails. */

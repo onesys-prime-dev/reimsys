@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { PERMISSIONS, isLockedGrant, type RoleSummary } from '@reimsis/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
+import { EmailSettingsTab } from './EmailSettings';
 import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '../ui';
 
 interface UserRow {
@@ -12,7 +13,7 @@ interface UserRow {
 
 export function AccessPage() {
   const { can } = useAuth();
-  const [tab, setTab] = useState<'users' | 'perms' | 'cats'>(can('user.manage') ? 'users' : 'perms');
+  const [tab, setTab] = useState<'users' | 'perms' | 'cats' | 'mail'>(can('user.manage') ? 'users' : 'perms');
   return (
     <>
       <div className="ph"><div><h1>Access control</h1><p>Manage who can sign in and what each role can do.</p></div></div>
@@ -20,8 +21,9 @@ export function AccessPage() {
         {can('user.manage') && <button role="tab" aria-selected={tab === 'users'} className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Users</button>}
         <button role="tab" aria-selected={tab === 'perms'} className={tab === 'perms' ? 'on' : ''} onClick={() => setTab('perms')}>Roles and permissions</button>
         {can('category.manage') && <button role="tab" aria-selected={tab === 'cats'} className={tab === 'cats' ? 'on' : ''} onClick={() => setTab('cats')}>Categories</button>}
+        {can('settings.manage') && <button role="tab" aria-selected={tab === 'mail'} className={tab === 'mail' ? 'on' : ''} onClick={() => setTab('mail')}>Email</button>}
       </div>
-      {tab === 'users' ? <UsersTab /> : tab === 'cats' ? <CategoriesTab /> : <PermsTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'cats' ? <CategoriesTab /> : tab === 'mail' ? <EmailSettingsTab /> : <PermsTab />}
     </>
   );
 }
