@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique @db.VarChar(30)
+  name        String           @db.VarChar(60)
+  rank        Int
+  isSystem    Boolean          @default(false)
+  users       User[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Permission {
+  id        Int              @id @default(autoincrement())
+  code      String           @unique @db.VarChar(60)
+  label     String           @db.VarChar(120)
+  groupName String           @db.VarChar(60)
+  roles     RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  email              String    @unique @db.VarChar(160)
+  name               String    @db.VarChar(100)
+  passwordHash       String    @db.VarChar(255)
+  roleId             Int
+  role               Role      @relation(fields: [roleId], references: [id])
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  failedAttempts     Int       @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  phone              String?   @db.VarChar(30)
+  branch             String?   @db.VarChar(100)
+  photoFile          String?   @db.VarChar(120)
+  theme              String    @default("light") @db.VarChar(10)
+  dailyDigest        Boolean   @default(true)
+  reservationReleased Boolean  @default(false)
+  sessions           Session[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([roleId])
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.VarChar(36)
+  tokenHash  String    @unique @db.VarChar(64)
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent  String?   @db.VarChar(255)
+  ip         String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+/// Append-only. The application never updates or deletes rows here.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName  String   @db.VarChar(160)
+  action     String   @db.VarChar(80)
+  entityType String   @db.VarChar(60)
+  entityId   String?  @db.VarChar(60)
+  summary    String?  @db.VarChar(255)
+  before     String?  @db.LongText
+  after      String?  @db.LongText
+  ip         String?  @db.VarChar(64)
+  userAgent  String?  @db.VarChar(255)
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}

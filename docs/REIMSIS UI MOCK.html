@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REIMSIS Mock Interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: left sidebar + content on desktop, bottom tab bar on phones. One primary action per screen. */
+:root{
+  --bg:#f9fbfb;--surface:#ffffff;--ink:#12232b;--muted:#5a6d76;--line:#e3eaec;--soft:#f1f6f6;
+  --accent:#0c7480;--accent-ink:#ffffff;--accent-soft:#dff1f3;
+  --info:#2457c5;--info-soft:#e3ecfc;--ok:#1b7b4a;--ok-soft:#dff3e7;--bad:#b5352e;--bad-soft:#fbe6e4;
+  --warn:#8a5a00;--warn-soft:#fbf0d3;--hold:#6d45b8;--hold-soft:#ece6f8;
+  --shadow:0 1px 2px rgba(18,35,43,.06),0 4px 14px rgba(18,35,43,.05);
+  --sans:'Public Sans',system-ui,sans-serif;--display:'Bricolage Grotesque','Public Sans',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1519;--surface:#132127;--ink:#e6eef0;--muted:#92a7ae;--line:#24373e;--soft:#192a31;
+  --accent:#4fc0cc;--accent-ink:#06181b;--accent-soft:#123239;
+  --info:#8fb0f5;--info-soft:#17284a;--ok:#5cc791;--ok-soft:#133323;--bad:#f0908a;--bad-soft:#3b1b19;
+  --warn:#e8b650;--warn-soft:#3a2d0d;--hold:#b99cf0;--hold-soft:#2a2045;--shadow:0 1px 2px rgba(0,0,0,.4);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1519;--surface:#132127;--ink:#e6eef0;--muted:#92a7ae;--line:#24373e;--soft:#192a31;
+  --accent:#4fc0cc;--accent-ink:#06181b;--accent-soft:#123239;
+  --info:#8fb0f5;--info-soft:#17284a;--ok:#5cc791;--ok-soft:#133323;--bad:#f0908a;--bad-soft:#3b1b19;
+  --warn:#e8b650;--warn-soft:#3a2d0d;--hold:#b99cf0;--hold-soft:#2a2045;--shadow:0 1px 2px rgba(0,0,0,.4);color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font:400 14.5px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.2;text-wrap:balance}
+h1{font-size:1.6rem;letter-spacing:-.015em}h2{font-size:1.15rem}h3{font-size:1rem}
+small,.muted{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ic{width:20px;height:20px;flex:none}
+.sr{position:absolute;left:-9999px}
+
+/* demo strip */
+.demo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-content:space-between;background:var(--ink);color:var(--bg);padding:6px 16px;font-size:.78rem}
+.demo select{background:transparent;color:inherit;border:1px solid color-mix(in srgb,var(--bg) 40%,transparent);border-radius:6px;padding:2px 6px}
+.demo select option{color:#12232b}
+.demo button{background:none;border:0;color:inherit;text-decoration:underline;padding:0;font-size:.78rem}
+
+/* shell */
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:calc(100vh - 34px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;align-self:start;height:calc(100vh - 34px)}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 16px}
+.logo{width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:700 1rem var(--display)}
+.brand b{font:700 1.05rem var(--display);letter-spacing:.02em}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:12px;background:none;border:0;border-radius:8px;padding:9px 10px;color:var(--muted);font-weight:500;text-align:left}
+.nav button:hover{background:var(--soft);color:var(--ink)}
+.nav button.on{background:var(--accent-soft);color:var(--accent)}
+.nav .badge{margin-left:auto}
+.badge{background:var(--accent);color:var(--accent-ink);font-size:.7rem;font-weight:600;border-radius:99px;min-width:20px;height:20px;display:inline-grid;place-items:center;padding:0 6px}
+.side .who{margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:none;text-align:left;width:100%}
+.av{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:600;font-size:.8rem;flex:none}
+.av.lg{width:72px;height:72px;font-size:1.4rem}
+.who b{display:block;line-height:1.2}.who small{font-size:.76rem}
+
+.main{min-width:0}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);display:flex;align-items:center;gap:12px;padding:12px 28px;border-bottom:1px solid var(--line)}
+.top .t{font:600 1.05rem var(--display);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none}
+.iconbtn .dotn{position:absolute;top:-5px;right:-5px}
+.page{padding:24px 28px 40px;max-width:1120px}
+.ph{display:flex;flex-wrap:wrap;gap:12px 16px;justify-content:space-between;align-items:flex-end;margin-bottom:20px}
+.ph p{margin:4px 0 0;color:var(--muted)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:9px;border:1px solid var(--line);background:var(--surface);padding:9px 14px;font-weight:600;min-height:40px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:var(--accent-ink)}
+.btn.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,var(--line))}
+.btn.hold{color:var(--hold);border-color:color-mix(in srgb,var(--hold) 45%,var(--line))}
+.btn.sm{min-height:32px;padding:4px 10px;font-size:.84rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted)}
+
+/* cards, tiles */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:0}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-b{padding:16px 18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.tile{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.tile:hover{border-color:var(--accent)}
+.tile small{display:block;font-weight:500}
+.tile b{display:block;font:700 1.8rem/1.2 var(--display);margin-top:4px;font-variant-numeric:tabular-nums}
+.tile.alert b{color:var(--accent)}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;border-radius:99px;padding:2px 10px 2px 8px;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-draft{background:var(--soft);color:var(--muted)}.s-sub{background:var(--info-soft);color:var(--info)}
+.s-ret{background:var(--warn-soft);color:var(--warn)}.s-chk{background:var(--accent-soft);color:var(--accent)}
+.s-app{background:var(--ok-soft);color:var(--ok)}.s-dis{background:var(--bad-soft);color:var(--bad)}.s-res{background:var(--hold-soft);color:var(--hold)}
+
+/* list rows */
+.thead,.row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 130px;gap:12px;align-items:center;padding:12px 18px}
+.thead{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding-block:10px}
+.row{width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--soft)}
+.row .c-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{display:block}
+.c-amt{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.thead .c-amt{text-align:right}
+.mdate{display:none}
+.empty{padding:36px 18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font:600 1.05rem var(--display);margin-bottom:4px}
+
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.search{position:relative;flex:1 1 220px;max-width:340px}
+.search .ic{position:absolute;left:11px;top:10px;color:var(--muted);width:18px;height:18px}
+.search input{padding-left:36px}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=tel],select,textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 12px;min-height:42px}
+textarea{min-height:92px;resize:vertical}
+input:disabled{background:var(--soft);color:var(--muted)}
+label.f{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.84rem;min-width:0}
+label.f .hint{font-weight:400;color:var(--muted)}
+.err{color:var(--bad);font-size:.8rem;font-weight:500}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 12px;font-size:.84rem;font-weight:500;color:var(--muted)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:8px 16px;font-weight:600;color:var(--muted);min-height:38px}
+.seg button.on{background:var(--accent-soft);color:var(--accent)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tabs button.on{color:var(--accent);border-color:var(--accent)}
+
+/* form */
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.form .full{grid-column:1/-1}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;background:var(--soft);color:var(--muted)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.files{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.file{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--surface)}
+.file .thumb{width:38px;height:38px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.file div{flex:1;min-width:0}.file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.formbar{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:20px}
+
+/* detail */
+.back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--muted);font-weight:600;padding:0 0 10px}
+.dh{display:flex;flex-wrap:wrap;gap:12px 20px;justify-content:space-between;align-items:center;margin-bottom:18px}
+.dh .ttl{min-width:0}
+.dh .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.amt-big{font:700 1.5rem var(--display);font-variant-numeric:tabular-nums}
+.actionbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hint-line{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;flex-basis:100%}
+.dl{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px 14px;margin:0}
+.dl dt{color:var(--muted)}.dl dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.callout{display:flex;gap:10px;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:.92rem}
+.callout .ic{margin-top:1px}
+.callout.warn{background:var(--warn-soft);color:var(--warn)}.callout.bad{background:var(--bad-soft);color:var(--bad)}.callout.hold{background:var(--hold-soft);color:var(--hold)}.callout.ok{background:var(--ok-soft);color:var(--ok)}
+.callout b{display:block}.callout span{color:var(--ink)}
+.evtabs{display:flex;gap:6px;padding:10px 14px 0;overflow-x:auto}
+.evtab{display:flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;font-size:.82rem;font-weight:500;white-space:nowrap;color:var(--muted)}
+.evtab .ic{width:16px;height:16px}
+.evtab.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.stage{margin:12px 14px;border-radius:10px;background:var(--soft);height:420px;overflow:auto;display:grid;place-items:center;padding:16px}
+.paper{transition:transform .15s;transform-origin:center;filter:drop-shadow(0 6px 14px rgba(0,0,0,.18))}
+.paper.photo{transform-origin:center}
+.evtool{display:flex;gap:8px;align-items:center;padding:0 14px 14px;flex-wrap:wrap}
+.evtool .sp{flex:1}
+.locked{margin:12px 14px 14px;border-radius:10px;border:1px dashed var(--line);background:var(--soft);padding:34px 18px;text-align:center}
+.locked .ic{width:30px;height:30px;color:var(--muted)}
+.locked b{display:block;margin:8px 0 2px;font:600 1.02rem var(--display)}
+.tl{list-style:none;margin:0;padding:0 0 0 4px}
+.tl li{position:relative;padding:0 0 16px 22px;border-left:2px solid var(--line);margin-left:5px}
+.tl li:last-child{border-color:transparent;padding-bottom:0}
+.tl .dot{position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.tl small{display:block}
+.tl q{display:block;margin-top:4px;background:var(--soft);border-radius:8px;padding:6px 10px;quotes:none;font-size:.9rem}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+
+/* access */
+.matrix{overflow-x:auto}
+.matrix table{width:100%;border-collapse:collapse;min-width:560px}
+.matrix th,.matrix td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:center}
+.matrix th:first-child,.matrix td:first-child{text-align:left}
+.matrix th{font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.matrix tr.grp td{background:var(--soft);font-weight:600;font-size:.78rem;color:var(--muted);text-align:left;letter-spacing:.05em;text-transform:uppercase}
+.matrix input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+.savebar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);display:flex;align-items:center;gap:12px;justify-content:space-between;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 14px;margin-top:14px;flex-wrap:wrap}
+.savebar .btn{min-height:34px}
+.urow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) 150px 90px;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)}
+.urow:last-child{border-bottom:0}
+.urow .nm{display:flex;gap:12px;align-items:center;min-width:0}
+.urow .nm div{min-width:0}.urow .nm small,.urow .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.switch{position:relative;width:42px;height:24px;flex:none}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.switch i{position:absolute;inset:0;background:var(--line);border-radius:99px;transition:.15s}
+.switch i::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.switch input:checked+i{background:var(--accent)}.switch input:checked+i::after{transform:translateX(18px)}
+.switch input:disabled{cursor:not-allowed}.switch input:disabled+i{opacity:.5}
+.pref{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line)}
+.pref:last-child{border-bottom:0}
+.pref div{min-width:0}
+.meter{display:flex;gap:4px;margin-top:6px}.meter i{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.meter i.on{background:var(--ok)}.meter i.w{background:var(--warn)}.meter i.b{background:var(--bad)}
+.lock{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:.78rem}
+
+/* notif panel + modal + toast */
+.panel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 58px);right:20px;width:min(380px,calc(100vw - 32px));max-height:70vh;overflow:auto;z-index:40;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.note{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left}
+.note:last-child{border-bottom:0}.note.un{background:var(--accent-soft)}
+.note .dotp{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:7px;flex:none}.note.rd .dotp{background:transparent}
+.scrim{position:fixed;inset:0;background:rgba(8,16,20,.5);z-index:50;display:grid;place-items:center;padding:16px}
+.modal{background:var(--surface);border-radius:14px;width:min(460px,100%);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:90vh;overflow:auto}
+.modal h2{margin-bottom:6px}.modal p{margin:0 0 14px;color:var(--muted)}
+.modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.modal ul{padding-left:1.1rem;margin:0}.modal li{margin:8px 0}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(480px,calc(100vw - 32px));pointer-events:none}
+.toast{background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center}
+@media(min-width:821px){#toast{bottom:28px}}
+
+/* login */
+.login{min-height:calc(100vh - 34px);display:grid;place-items:center;padding:24px 16px}
+.lcard{width:min(440px,100%);padding:28px}
+.lcard .brand{padding:0 0 18px}
+.lcard form{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.lcard .seg{display:flex;width:100%}.lcard .seg button{flex:1;padding-inline:4px;font-size:.84rem}
+
+/* bottom nav */
+.bnav{display:none}
+@media(max-width:820px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{display:none}
+  .top{padding:10px 16px}
+  .page{padding:18px 16px 110px}
+  .bnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(env(safe-area-inset-bottom,0px) + 6px)}
+  .bnav button{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.7rem;font-weight:600;color:var(--muted);padding:6px 2px;position:relative;border-radius:8px}
+  .bnav button.on{color:var(--accent)}
+  .bnav .badge{position:absolute;top:0;right:18%;height:16px;min-width:16px;font-size:.62rem}
+  .grid2,.dgrid{grid-template-columns:minmax(0,1fr)}
+  .thead{display:none}
+  .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amt" "cat st";gap:6px 12px;padding:14px 16px}
+  .row .c-main{grid-area:main}.row .c-amt{grid-area:amt}.row .c-cat{grid-area:cat;color:var(--muted);font-size:.84rem}.row .c-st{grid-area:st;justify-self:end}
+  .row .c-date{display:none}.mdate{display:inline}
+  .form{grid-template-columns:minmax(0,1fr)}
+  .urow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"nm st" "em em" "rl rl"}
+  .urow .nm{grid-area:nm}.urow .em{grid-area:em}.urow .rl{grid-area:rl}.urow .stt{grid-area:st}
+  .actionbar{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 62px);z-index:25;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px;box-shadow:0 -6px 18px rgba(0,0,0,.08)}
+  .actionbar .btn{flex:1}
+  .stage{height:340px}
+  .panel{right:16px}
+  .dl{grid-template-columns:104px minmax(0,1fr)}
+  .tl li{padding-bottom:14px}
+}
+@media print{.demo,.side,.bnav,.top{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="app"></div>
+<div id="toast" aria-live="polite"></div>
+
+<script>
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const peso = n => '₱' + Number(n).toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fd = d => { const p = d.split('-'); return MON[+p[1]-1] + ' ' + (+p[2]) + ', ' + p[0]; };
+const stamp = () => { const d = new Date(); let h = d.getHours(), m = String(d.getMinutes()).padStart(2,'0'); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return 'Today, ' + h + ':' + m + ' ' + ap; };
+
+const IC = {
+  home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  file:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  shield:'<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 21a2 2 0 0 0 3.4 0"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  pause:'<path d="M9 5v14M15 5v14"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  download:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+  print:'<path d="M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/>',
+  upload:'<path d="M12 16V5M7 9l5-5 5 5M5 20h14"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  logout:'<path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5M16 8l4 4-4 4M20 12H9"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
+  camera:'<path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  undo:'<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  zin:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v6M8 11h6"/>',
+  zout:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8 11h6"/>',
+  bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>'
+};
+const ic = n => '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + IC[n] + '</svg>';
+
+/* ---------- mock data ---------- */
+const ROLES = {
+  medref:   {label:'Med Ref',     name:'Ana Reyes',        title:'Med Ref · Cebu North', ini:'AR', email:'ana.reyes@example.com'},
+  checker:  {label:'Checker',     name:'Liza Santos',      title:'Checker',              ini:'LS', email:'liza.santos@example.com'},
+  approver: {label:'Approver',    name:'Paolo Villanueva', title:'Approver',             ini:'PV', email:'paolo.v@example.com'},
+  admin:    {label:'Super Admin', name:'Admin User',       title:'Super Admin',          ini:'AD', email:'admin@example.com'}
+};
+const STATUS = {
+  draft:['Draft','s-draft'], submitted:['Submitted','s-sub'], returned:['Returned','s-ret'], checked:['Checked','s-chk'],
+  approved:['Approved','s-app'], disapproved:['Disapproved','s-dis'], reserved:['Reserved','s-res']
+};
+const pill = s => '<span class="pill ' + STATUS[s][1] + '">' + STATUS[s][0] + '</span>';
+const CATS = ['Medicine','Transport','Meals','Supplies','Lodging'];
+
+const receipts = [
+  {id:1, ref:'RC-2026-0148', payee:'Mercury Drug - Mandaue', date:'2026-10-12', amt:1284.5, cat:'Medicine', desc:'Medicine and supplies for the Mandaue clinic visit.', by:'Ana Reyes', status:'draft', ev:[{name:'receipt-photo.jpg',kind:'img'}], tl:[{who:'Ana Reyes',text:'created the draft',t:'Oct 12, 4:02 PM'}]},
+  {id:2, ref:'RC-2026-0147', payee:'Grab Philippines', date:'2026-10-11', amt:356, cat:'Transport', desc:'Ride to Talisay hospital for the medical mission.', by:'Ana Reyes', status:'submitted', ev:[{name:'grab-receipt.pdf',kind:'pdf'}], tl:[{who:'Ana Reyes',text:'submitted for checking',t:'Oct 11, 6:20 PM'},{who:'Ana Reyes',text:'created the draft',t:'Oct 11, 6:11 PM'}]},
+  {id:3, ref:'RC-2026-0146', payee:'Chong Hua Hospital Pharmacy', date:'2026-10-09', amt:4920.75, cat:'Medicine', desc:'Sample medicines for the quarterly doctor visit.', by:'Ana Reyes', status:'checked', ev:[{name:'official-receipt.jpg',kind:'img'},{name:'prescription.pdf',kind:'pdf'}], tl:[{who:'Liza Santos',text:'marked as checked',note:'Amounts match the receipt. Evidence is clear.',t:'Oct 10, 9:48 AM'},{who:'Liza Santos',text:'viewed the evidence',t:'Oct 10, 9:44 AM'},{who:'Ana Reyes',text:'submitted for checking',t:'Oct 9, 5:30 PM'}]},
+  {id:4, ref:'RC-2026-0145', payee:'Jollibee Colon', date:'2026-10-09', amt:640, cat:'Meals', desc:'Team meal during field visit.', by:'Mark Dela Cruz', status:'submitted', ev:[{name:'meal-receipt.jpg',kind:'img'}], tl:[{who:'Mark Dela Cruz',text:'submitted for checking',t:'Oct 9, 1:15 PM'}]},
+  {id:5, ref:'RC-2026-0144', payee:'National Book Store', date:'2026-10-07', amt:812.25, cat:'Supplies', desc:'Forms, folders and printer ink.', by:'Ana Reyes', status:'returned', reason:'The receipt photo is blurred. Please upload a clear copy of the whole receipt.', ev:[{name:'receipt-blurry.jpg',kind:'img'}], tl:[{who:'Liza Santos',text:'returned the record',note:'The receipt photo is blurred. Please upload a clear copy of the whole receipt.',t:'Oct 8, 10:05 AM'},{who:'Ana Reyes',text:'submitted for checking',t:'Oct 7, 3:40 PM'}]},
+  {id:6, ref:'RC-2026-0143', payee:'Cebu Pacific', date:'2026-10-03', amt:3150, cat:'Transport', desc:'Flight to Manila for the regional meeting.', by:'Mark Dela Cruz', status:'approved', doc:'REIM-2026-000031', ev:[{name:'e-ticket.pdf',kind:'pdf'},{name:'boarding-pass.jpg',kind:'img'}], tl:[{who:'Paolo Villanueva',text:'approved the record',t:'Oct 6, 2:10 PM'},{who:'Liza Santos',text:'marked as checked',t:'Oct 5, 11:20 AM'},{who:'Mark Dela Cruz',text:'submitted for checking',t:'Oct 3, 6:00 PM'}]},
+  {id:7, ref:'RC-2026-0142', payee:'Seaside Pension House', date:'2026-10-02', amt:2800, cat:'Lodging', desc:'Two nights for the Dumaguete visit.', by:'Ana Reyes', status:'reserved', reason:'Hold until the room rate is confirmed by the regional office.', ev:[{name:'lodging-receipt.jpg',kind:'img'}], tl:[{who:'Paolo Villanueva',text:'reserved the record',note:'Hold until the room rate is confirmed by the regional office.',t:'Oct 6, 3:30 PM'},{who:'Liza Santos',text:'marked as checked',t:'Oct 5, 11:02 AM'},{who:'Ana Reyes',text:'submitted for checking',t:'Oct 3, 8:12 AM'}]},
+  {id:8, ref:'RC-2026-0141', payee:'SM Supermarket', date:'2026-09-30', amt:1175.4, cat:'Supplies', desc:'Cleaning supplies and snacks.', by:'Mark Dela Cruz', status:'disapproved', reason:'Snacks are not reimbursable under the current policy.', ev:[{name:'sm-receipt.jpg',kind:'img'}], tl:[{who:'Paolo Villanueva',text:'disapproved the record',note:'Snacks are not reimbursable under the current policy.',t:'Oct 2, 4:45 PM'},{who:'Liza Santos',text:'marked as checked',t:'Oct 2, 10:10 AM'},{who:'Mark Dela Cruz',text:'submitted for checking',t:'Oct 1, 9:00 AM'}]},
+  {id:9, ref:'RC-2026-0140', payee:'Watsons Banilad', date:'2026-10-10', amt:489, cat:'Medicine', desc:'First aid supplies.', by:'Mark Dela Cruz', status:'checked', ev:[{name:'watsons.jpg',kind:'img'}], tl:[{who:'Liza Santos',text:'marked as checked',t:'Oct 12, 8:55 AM'},{who:'Liza Santos',text:'viewed the evidence',t:'Oct 12, 8:52 AM'},{who:'Mark Dela Cruz',text:'submitted for checking',t:'Oct 11, 5:05 PM'}]}
+];
+let nextId = 10, nextRef = 149, nextDoc = 32;
+
+const audit = [
+  {t:'Today, 8:55 AM', who:'Liza Santos', action:'marked as checked', ref:'RC-2026-0140'},
+  {t:'Today, 8:52 AM', who:'Liza Santos', action:'viewed the evidence', ref:'RC-2026-0140'},
+  {t:'Yesterday, 6:20 PM', who:'Ana Reyes', action:'submitted for checking', ref:'RC-2026-0147'},
+  {t:'Yesterday, 4:02 PM', who:'Ana Reyes', action:'created the draft', ref:'RC-2026-0148'},
+  {t:'Oct 10, 9:48 AM', who:'Liza Santos', action:'marked as checked', ref:'RC-2026-0146'},
+  {t:'Oct 8, 10:05 AM', who:'Liza Santos', action:'returned the record', ref:'RC-2026-0144'},
+  {t:'Oct 6, 3:30 PM', who:'Paolo Villanueva', action:'reserved the record', ref:'RC-2026-0142'},
+  {t:'Oct 6, 2:10 PM', who:'Paolo Villanueva', action:'approved the record', ref:'RC-2026-0143'}
+];
+const notes = [
+  {to:'medref', text:'RC-2026-0144 was returned. The receipt photo is blurred.', id:5, un:true},
+  {to:'medref', text:'RC-2026-0142 is on hold. Room rate to be confirmed.', id:7, un:true},
+  {to:'checker', text:'RC-2026-0147 is waiting to be checked.', id:2, un:true},
+  {to:'checker', text:'RC-2026-0145 is waiting to be checked.', id:4, un:true},
+  {to:'approver', text:'RC-2026-0146 was checked and is ready for your decision.', id:3, un:true},
+  {to:'approver', text:'RC-2026-0140 was checked and is ready for your decision.', id:9, un:true},
+  {to:'admin', text:'2 records are waiting to be checked.', id:null, un:false}
+];
+const reports = [
+  {name:'Liquidation_2026-09.xlsx', meta:'Sep 1 - Sep 30 · 18 records · ₱41,260.00'},
+  {name:'Liquidation_2026-08.pdf', meta:'Aug 1 - Aug 31 · 22 records · ₱56,832.40'}
+];
+const users = [
+  {n:'Ana Reyes', e:'ana.reyes@example.com', r:'medref', on:true},
+  {n:'Mark Dela Cruz', e:'mark.dc@example.com', r:'medref', on:true},
+  {n:'Liza Santos', e:'liza.santos@example.com', r:'checker', on:true},
+  {n:'Paolo Villanueva', e:'paolo.v@example.com', r:'approver', on:true},
+  {n:'Admin User', e:'admin@example.com', r:'admin', on:true},
+  {n:'Joy Mercado', e:'joy.m@example.com', r:'medref', on:false}
+];
+const PERMS = [
+  ['Receipts', [['receipt.create','Create and edit own receipts',{medref:1}],['receipt.view_all','View all receipts',{checker:1,admin:1}],['receipt.import','Import CSV or XLSX',{medref:1,admin:1}]]],
+  ['Evidence', [['evidence.view','View evidence (logged)',{medref:1,checker:1,approver:1,admin:1}],['evidence.download','Download evidence',{medref:1,checker:1,approver:1,admin:1}],['evidence.print','Print evidence',{medref:1,checker:1,approver:1,admin:1}]]],
+  ['Review', [['review.check','Check or return',{checker:1},['checker']],['review.decide','Approve, disapprove, reserve, release',{approver:1},['approver']]]],
+  ['Reports', [['report.generate','Generate liquidation reports',{medref:1,checker:1,approver:1,admin:1}]]],
+  ['Administration', [['user.manage','Manage users and roles',{admin:1},['admin']],['audit.view','Browse the audit log',{admin:1}]]]
+];
+let perms = {};
+PERMS.forEach(g => g[1].forEach(p => { perms[p[0]] = Object.assign({}, p[2]); }));
+
+/* ---------- state ---------- */
+const S = {signed:false, loginRole:'medref', role:'medref', screen:'dashboard', sel:null, filter:'all', q:'', evIdx:0, zoom:1,
+  viewed:{}, notif:false, tab:{access:'users', profile:'details'}, form:null, modal:null, permDraft:null, theme:'light', auditQ:'',
+  repFmt:'PDF', repCat:'All', repFrom:'2026-10-01', repTo:'2026-10-31', pref:{digest:true, reserveRel:false}};
+const cur = () => receipts.find(r => r.id === S.sel);
+const me = () => ROLES[S.role];
+
+function visible() {
+  if (S.role === 'medref') return receipts.filter(r => r.by === 'Ana Reyes');
+  if (S.role === 'approver') return receipts.filter(r => ['checked','reserved','approved','disapproved'].indexOf(r.status) >= 0);
+  return receipts.slice();
+}
+function queue() {
+  const v = visible();
+  if (S.role === 'medref') return v.filter(r => ['returned','reserved','draft'].indexOf(r.status) >= 0);
+  if (S.role === 'checker') return v.filter(r => r.status === 'submitted');
+  if (S.role === 'approver') return v.filter(r => r.status === 'checked');
+  return v.filter(r => ['submitted','checked'].indexOf(r.status) >= 0);
+}
+const unread = () => notes.filter(n => n.to === S.role && n.un).length;
+const count = (arr, st) => arr.filter(r => st.indexOf(r.status) >= 0).length;
+
+/* ---------- toast ---------- */
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = ic('check') + '<span>' + esc(msg) + '</span>';
+  $('#toast').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+/* ---------- events and workflow ---------- */
+function logEvent(r, who, text, note) {
+  const e = {who:who, text:text, t:stamp()};
+  if (note) e.note = note;
+  r.tl.unshift(e);
+  audit.unshift({t:e.t, who:who, action:text, ref:r.ref});
+}
+function notify(to, text, id) { notes.unshift({to:to, text:text, id:id, un:true}); }
+
+function decide(kind, text) {
+  const r = cur(), who = me().name;
+  if (kind === 'check') {
+    r.status = 'checked'; logEvent(r, who, 'marked as checked', text);
+    notify('approver', r.ref + ' was checked and is ready for your decision.', r.id);
+    toast('Marked as checked. Approvers have been notified.');
+  } else if (kind === 'return') {
+    r.status = 'returned'; r.reason = text; logEvent(r, who, 'returned the record', text);
+    notify('medref', r.ref + ' was returned. ' + text, r.id);
+    toast('Returned to ' + r.by + '. Email queued.');
+  } else if (kind === 'approve') {
+    r.status = 'approved'; r.doc = 'REIM-2026-0000' + (nextDoc++); logEvent(r, who, 'approved the record', text);
+    notify('medref', r.ref + ' was approved. Your reimbursement document is ready.', r.id);
+    toast('Approved. Reimbursement document ' + r.doc + ' created. Email queued.');
+  } else if (kind === 'disapprove') {
+    r.status = 'disapproved'; r.reason = text; logEvent(r, who, 'disapproved the record', text);
+    notify('medref', r.ref + ' was disapproved. ' + text, r.id);
+    toast('Disapproved. Email with the reason queued.');
+  } else if (kind === 'reserve') {
+    r.status = 'reserved'; r.reason = text; logEvent(r, who, 'reserved the record', text);
+    notify('medref', r.ref + ' is on hold. ' + text, r.id);
+    toast('Reserved. Email with your note queued.');
+  } else if (kind === 'release') {
+    r.status = 'checked'; logEvent(r, who, 'released the reservation', text);
+    notify('medref', r.ref + ' hold was released and is back in review.', r.id);
+    toast('Released. The record is back in your queue.');
+  }
+  S.modal = null; S.evIdx = 0; render();
+}
+
+const MODALS = {
+  check:{title:'Mark as checked', desc:'Add remarks for the Approver. Optional.', label:'Remarks', req:false, btn:'Mark checked', cls:'pri'},
+  return:{title:'Return to Med Ref', desc:'Tell the Med Ref what to fix. They will get an email.', label:'What needs to be corrected', req:true, btn:'Return record', cls:'pri'},
+  approve:{title:'Approve this record', desc:'A reimbursement document will be created and the Med Ref will be emailed.', label:'Remark', req:false, btn:'Approve', cls:'ok'},
+  disapprove:{title:'Disapprove this record', desc:'A reason is required. The Med Ref will see it in the email.', label:'Reason for disapproval', req:true, btn:'Disapprove', cls:'bad'},
+  reserve:{title:'Put this record on hold', desc:'A note is required. You can release it back to your queue later.', label:'Why is it on hold', req:true, btn:'Reserve', cls:'hold'},
+  release:{title:'Release reservation', desc:'The record returns to your approval queue.', label:'Remark', req:false, btn:'Release', cls:'pri'}
+};
+
+/* ---------- form ---------- */
+function openForm(id) {
+  const r = id ? receipts.find(x => x.id === id) : null;
+  S.form = r ? {id:r.id, payee:r.payee, date:r.date, amt:r.amt, cat:r.cat, desc:r.desc, ev:r.ev.slice(), err:{}}
+             : {id:null, payee:'', date:'2026-10-13', amt:'', cat:'Medicine', desc:'', ev:[], err:{}};
+  go('form');
+}
+function readForm() {
+  const f = S.form;
+  f.payee = $('#f-payee').value.trim(); f.date = $('#f-date').value; f.amt = $('#f-amt').value;
+  f.cat = $('#f-cat').value; f.desc = $('#f-desc').value.trim();
+}
+function saveForm(submit) {
+  readForm();
+  const f = S.form, err = {};
+  if (!f.payee) err.payee = 'Enter who was paid.';
+  if (!f.date) err.date = 'Pick the receipt date.';
+  if (!(parseFloat(f.amt) > 0)) err.amt = 'Enter an amount greater than zero.';
+  if (submit && !f.ev.length) err.ev = 'Add at least one photo or PDF of the receipt.';
+  f.err = err;
+  if (Object.keys(err).length) { render(); const fe = document.querySelector('.err'); if (fe) fe.scrollIntoView({block:'center'}); return; }
+  let r = f.id ? receipts.find(x => x.id === f.id) : null;
+  if (!r) {
+    r = {id:nextId++, ref:'RC-2026-0' + (nextRef++), by:'Ana Reyes', status:'draft', ev:[], tl:[]};
+    receipts.unshift(r); logEvent(r, 'Ana Reyes', 'created the draft');
+  }
+  r.payee = f.payee; r.date = f.date; r.amt = parseFloat(f.amt); r.cat = f.cat; r.desc = f.desc; r.ev = f.ev.slice();
+  if (submit) {
+    r.status = 'submitted'; logEvent(r, 'Ana Reyes', 'submitted for checking');
+    notify('checker', r.ref + ' is waiting to be checked.', r.id);
+    toast('Submitted. Checkers have been notified.');
+  } else { toast('Draft saved.'); }
+  S.form = null; S.sel = r.id; S.evIdx = 0; go('detail');
+}
+function addFiles(list) {
+  readForm();
+  Array.prototype.forEach.call(list, f => S.form.ev.push({name:f.name, kind:/pdf/i.test(f.type) ? 'pdf' : 'img'}));
+  S.form.err.ev = null; render();
+}
+
+/* ---------- views ---------- */
+function paper(r, e) {
+  const lines = [['Item 1', .42],['Item 2', .33],['Item 3', .25]].map((l, i) => {
+    const y = 150 + i * 22;
+    return '<text x="22" y="' + y + '" font-size="11" fill="#444">' + l[0] + '</text><text x="238" y="' + y + '" font-size="11" fill="#444" text-anchor="end">' + (r.amt * l[1]).toFixed(2) + '</text>';
+  }).join('');
+  const head = e.kind === 'pdf'
+    ? '<rect width="260" height="34" fill="#243b45"/><text x="130" y="22" font-size="12" fill="#fff" text-anchor="middle" font-weight="700">OFFICIAL RECEIPT</text>'
+    : '<text x="130" y="30" font-size="11" fill="#222" text-anchor="middle" font-weight="700">' + esc(r.payee.slice(0, 32)) + '</text><text x="130" y="46" font-size="9" fill="#777" text-anchor="middle">Thank you for your purchase</text>';
+  const body = '<svg class="paper' + (e.kind === 'img' ? ' photo' : '') + '" style="transform:scale(' + S.zoom + ')' + (e.kind === 'img' ? ' rotate(-1.2deg)' : '') + '" width="260" height="330" viewBox="0 0 260 330" role="img" aria-label="Sample receipt image">'
+    + '<rect width="260" height="330" rx="3" fill="#fbfaf6"/>' + head
+    + '<text x="22" y="82" font-size="10" fill="#666">Date: ' + fd(r.date) + '</text><text x="22" y="98" font-size="10" fill="#666">Ref: ' + r.ref + '</text>'
+    + '<line x1="22" x2="238" y1="112" y2="112" stroke="#bbb" stroke-dasharray="3 3"/>'
+    + '<text x="22" y="132" font-size="10" fill="#888">DESCRIPTION</text><text x="238" y="132" font-size="10" fill="#888" text-anchor="end">AMOUNT</text>'
+    + lines + '<line x1="22" x2="238" y1="228" y2="228" stroke="#bbb" stroke-dasharray="3 3"/>'
+    + '<text x="22" y="254" font-size="14" font-weight="700" fill="#111">TOTAL</text><text x="238" y="254" font-size="14" font-weight="700" fill="#111" text-anchor="end">PHP ' + r.amt.toFixed(2) + '</text>'
+    + '<text x="130" y="296" font-size="9" fill="#999" text-anchor="middle">' + esc(e.name) + '</text></svg>';
+  return body;
+}
+
+function login() {
+  const roles = Object.keys(ROLES);
+  const rl = ROLES[S.loginRole];
+  return '<div class="login"><div class="card lcard">'
+    + '<div class="brand"><span class="logo">R</span><b>REIMSIS</b></div>'
+    + '<h1>Sign in</h1><p class="muted" style="margin:6px 0 0">Reimbursement management. Choose a role to explore the mock.</p>'
+    + '<form id="loginf" style="margin-top:18px"><div class="seg" role="tablist" aria-label="Demo role">' + roles.map(k => '<button type="button" data-act="lrole" data-v="' + k + '" class="' + (k === S.loginRole ? 'on' : '') + '">' + (k === 'admin' ? 'Admin' : ROLES[k].label) + '</button>').join('') + '</div>'
+    + '<label class="f">Email<input type="email" id="l-em" value="' + esc(rl.email) + '" autocomplete="username"></label>'
+    + '<label class="f">Password<input type="password" id="l-pw" value="password123" autocomplete="current-password"></label>'
+    + '<button class="btn pri" type="submit">Sign in</button></form>'
+    + '<p class="muted" style="font-size:.8rem;margin:14px 0 0">Sample data only. Nothing is saved or sent.</p></div></div>';
+}
+
+function navItems() {
+  const r = S.role, a = [['dashboard','Dashboard','home'],['receipts', r === 'medref' ? 'My receipts' : 'Receipts','file']];
+  if (r === 'medref') a.push(['form','New receipt','plus']);
+  a.push(['reports','Reports','chart']);
+  if (r === 'admin') { a.push(['access','Access','shield']); a.push(['audit','Audit log','list']); }
+  return a;
+}
+const TITLES = {dashboard:'Dashboard', receipts:'Receipts', form:'Receipt', detail:'Receipt', reports:'Liquidation reports', access:'Access control', audit:'Audit log', profile:'Profile'};
+
+function shell(content) {
+  const items = navItems(), q = queue().length;
+  const on = k => (S.screen === k || (k === 'receipts' && S.screen === 'detail') || (k === 'form' && S.screen === 'form' && S.form && !S.form.id)) ? 'on' : '';
+  const side = items.map(i => '<button data-act="go" data-v="' + (i[0] === 'form' ? 'newform' : i[0]) + '" class="' + on(i[0]) + '">' + ic(i[2]) + '<span>' + i[1] + '</span>' + (i[0] === 'receipts' && q ? '<span class="badge">' + q + '</span>' : '') + '</button>').join('');
+  const bot = items.map(i => '<button data-act="go" data-v="' + (i[0] === 'form' ? 'newform' : i[0]) + '" class="' + on(i[0]) + '">' + ic(i[2]) + '<span>' + i[1] + '</span>' + (i[0] === 'receipts' && q ? '<span class="badge">' + q + '</span>' : '') + '</button>').join('');
+  const u = unread();
+  const notifPanel = S.notif ? '<div class="panel" role="dialog" aria-label="Notifications"><div class="card-h"><h3>Notifications</h3><button class="btn sm ghost" data-act="readall">Mark all read</button></div>'
+    + (notes.filter(n => n.to === S.role).slice(0, 8).map(n => '<button class="note ' + (n.un ? 'un' : 'rd') + '" data-act="opennote" data-id="' + (n.id || '') + '"><span class="dotp"></span><span>' + esc(n.text) + '</span></button>').join('') || '<div class="empty">Nothing new.</div>') + '</div>' : '';
+  return '<div class="shell"><aside class="side"><div class="brand"><span class="logo">R</span><b>REIMSIS</b></div><nav class="nav" aria-label="Main">' + side + '</nav>'
+    + '<button class="who" data-act="go" data-v="profile"><span class="av">' + me().ini + '</span><span><b>' + esc(me().name) + '</b><small>' + me().title + '</small></span></button></aside>'
+    + '<div class="main"><header class="top"><div class="t">' + (S.screen === 'form' ? (S.form && S.form.id ? 'Edit receipt' : 'New receipt') : TITLES[S.screen]) + '</div>'
+    + '<button class="iconbtn" data-act="bell" aria-label="Notifications">' + ic('bell') + (u ? '<span class="badge dotn">' + u + '</span>' : '') + '</button>'
+    + '<button class="iconbtn" data-act="go" data-v="profile" aria-label="Profile"><span class="av" style="width:30px;height:30px;font-size:.7rem">' + me().ini + '</span></button>'
+    + '<button class="iconbtn" data-act="logout" aria-label="Sign out">' + ic('logout') + '</button></header>'
+    + notifPanel + '<main class="page">' + content + '</main></div><nav class="bnav" aria-label="Main">' + bot + '</nav></div>';
+}
+
+function rowHtml(r) {
+  return '<button class="row" data-act="open" data-id="' + r.id + '"><span class="c-main"><b>' + esc(r.payee) + '</b><small>' + r.ref + (S.role !== 'medref' ? ' · ' + esc(r.by) : '') + '</small></span>'
+    + '<span class="c-cat">' + r.cat + '<span class="mdate"> · ' + fd(r.date) + '</span></span><span class="c-date">' + fd(r.date) + '</span><span class="c-amt">' + peso(r.amt) + '</span><span class="c-st">' + pill(r.status) + '</span></button>';
+}
+
+function dashboard() {
+  const v = visible(), q = queue(), role = S.role;
+  const hr = new Date().getHours(), greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  let tiles, sub, qtitle;
+  const T = (label, n, f, alert) => '<button class="tile ' + (alert ? 'alert' : '') + '" data-act="tile" data-f="' + f + '"><small>' + label + '</small><b>' + n + '</b></button>';
+  if (role === 'medref') {
+    tiles = T('Needs your action', count(v, ['returned','reserved']), 'returned', 1) + T('Drafts', count(v, ['draft']), 'draft') + T('In review', count(v, ['submitted','checked']), 'submitted') + T('Approved', count(v, ['approved']), 'approved');
+    sub = 'Encode receipts, attach evidence and track each one.'; qtitle = 'Your next steps';
+  } else if (role === 'checker') {
+    tiles = T('To check', count(v, ['submitted']), 'submitted', 1) + T('Returned', count(v, ['returned']), 'returned') + T('Checked', count(v, ['checked']), 'checked') + T('All records', v.length, 'all');
+    sub = 'Verify receipts and evidence, oldest first.'; qtitle = 'Waiting to be checked';
+  } else if (role === 'approver') {
+    tiles = T('To decide', count(v, ['checked']), 'checked', 1) + T('On hold', count(v, ['reserved']), 'reserved') + T('Approved', count(v, ['approved']), 'approved') + T('Disapproved', count(v, ['disapproved']), 'disapproved');
+    sub = 'Only checked records reach you.'; qtitle = 'Ready for your decision';
+  } else {
+    tiles = T('Waiting for review', q.length, 'all', 1) + T('All receipts', v.length, 'all') + T('Active users', users.filter(u => u.on).length, 'users') + T('Audit events', audit.length, 'audit');
+    sub = 'A read-only view of the whole system.'; qtitle = 'Pending in the workflow';
+  }
+  const refs = v.map(r => r.ref);
+  const act = audit.filter(a => role === 'medref' ? refs.indexOf(a.ref) >= 0 : true).slice(0, 6);
+  return '<div class="ph"><div><h1>' + greet + ', ' + esc(me().name.split(' ')[0]) + '</h1><p>' + sub + '</p></div>'
+    + (role === 'medref' ? '<button class="btn pri" data-act="go" data-v="newform">' + ic('plus') + 'New receipt</button>' : '') + '</div>'
+    + '<div class="tiles">' + tiles + '</div>'
+    + '<div class="grid2"><section class="card"><div class="card-h"><h2>' + qtitle + '</h2><button class="btn sm ghost" data-act="go" data-v="receipts">View all</button></div>'
+    + (q.length ? q.slice(0, 5).map(rowHtml).join('') : '<div class="empty"><b>You are all caught up</b>Nothing needs your attention right now.</div>') + '</section>'
+    + '<section class="card"><div class="card-h"><h2>Recent activity</h2></div><div class="card-b"><ol class="tl">'
+    + act.map(a => '<li><span class="dot"></span><div><b>' + esc(a.who) + '</b> ' + esc(a.action) + ' <span class="muted">' + a.ref + '</span><small>' + a.t + '</small></div></li>').join('') + '</ol></div></section></div>';
+}
+
+function receiptsView() {
+  const v = visible();
+  const opts = role => ({medref:['all','draft','submitted','returned','checked','approved','disapproved','reserved'], checker:['all','submitted','returned','checked','approved','disapproved','reserved'], approver:['all','checked','reserved','approved','disapproved'], admin:['all','submitted','returned','checked','approved','disapproved','reserved','draft']}[role]);
+  const f = S.filter;
+  let list = v.filter(r => (f === 'all' || r.status === f) && (!S.q || (r.payee + r.ref + r.by + r.cat).toLowerCase().indexOf(S.q.toLowerCase()) >= 0));
+  const chips = opts(S.role).map(k => '<button class="chip ' + (k === f ? 'on' : '') + '" data-act="filter" data-v="' + k + '">' + (k === 'all' ? 'All' : STATUS[k][0]) + ' ' + (k === 'all' ? v.length : count(v, [k])) + '</button>').join('');
+  return '<div class="ph"><div><h1>' + (S.role === 'medref' ? 'My receipts' : 'Receipts') + '</h1><p>' + (S.role === 'approver' ? 'Checked records and your past decisions.' : S.role === 'checker' ? 'Open a submitted record to review its evidence.' : S.role === 'admin' ? 'All records, read only.' : 'Everything you have encoded.') + '</p></div>'
+    + (S.role === 'medref' ? '<button class="btn pri" data-act="go" data-v="newform">' + ic('plus') + 'New receipt</button>' : '<button class="btn" data-act="export">' + ic('download') + 'Export CSV</button>') + '</div>'
+    + '<div class="tools"><div class="search">' + ic('search') + '<input type="text" id="q" placeholder="Search payee, reference, name" value="' + esc(S.q) + '" aria-label="Search receipts"></div></div>'
+    + '<div class="chips" style="margin-bottom:14px">' + chips + '</div>'
+    + '<section class="card"><div class="thead"><span>Receipt</span><span>Category</span><span>Date</span><span class="c-amt">Amount</span><span>Status</span></div>'
+    + (list.length ? list.map(rowHtml).join('') : '<div class="empty"><b>No receipts here</b>Try another filter or search.</div>') + '</section>';
+}
+
+function formView() {
+  const f = S.form || (S.form = {id:null, payee:'', date:'2026-10-13', amt:'', cat:'Medicine', desc:'', ev:[], err:{}});
+  const e = f.err || {};
+  const files = f.ev.map((x, i) => '<div class="file"><span class="thumb">' + ic(x.kind === 'pdf' ? 'file' : 'camera') + '</span><div><b>' + esc(x.name) + '</b><small>' + (x.kind === 'pdf' ? 'PDF document' : 'Photo') + '</small></div><button class="btn sm ghost" data-act="rmfile" data-i="' + i + '" aria-label="Remove ' + esc(x.name) + '">' + ic('x') + '</button></div>').join('');
+  return '<button class="back" data-act="' + (f.id ? 'open' : 'go') + '" data-id="' + (f.id || '') + '" data-v="receipts">' + ic('back') + 'Back</button>'
+    + '<div class="ph"><div><h1>' + (f.id ? 'Edit receipt' : 'New receipt') + '</h1><p>Fill in the details, then attach a clear photo or PDF.</p></div></div>'
+    + '<section class="card"><div class="card-b"><div class="form">'
+    + '<label class="f full">Paid to<input type="text" id="f-payee" value="' + esc(f.payee) + '" placeholder="Store or provider name">' + (e.payee ? '<span class="err">' + e.payee + '</span>' : '') + '</label>'
+    + '<label class="f">Receipt date<input type="date" id="f-date" value="' + esc(f.date) + '">' + (e.date ? '<span class="err">' + e.date + '</span>' : '') + '</label>'
+    + '<label class="f">Amount (PHP)<input type="number" id="f-amt" step="0.01" min="0" inputmode="decimal" value="' + esc(f.amt) + '" placeholder="0.00">' + (e.amt ? '<span class="err">' + e.amt + '</span>' : '') + '</label>'
+    + '<label class="f">Category<select id="f-cat">' + CATS.map(c => '<option' + (c === f.cat ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>'
+    + '<label class="f"><span>Description <span class="hint">Optional</span></span><input type="text" id="f-desc" value="' + esc(f.desc) + '" placeholder="What was this for?"></label>'
+    + '<div class="full"><div style="font-weight:600;font-size:.84rem;margin-bottom:6px">Evidence</div>'
+    + '<div class="drop" id="drop">' + ic('upload') + '<div style="margin-top:6px"><b style="color:var(--ink)">Drop files here</b><br>JPG, PNG, PDF · up to 10 MB each</div>'
+    + '<div class="btns"><button type="button" class="btn" data-act="pick">' + ic('upload') + 'Choose files</button><button type="button" class="btn" data-act="pick" data-cam="1">' + ic('camera') + 'Take photo</button><button type="button" class="btn ghost" data-act="sample">Add sample photo</button></div>'
+    + '<input type="file" id="pickfile" class="sr" multiple accept="image/*,application/pdf"></div>'
+    + (e.ev ? '<span class="err">' + e.ev + '</span>' : '') + '<div class="files">' + files + '</div></div></div>'
+    + '<div class="formbar"><button class="btn" data-act="savedraft">Save draft</button><button class="btn pri" data-act="submitform">Submit for checking</button></div></div></section>';
+}
+
+function detail() {
+  const r = cur(), role = S.role, mine = role === 'medref';
+  if (!r) return '<div class="empty">Record not found.</div>';
+  const locked = !mine && !S.viewed[r.id] && r.ev.length;
+  const ev = r.ev[S.evIdx] || r.ev[0];
+  let actions = '', hint = '';
+  if (mine && (r.status === 'draft' || r.status === 'returned')) actions = '<button class="btn" data-act="edit" data-id="' + r.id + '">Edit</button><button class="btn pri" data-act="resubmit" data-id="' + r.id + '">' + (r.status === 'returned' ? 'Resubmit' : 'Submit for checking') + '</button>';
+  if (role === 'checker' && r.status === 'submitted') {
+    actions = '<button class="btn" data-act="m" data-v="return">' + ic('undo') + 'Return</button><button class="btn pri" data-act="m" data-v="check" ' + (S.viewed[r.id] ? '' : 'disabled') + '>' + ic('check') + 'Mark checked</button>';
+    if (!S.viewed[r.id]) hint = '<span class="hint-line">' + ic('eye') + 'Open the evidence first. Checking unlocks after you view it.</span>';
+  }
+  if (role === 'approver' && r.status === 'checked') actions = '<button class="btn bad" data-act="m" data-v="disapprove">' + ic('x') + 'Disapprove</button><button class="btn hold" data-act="m" data-v="reserve">' + ic('pause') + 'Reserve</button><button class="btn ok" data-act="m" data-v="approve">' + ic('check') + 'Approve</button>';
+  if (role === 'approver' && r.status === 'reserved') actions = '<button class="btn pri" data-act="m" data-v="release">Release to queue</button>';
+  const callout = r.status === 'returned' ? '<div class="callout warn">' + ic('undo') + '<div><b>Returned for correction</b><span>' + esc(r.reason) + '</span></div></div>'
+    : r.status === 'reserved' ? '<div class="callout hold">' + ic('pause') + '<div><b>On hold</b><span>' + esc(r.reason) + '</span></div></div>'
+    : r.status === 'disapproved' ? '<div class="callout bad">' + ic('x') + '<div><b>Disapproved</b><span>' + esc(r.reason) + '</span></div></div>' : '';
+  const doc = r.status === 'approved' ? '<section class="card"><div class="card-h"><h3>Reimbursement document</h3>' + pill('approved') + '</div><div class="card-b"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="thumb" style="width:42px;height:42px;border-radius:9px;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center">' + ic('file') + '</span><div style="flex:1;min-width:140px"><b>' + r.doc + '</b><br><small>One document for this approved transaction</small></div><button class="btn sm" data-act="docdl">' + ic('download') + 'Download</button><button class="btn sm" data-act="docpr">' + ic('print') + 'Print</button></div></div></section>' : '';
+  const viewer = !r.ev.length ? '<div class="locked">' + ic('camera') + '<b>No evidence yet</b><span class="muted">Add a photo or PDF before submitting.</span></div>'
+    : locked ? '<div class="locked">' + ic('lock') + '<b>Evidence is protected</b><span class="muted">Opening it is recorded in the audit log with your name and time.</span><div style="margin-top:14px"><button class="btn pri" data-act="openev">' + ic('eye') + 'Open evidence</button></div></div>'
+    : '<div class="stage">' + paper(r, ev) + '</div><div class="evtool"><button class="btn sm" data-act="zoom" data-v="-1" aria-label="Zoom out">' + ic('zout') + '</button><button class="btn sm" data-act="zoom" data-v="1" aria-label="Zoom in">' + ic('zin') + '</button><span class="sp"></span><button class="btn sm" data-act="evdl">' + ic('download') + 'Download</button><button class="btn sm" data-act="evpr">' + ic('print') + 'Print</button></div>';
+  const tabs = r.ev.length ? '<div class="evtabs">' + r.ev.map((e, i) => '<button class="evtab ' + (i === S.evIdx ? 'on' : '') + '" data-act="evsel" data-i="' + i + '">' + ic(e.kind === 'pdf' ? 'file' : 'camera') + '<span>' + esc(e.name) + '</span></button>').join('') + '</div>' : '';
+  return '<button class="back" data-act="go" data-v="receipts">' + ic('back') + 'Back to receipts</button>'
+    + '<div class="dh"><div class="ttl"><h1>' + esc(r.payee) + '</h1><div class="meta">' + pill(r.status) + '<span class="muted">' + r.ref + '</span><span class="amt-big">' + peso(r.amt) + '</span></div></div><div class="actionbar">' + hint + actions + '</div></div>'
+    + callout
+    + '<div class="dgrid"><div class="stack">' + doc
+    + '<section class="card"><div class="card-h"><h3>Details</h3></div><div class="card-b"><dl class="dl"><dt>Paid to</dt><dd>' + esc(r.payee) + '</dd><dt>Receipt date</dt><dd>' + fd(r.date) + '</dd><dt>Amount</dt><dd>' + peso(r.amt) + '</dd><dt>Category</dt><dd>' + r.cat + '</dd><dt>Encoded by</dt><dd>' + esc(r.by) + '</dd><dt>Description</dt><dd>' + esc(r.desc || '-') + '</dd></dl></div></section>'
+    + '<section class="card"><div class="card-h"><h3>History</h3><small>Every action is recorded</small></div><div class="card-b"><ol class="tl">'
+    + r.tl.map(e => '<li><span class="dot"></span><div><b>' + esc(e.who) + '</b> ' + esc(e.text) + '<small>' + e.t + '</small>' + (e.note ? '<q>' + esc(e.note) + '</q>' : '') + '</div></li>').join('') + '</ol></div></section></div>'
+    + '<section class="card"><div class="card-h"><h3>Evidence</h3><small>' + r.ev.length + ' file' + (r.ev.length === 1 ? '' : 's') + '</small></div>' + tabs + viewer + '</section></div>';
+}
+
+function reportsView() {
+  const ap = receipts.filter(r => r.status === 'approved' && (S.repCat === 'All' || r.cat === S.repCat) && r.date >= S.repFrom && r.date <= S.repTo && (S.role !== 'medref' || r.by === 'Ana Reyes'));
+  const total = ap.reduce((s, r) => s + r.amt, 0);
+  return '<div class="ph"><div><h1>Liquidation reports</h1><p>Approved records only. Pending, returned and disapproved records are never included.</p></div></div>'
+    + '<div class="grid2"><section class="card"><div class="card-h"><h2>Build a report</h2></div><div class="card-b"><div class="form">'
+    + '<label class="f">From<input type="date" id="r-from" value="' + S.repFrom + '"></label><label class="f">To<input type="date" id="r-to" value="' + S.repTo + '"></label>'
+    + '<label class="f">Category<select id="r-cat">' + ['All'].concat(CATS).map(c => '<option' + (c === S.repCat ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>'
+    + '<div class="f"><span>Format</span><div class="seg">' + ['PDF','XLSX','CSV'].map(k => '<button type="button" data-act="fmt" data-v="' + k + '" class="' + (k === S.repFmt ? 'on' : '') + '">' + k + '</button>').join('') + '</div></div></div>'
+    + '<div class="callout ok" style="margin:18px 0 0">' + ic('info') + '<div><b>' + ap.length + ' approved record' + (ap.length === 1 ? '' : 's') + ' match</b><span>Total ' + peso(total) + '</span></div></div>'
+    + '<div class="formbar"><button class="btn pri" data-act="genreport" ' + (ap.length ? '' : 'disabled') + '>' + ic('chart') + 'Generate ' + S.repFmt + '</button></div></div></section>'
+    + '<section class="card"><div class="card-h"><h2>Past reports</h2></div>' + reports.map(r => '<div class="pref" style="padding:12px 18px"><div><b>' + esc(r.name) + '</b><br><small>' + esc(r.meta) + '</small></div><span style="display:flex;gap:6px"><button class="btn sm" data-act="repdl" aria-label="Download ' + esc(r.name) + '">' + ic('download') + '</button><button class="btn sm" data-act="reppr" aria-label="Print ' + esc(r.name) + '">' + ic('print') + '</button></span></div>').join('') + '</section></div>';
+}
+
+function accessView() {
+  const t = S.tab.access, d = S.permDraft || perms;
+  const changed = S.permDraft ? Object.keys(perms).reduce((n, k) => n + Object.keys(ROLES).filter(r => !!perms[k][r] !== !!S.permDraft[k][r]).length, 0) : 0;
+  let body;
+  if (t === 'users') {
+    body = '<section class="card"><div class="card-h"><h2>Users</h2><button class="btn sm pri" data-act="adduser">' + ic('plus') + 'Add user</button></div>'
+      + users.map((u, i) => '<div class="urow"><div class="nm"><span class="av">' + u.n.split(' ').map(x => x[0]).join('').slice(0, 2) + '</span><div><b>' + esc(u.n) + '</b><small class="em">' + esc(u.e) + '</small></div></div><span class="em muted" style="overflow:hidden;text-overflow:ellipsis">' + (u.on ? 'Active' : 'Deactivated') + '</span>'
+        + '<select class="rl" data-act="urole" data-i="' + i + '" aria-label="Role for ' + esc(u.n) + '">' + Object.keys(ROLES).map(k => '<option value="' + k + '"' + (k === u.r ? ' selected' : '') + '>' + ROLES[k].label + '</option>').join('') + '</select>'
+        + '<label class="switch stt"><input type="checkbox" data-act="utoggle" data-i="' + i + '" ' + (u.on ? 'checked' : '') + ' aria-label="Active"><i></i></label></div>').join('') + '</section>';
+  } else {
+    body = '<section class="card"><div class="card-h"><h2>Roles and permissions</h2><small>Applies to all users in a role</small></div><div class="matrix"><table><thead><tr><th>Permission</th>' + Object.keys(ROLES).map(k => '<th>' + ROLES[k].label + '</th>').join('') + '</tr></thead><tbody>'
+      + PERMS.map(g => '<tr class="grp"><td colspan="5">' + g[0] + '</td></tr>' + g[1].map(p => '<tr><td>' + p[1] + '<br><small class="mono" style="font-family:monospace">' + p[0] + '</small></td>' + Object.keys(ROLES).map(k => {
+        const lockedP = p[3] && p[3].indexOf(k) >= 0;
+        return '<td><input type="checkbox" data-act="perm" data-p="' + p[0] + '" data-r="' + k + '" ' + (d[p[0]][k] ? 'checked' : '') + (lockedP ? ' disabled' : '') + ' aria-label="' + p[1] + ' for ' + ROLES[k].label + '">' + (lockedP ? '<br><span class="lock">' + ic('lock').replace('class="ic"', 'class="ic" style="width:12px;height:12px"') + 'locked</span>' : '') + '</td>';
+      }).join('') + '</tr>').join('')).join('') + '</tbody></table></div></section>'
+      + (changed ? '<div class="savebar"><span>' + changed + ' unsaved change' + (changed === 1 ? '' : 's') + '</span><span style="display:flex;gap:8px"><button class="btn" data-act="permcancel">Discard</button><button class="btn pri" data-act="permsave">Save changes</button></span></div>' : '')
+      + '<p class="muted" style="font-size:.84rem">Locked cells protect the review path so the system always has someone who can check and approve. Every change is written to the audit log.</p>';
+  }
+  return '<div class="ph"><div><h1>Access control</h1><p>Manage who can sign in and what each role can do.</p></div></div>'
+    + '<div class="tabs"><button data-act="atab" data-v="users" class="' + (t === 'users' ? 'on' : '') + '">Users</button><button data-act="atab" data-v="perms" class="' + (t === 'perms' ? 'on' : '') + '">Roles and permissions</button></div>' + body;
+}
+
+function auditView() {
+  const q = S.auditQ.toLowerCase();
+  const rows = audit.filter(a => !q || (a.who + a.action + a.ref).toLowerCase().indexOf(q) >= 0);
+  return '<div class="ph"><div><h1>Audit log</h1><p>Every movement in the system. Entries cannot be edited or deleted.</p></div><button class="btn" data-act="export">' + ic('download') + 'Export CSV</button></div>'
+    + '<div class="tools"><div class="search">' + ic('search') + '<input type="text" id="aq" placeholder="Filter by person, action, record" value="' + esc(S.auditQ) + '" aria-label="Filter audit log"></div></div>'
+    + '<section class="card">' + (rows.length ? rows.map(a => '<div class="pref" style="padding:12px 18px"><div><b>' + esc(a.who) + '</b> ' + esc(a.action) + ' <span class="muted">' + a.ref + '</span></div><small style="white-space:nowrap">' + a.t + '</small></div>').join('') : '<div class="empty"><b>No matching entries</b></div>') + '</section>';
+}
+
+function profileView() {
+  const t = S.tab.profile, m = me();
+  const tabs = [['details','Details'],['security','Security'],['notify','Notifications'],['access','My access'],['look','Appearance']];
+  let body = '';
+  if (t === 'details') {
+    body = '<section class="card"><div class="card-b"><div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:20px"><span class="av lg">' + m.ini + '</span><div><b style="font-size:1.1rem">' + esc(m.name) + '</b><br><span class="muted">' + m.title + '</span><br><button class="btn sm" style="margin-top:8px" data-act="photo">' + ic('upload') + 'Change photo</button></div></div>'
+      + '<div class="form"><label class="f">Full name<input type="text" value="' + esc(m.name) + '"></label><label class="f"><span>Email <span class="hint">Set by the administrator</span></span><input type="email" value="' + esc(m.email) + '" disabled></label>'
+      + '<label class="f">Phone<input type="tel" value="0917 555 0142"></label><label class="f">Branch<input type="text" value="Cebu North"></label></div>'
+      + '<div class="formbar"><button class="btn pri" data-act="saveprofile">Save changes</button></div></div></section>';
+  } else if (t === 'security') {
+    body = '<section class="card"><div class="card-h"><h2>Change password</h2></div><div class="card-b"><div class="form"><label class="f full">Current password<input type="password" id="pw0" autocomplete="current-password"></label>'
+      + '<label class="f">New password<input type="password" id="pw1" autocomplete="new-password"><span class="meter" id="meter"><i></i><i></i><i></i><i></i></span><span class="hint" id="mtxt">Use 8 or more characters with numbers and symbols.</span></label>'
+      + '<label class="f">Confirm new password<input type="password" id="pw2" autocomplete="new-password"></label></div><div class="formbar"><button class="btn pri" data-act="savepw">Update password</button></div></div></section>'
+      + '<section class="card" style="margin-top:16px"><div class="card-h"><h2>Where you are signed in</h2></div><div class="card-b"><div class="pref" style="padding-top:0"><div><b>This device</b><br><small>Chrome on Windows · Cebu · active now</small></div><span class="pill s-app">Current</span></div><div class="pref"><div><b>Android phone</b><br><small>Chrome · last seen yesterday</small></div><button class="btn sm" data-act="signout">Sign out</button></div></div></section>';
+  } else if (t === 'notify') {
+    body = '<section class="card"><div class="card-b">'
+      + '<div class="pref"><div><b>Returned, approved, disapproved or reserved</b><br><small>Email and in-app. Always on so you never miss a decision.</small></div><label class="switch"><input type="checkbox" checked disabled aria-label="Required emails"><i></i></label></div>'
+      + '<div class="pref"><div><b>Daily digest of pending items</b><br><small>One email each morning.</small></div><label class="switch"><input type="checkbox" data-act="pref" data-k="digest" ' + (S.pref.digest ? 'checked' : '') + ' aria-label="Daily digest"><i></i></label></div>'
+      + '<div class="pref"><div><b>Reservation released</b><br><small>Email when a hold is lifted.</small></div><label class="switch"><input type="checkbox" data-act="pref" data-k="reserveRel" ' + (S.pref.reserveRel ? 'checked' : '') + ' aria-label="Reservation released"><i></i></label></div></div></section>';
+  } else if (t === 'access') {
+    const list = []; PERMS.forEach(g => g[1].forEach(p => { if (perms[p[0]][S.role]) list.push(p[1]); }));
+    body = '<section class="card"><div class="card-h"><h2>What ' + m.label + ' can do</h2></div><div class="card-b"><ul style="margin:0;padding-left:1.1rem">' + list.map(x => '<li style="margin:6px 0">' + x + '</li>').join('') + '</ul><p class="muted" style="margin:14px 0 0;font-size:.86rem">Something missing? Ask your administrator to change your role.</p></div></section>';
+  } else {
+    body = '<section class="card"><div class="card-b"><div class="pref" style="padding-top:0"><div><b>Theme</b><br><small>Light, dark, or match your device.</small></div><div class="seg">' + ['light','dark','system'].map(k => '<button data-act="theme" data-v="' + k + '" class="' + (S.theme === k ? 'on' : '') + '">' + k[0].toUpperCase() + k.slice(1) + '</button>').join('') + '</div></div></div></section>';
+  }
+  return '<div class="ph"><div><h1>Profile</h1><p>Your details, security and preferences.</p></div></div><div class="tabs">' + tabs.map(x => '<button data-act="ptab" data-v="' + x[0] + '" class="' + (t === x[0] ? 'on' : '') + '">' + x[1] + '</button>').join('') + '</div>' + body;
+}
+
+function modalHtml() {
+  const m = S.modal; if (!m) return '';
+  if (m.kind === 'notes') {
+    return '<div class="scrim" data-act="closemodal"><div class="modal" role="dialog" aria-modal="true" aria-label="Design notes" data-stop="1"><h2>Design notes</h2><p>Choices behind this interface.</p><ul>'
+      + '<li><b>One main action per screen.</b> The filled button is always the next step.</li>'
+      + '<li><b>Queues first.</b> Each role lands on what needs them, not on menus.</li>'
+      + '<li><b>Required text, said plainly.</b> Reason and note boxes block the action until filled.</li>'
+      + '<li><b>Evidence is protected.</b> Reviewers open it deliberately, and that click is logged.</li>'
+      + '<li><b>Same layout on every device.</b> Tables become cards, actions dock to the bottom on phones.</li>'
+      + '<li><b>Status by color and word.</b> Never color alone.</li></ul><div class="btns"><button class="btn pri" data-act="closemodal">Got it</button></div></div></div>';
+  }
+  if (m.kind === 'adduser') {
+    return '<div class="scrim" data-act="closemodal"><div class="modal" role="dialog" aria-modal="true" aria-label="Add user" data-stop="1"><h2>Add user</h2><p>They get an email with a temporary password and must change it on first sign in.</p>'
+      + '<div class="stack"><label class="f">Full name<input type="text" id="nu-n"></label><label class="f">Email<input type="email" id="nu-e"></label><label class="f">Role<select id="nu-r">' + Object.keys(ROLES).map(k => '<option value="' + k + '">' + ROLES[k].label + '</option>').join('') + '</select></label></div>'
+      + '<div class="btns"><button class="btn" data-act="closemodal">Cancel</button><button class="btn pri" data-act="saveuser">Create user</button></div></div></div>';
+  }
+  const c = MODALS[m.kind];
+  return '<div class="scrim" data-act="closemodal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + c.title + '" data-stop="1"><h2>' + c.title + '</h2><p>' + c.desc + '</p>'
+    + '<label class="f"><span>' + c.label + (c.req ? '' : ' <span class="hint">Optional</span>') + '</span><textarea id="m-text" placeholder="' + (c.req ? 'Required' : 'Add a remark') + '"></textarea></label>'
+    + '<div class="btns"><button class="btn" data-act="closemodal">Cancel</button><button class="btn ' + c.cls + '" id="m-ok" data-act="confirm" ' + (c.req ? 'disabled' : '') + '>' + c.btn + '</button></div></div></div>';
+}
+
+/* ---------- render ---------- */
+let scrollKeep = null;
+function render() {
+  const y = window.scrollY;
+  let inner;
+  if (!S.signed) inner = login();
+  else {
+    const map = {dashboard:dashboard, receipts:receiptsView, form:formView, detail:detail, reports:reportsView, access:accessView, audit:auditView, profile:profileView};
+    inner = shell(map[S.screen]());
+  }
+  const demo = '<div class="demo"><span>Mock interface with sample data. Nothing is saved or sent.</span><span style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">'
+    + (S.signed ? '<label>View as <select id="demo-role" aria-label="View as role">' + Object.keys(ROLES).map(k => '<option value="' + k + '"' + (k === S.role ? ' selected' : '') + '>' + ROLES[k].label + '</option>').join('') + '</select></label>' : '')
+    + '<button data-act="notes">Design notes</button></span></div>';
+  $('#app').innerHTML = demo + inner + modalHtml();
+  if (scrollKeep === null) window.scrollTo(0, y); else { window.scrollTo(0, 0); scrollKeep = null; }
+  if (S.screen === 'form') bindDrop();
+}
+function go(screen) {
+  S.screen = screen; S.notif = false; S.modal = null; scrollKeep = 0;
+  if (screen === 'receipts') S.sel = null;
+  render();
+}
+function bindDrop() {
+  const d = $('#drop'); if (!d) return;
+  ['dragenter','dragover'].forEach(n => d.addEventListener(n, e => { e.preventDefault(); d.classList.add('over'); }));
+  ['dragleave','drop'].forEach(n => d.addEventListener(n, e => { e.preventDefault(); d.classList.remove('over'); }));
+  d.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+  $('#pickfile').addEventListener('change', e => { if (e.target.files.length) addFiles(e.target.files); });
+}
+function openRec(id) { S.sel = id; S.evIdx = 0; S.zoom = 1; go('detail'); }
+
+/* ---------- event delegation ---------- */
+document.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-act]'); if (!el) { if (S.notif && !ev.target.closest('.panel')) { S.notif = false; render(); } return; }
+  if (el.classList.contains('scrim') && ev.target !== el) return;
+  const a = el.dataset.act, v = el.dataset.v, id = el.dataset.id ? +el.dataset.id : null;
+  switch (a) {
+    case 'lrole': S.loginRole = v; render(); break;
+    case 'go': if (v === 'newform') { openForm(null); } else go(v); break;
+    case 'open': if (id) openRec(id); else go('receipts'); break;
+    case 'tile': { const f = el.dataset.f; if (f === 'users') { S.tab.access = 'users'; go('access'); } else if (f === 'audit') go('audit'); else { S.filter = f; go('receipts'); } break; }
+    case 'filter': S.filter = v; render(); break;
+    case 'bell': S.notif = !S.notif; render(); break;
+    case 'readall': notes.forEach(n => { if (n.to === S.role) n.un = false; }); render(); break;
+    case 'opennote': { const n = id; S.notif = false; notes.forEach(x => { if (x.to === S.role && x.id === n) x.un = false; }); if (n) openRec(n); else render(); break; }
+    case 'logout': S.signed = false; S.notif = false; render(); break;
+    case 'notes': S.modal = {kind:'notes'}; render(); break;
+    case 'closemodal': S.modal = null; render(); break;
+    case 'm': S.modal = {kind:v}; render(); { const t = $('#m-text'); if (t) t.focus(); } break;
+    case 'confirm': { const t = $('#m-text'); decide(S.modal.kind, t ? t.value.trim() : ''); break; }
+    case 'edit': openForm(id); break;
+    case 'resubmit': { const r = receipts.find(x => x.id === id); r.status = 'submitted'; logEvent(r, me().name, 'submitted for checking'); notify('checker', r.ref + ' is waiting to be checked.', r.id); toast('Submitted. Checkers have been notified.'); render(); break; }
+    case 'savedraft': saveForm(false); break;
+    case 'submitform': saveForm(true); break;
+    case 'pick': { const i = $('#pickfile'); if (el.dataset.cam) i.setAttribute('capture', 'environment'); else i.removeAttribute('capture'); i.click(); break; }
+    case 'sample': readForm(); S.form.ev.push({name:'receipt-photo-' + (S.form.ev.length + 1) + '.jpg', kind:'img'}); S.form.err.ev = null; render(); break;
+    case 'rmfile': readForm(); S.form.ev.splice(+el.dataset.i, 1); render(); break;
+    case 'evsel': S.evIdx = +el.dataset.i; S.zoom = 1; render(); break;
+    case 'openev': { const r = cur(); S.viewed[r.id] = true; logEvent(r, me().name, 'viewed the evidence'); toast('Evidence opened. This view was recorded.'); render(); break; }
+    case 'zoom': S.zoom = Math.max(.6, Math.min(1.5, S.zoom + (+v) * .25)); render(); break;
+    case 'evdl': { const r = cur(); logEvent(r, me().name, 'downloaded evidence'); toast('Download started. Recorded in the audit log.'); render(); break; }
+    case 'evpr': { const r = cur(); logEvent(r, me().name, 'printed evidence'); toast('Opening print view. Recorded in the audit log.'); render(); break; }
+    case 'docdl': toast('Reimbursement document downloaded.'); break;
+    case 'docpr': toast('Opening print view for the reimbursement document.'); break;
+    case 'export': toast('Export created. Download started.'); break;
+    case 'fmt': S.repFmt = v; render(); break;
+    case 'genreport': { const ext = S.repFmt.toLowerCase(); reports.unshift({name:'Liquidation_' + S.repFrom.slice(0, 7) + '.' + ext, meta:fd(S.repFrom) + ' - ' + fd(S.repTo) + ' · generated just now'}); toast('Report generated. Added to past reports.'); render(); break; }
+    case 'repdl': toast('Download started.'); break;
+    case 'reppr': toast('Opening print view.'); break;
+    case 'atab': S.tab.access = v; render(); break;
+    case 'adduser': S.modal = {kind:'adduser'}; render(); break;
+    case 'saveuser': { const n = $('#nu-n').value.trim(), e = $('#nu-e').value.trim(); if (!n || !e) { toast('Enter a name and email.'); break; } users.push({n:n, e:e, r:$('#nu-r').value, on:true}); audit.unshift({t:stamp(), who:me().name, action:'created user ' + n, ref:'Users'}); S.modal = null; toast('User created. Invitation email queued.'); render(); break; }
+    case 'permsave': Object.keys(S.permDraft).forEach(k => { perms[k] = S.permDraft[k]; }); S.permDraft = null; audit.unshift({t:stamp(), who:me().name, action:'updated role permissions', ref:'Access'}); toast('Permissions saved. Applies to signed-in users within a minute.'); render(); break;
+    case 'permcancel': S.permDraft = null; render(); break;
+    case 'ptab': S.tab.profile = v; render(); break;
+    case 'theme': S.theme = v; if (v === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', v); render(); break;
+    case 'photo': toast('Photo updated.'); break;
+    case 'saveprofile': toast('Profile saved.'); break;
+    case 'savepw': { const a1 = $('#pw1').value, a2 = $('#pw2').value; if (a1.length < 8) { toast('New password needs at least 8 characters.'); break; } if (a1 !== a2) { toast('Passwords do not match.'); break; } toast('Password updated. Other devices were signed out.'); break; }
+    case 'signout': toast('Android phone signed out.'); break;
+  }
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (el.id === 'demo-role') { S.role = el.value; S.screen = 'dashboard'; S.sel = null; S.filter = 'all'; S.q = ''; S.notif = false; S.form = null; go('dashboard'); return; }
+  const a = el.dataset.act;
+  if (a === 'perm') {
+    if (!S.permDraft) { S.permDraft = {}; Object.keys(perms).forEach(k => { S.permDraft[k] = Object.assign({}, perms[k]); }); }
+    S.permDraft[el.dataset.p][el.dataset.r] = el.checked ? 1 : 0; render();
+  } else if (a === 'urole') { const u = users[+el.dataset.i]; u.r = el.value; audit.unshift({t:stamp(), who:me().name, action:'changed role of ' + u.n + ' to ' + ROLES[u.r].label, ref:'Users'}); toast(u.n + ' is now ' + ROLES[u.r].label + '.'); }
+  else if (a === 'utoggle') { const u = users[+el.dataset.i]; u.on = el.checked; audit.unshift({t:stamp(), who:me().name, action:(u.on ? 'activated ' : 'deactivated ') + u.n, ref:'Users'}); toast(u.n + (u.on ? ' can sign in again.' : ' was deactivated and signed out.')); render(); }
+  else if (a === 'pref') { S.pref[el.dataset.k] = el.checked; toast('Preference saved.'); }
+  else if (el.id === 'r-from') { S.repFrom = el.value; render(); }
+  else if (el.id === 'r-to') { S.repTo = el.value; render(); }
+  else if (el.id === 'r-cat') { S.repCat = el.value; render(); }
+});
+document.addEventListener('input', ev => {
+  const el = ev.target;
+  if (el.id === 'q') { S.q = el.value; const pos = el.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(pos, pos); }
+  else if (el.id === 'aq') { S.auditQ = el.value; const pos = el.selectionStart; render(); const n = $('#aq'); n.focus(); n.setSelectionRange(pos, pos); }
+  else if (el.id === 'm-text') { const c = MODALS[S.modal.kind]; $('#m-ok').disabled = c.req && el.value.trim().length < 4; }
+  else if (el.id === 'pw1') {
+    const p = el.value; let s = 0; if (p.length >= 8) s++; if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++; if (/\d/.test(p)) s++; if (/[^A-Za-z0-9]/.test(p)) s++;
+    const bars = $('#meter').children; for (let i = 0; i < 4; i++) bars[i].className = i < s ? (s <= 1 ? 'b' : s <= 2 ? 'w' : 'on') : '';
+    $('#mtxt').textContent = ['Use 8 or more characters with numbers and symbols.','Weak','Fair','Good','Strong'][p ? s : 0];
+  }
+});
+document.addEventListener('submit', ev => {
+  if (ev.target.id === 'loginf') { ev.preventDefault(); S.signed = true; S.role = S.loginRole; S.filter = 'all'; S.q = ''; go('dashboard'); }
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && (S.modal || S.notif)) { S.modal = null; S.notif = false; render(); } });
+document.documentElement.setAttribute('data-theme', 'light');
+render();
+</script>
+
+</html>

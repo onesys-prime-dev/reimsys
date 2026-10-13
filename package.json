@@ -1,0 +1,17 @@
+{
+  "name": "reimsis",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@12.11.2",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @reimsis/api --filter @reimsis/web dev",
+    "dev:api": "pnpm --filter @reimsis/api dev",
+    "dev:web": "pnpm --filter @reimsis/web dev",
+    "db:migrate": "pnpm --filter @reimsis/api db:migrate",
+    "db:seed": "pnpm --filter @reimsis/api db:seed",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0"
+  }
+}

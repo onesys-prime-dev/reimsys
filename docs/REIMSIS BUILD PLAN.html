@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>REIMSIS Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column, wide figures scroll inside their own frame. Plan page, utilitarian. */
+:root{
+  --bg:#f5f8f8; --surface:#ffffff; --fg:#14232b; --muted:#546770; --line:#d6dfe2;
+  --accent:#0b6b76; --accent-soft:#dcf0f2; --ok:#1d7a4b; --ok-soft:#dff3e8;
+  --bad:#b3362f; --bad-soft:#fbe5e3; --warn:#946000; --warn-soft:#fbefd2;
+  --sans:'Public Sans',system-ui,sans-serif; --display:'Bricolage Grotesque','Public Sans',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1619; --surface:#142126; --fg:#e5eef0; --muted:#93a8af; --line:#26383e;
+  --accent:#58c7d3; --accent-soft:#12353b; --ok:#5cc791; --ok-soft:#133323;
+  --bad:#f0908a; --bad-soft:#3b1b19; --warn:#e8b650; --warn-soft:#3a2d0d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1619; --surface:#142126; --fg:#e5eef0; --muted:#93a8af; --line:#26383e;
+  --accent:#58c7d3; --accent-soft:#12353b; --ok:#5cc791; --ok-soft:#133323;
+  --bad:#f0908a; --bad-soft:#3b1b19; --warn:#e8b650; --warn-soft:#3a2d0d; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.6 var(--sans);padding-inline:max(16px,calc((100% - 960px)/2));padding-block:32px 72px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,6vw,3rem);letter-spacing:-.02em}
+h2{font-size:1.55rem;letter-spacing:-.01em;margin-block:56px 6px;scroll-margin-top:16px}
+h3{font-size:1.05rem;margin-block:28px 8px}
+p{margin:8px 0;max-width:68ch}
+.lede{font-size:1.1rem;color:var(--muted);max-width:60ch}
+.kicker{font:500 .72rem/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.sub{color:var(--muted);margin-top:0}
+code,.mono{font-family:var(--mono);font-size:.86em}
+code{background:var(--accent-soft);padding:1px 5px;border-radius:3px}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+nav.toc a{font-size:.82rem;color:var(--fg);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:4px 10px;border-radius:99px}
+nav.toc a:hover,nav.toc a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:28px}
+.summary div{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;min-width:0}
+.summary b{display:block;font:500 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+figure{margin:20px 0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 8px 6px}
+.scroll{overflow-x:auto}
+figure svg{display:block;width:100%;min-width:640px;height:auto;color:var(--fg)}
+figcaption{font-size:.85rem;color:var(--muted);padding:8px 8px 6px;max-width:80ch}
+table{border-collapse:collapse;width:100%;font-size:.88rem;background:var(--surface)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin:16px 0}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 .7rem var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:var(--bg);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.c,th.c{text-align:center}
+.y{color:var(--ok);font-weight:600}.n{color:var(--muted)}.o{color:var(--warn);font-weight:600}
+.pill{display:inline-block;font:500 .72rem var(--mono);padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}
+.cols>div{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;min-width:0}
+.cols h3{margin-top:0}
+ul{margin:6px 0;padding-left:1.1rem}li{margin:3px 0}
+.phase{display:grid;grid-template-columns:90px 1fr;gap:4px 20px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-top:12px}
+.phase .when{font:500 .78rem var(--mono);color:var(--accent);padding-top:3px}
+.phase h3{margin:0 0 4px}
+.phase .done{color:var(--muted);font-size:.88rem;margin-top:6px}
+@media(max-width:520px){.phase{grid-template-columns:1fr}}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 6px 6px 0;margin:16px 0;max-width:72ch}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+/* svg vocabulary */
+svg text{fill:currentColor;font:12px var(--sans)}
+svg .b{font-weight:600}svg .m{font:11px var(--mono)}svg .mu{fill:var(--muted)}svg .lg{font-size:13px}
+svg .box{fill:var(--surface);stroke:var(--muted);stroke-width:1.2}
+svg .acc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.4}
+svg .ok{fill:var(--ok-soft);stroke:var(--ok);stroke-width:1.4}
+svg .bad{fill:var(--bad-soft);stroke:var(--bad);stroke-width:1.4}
+svg .warn{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.4}
+svg .lane{fill:currentColor;fill-opacity:.04}
+svg .sep{stroke:var(--line);stroke-width:1}
+svg .e{stroke:currentColor;stroke-width:1.4;fill:none;marker-end:url(#ar)}
+svg .e.a{stroke:var(--accent);marker-end:url(#arA)}
+svg .e.d{stroke-dasharray:5 4}
+svg .er{stroke:var(--muted);stroke-width:1.2;fill:none}
+svg .hd{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2}
+footer{margin-top:64px;color:var(--muted);font-size:.85rem}
+</style>
+
+<div class="kicker">Build plan · v1 · for review</div>
+<h1>REIMSIS</h1>
+<p class="lede">Reimbursement Management System. Med Refs encode receipts with evidence, a Checker verifies them, an Approver decides. Every step is audited, emailed, and ends in a printable reimbursement document and liquidation report.</p>
+
+<div class="summary">
+  <div><b>Stack</b>React + Vite, Node/Express (TypeScript), MySQL, Prisma</div>
+  <div><b>Scale</b>50–500 users, queue for email and reports</div>
+  <div><b>Roles now</b>Med Ref, Checker, Approver, Super Admin</div>
+  <div><b>Roles later</b>Accounting, added as data, not code</div>
+</div>
+
+<nav class="toc" aria-label="Sections">
+  <a href="#arch">Architecture</a><a href="#roles">Roles</a><a href="#access">Access control &amp; profile</a><a href="#flow">Workflow</a><a href="#states">Status rules</a><a href="#data">Data model</a><a href="#evidence">Evidence</a><a href="#notify">Notifications</a><a href="#docs">Documents</a><a href="#api">API</a><a href="#ui">Screens</a><a href="#sec">Security</a><a href="#phases">Phases</a><a href="#open">Open items</a>
+</nav>
+
+<!-- ============ ARCHITECTURE ============ -->
+<h2 id="arch">System architecture</h2>
+<p class="sub">One API owns every rule. The browser never talks to the database or the file store.</p>
+
+<figure>
+<div class="scroll">
+<svg viewBox="0 0 900 460" role="img" aria-label="The React app calls an Express API over HTTPS. The API reads and writes MySQL and file storage and enqueues jobs in Redis. A worker consumes the queue, builds documents and sends email through SMTP.">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="currentColor"/></marker>
+  <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" style="fill:var(--accent)"/></marker>
+</defs>
+<rect class="box" x="20" y="150" width="170" height="120" rx="6"/>
+<text class="b lg" x="105" y="178" text-anchor="middle">React SPA</text>
+<text class="mu" x="105" y="198" text-anchor="middle">Vite · TypeScript</text>
+<text class="mu" x="105" y="216" text-anchor="middle">Med Ref · Checker</text>
+<text class="mu" x="105" y="232" text-anchor="middle">Approver · Admin</text>
+<text class="mu" x="105" y="252" text-anchor="middle">mobile + desktop</text>
+
+<line class="e a" x1="190" y1="215" x2="268" y2="215"/>
+<text x="229" y="192" text-anchor="middle">HTTPS</text>
+<text class="mu" x="229" y="206" text-anchor="middle">cookie auth</text>
+
+<rect class="acc" x="270" y="30" width="250" height="300" rx="6"/>
+<text class="b lg" x="395" y="54" text-anchor="middle">Express API</text>
+<g>
+  <rect class="box" x="286" y="70" width="218" height="38" rx="4"/><text x="395" y="93" text-anchor="middle">Auth + permission guard</text>
+  <rect class="box" x="286" y="116" width="218" height="38" rx="4"/><text x="395" y="139" text-anchor="middle">Receipt state machine</text>
+  <rect class="box" x="286" y="162" width="218" height="38" rx="4"/><text x="395" y="185" text-anchor="middle">Evidence upload + stream</text>
+  <rect class="box" x="286" y="208" width="218" height="38" rx="4"/><text x="395" y="231" text-anchor="middle">Audit on every write</text>
+  <rect class="box" x="286" y="254" width="218" height="38" rx="4"/><text x="395" y="277" text-anchor="middle">Reports · import / export</text>
+</g>
+<text class="mu" x="395" y="316" text-anchor="middle">Zod validation · rate limits</text>
+
+<rect class="box" x="640" y="30" width="200" height="70" rx="6"/>
+<text class="b" x="740" y="58" text-anchor="middle">MySQL</text><text class="mu" x="740" y="78" text-anchor="middle">records · users · audit</text>
+<line class="e" x1="520" y1="65" x2="638" y2="65"/><text x="579" y="57" text-anchor="middle">Prisma</text>
+
+<rect class="box" x="640" y="130" width="200" height="70" rx="6"/>
+<text class="b" x="740" y="158" text-anchor="middle">File storage</text><text class="mu" x="740" y="178" text-anchor="middle">disk now, S3 adapter later</text>
+<line class="e" x1="520" y1="165" x2="638" y2="165"/><text x="579" y="157" text-anchor="middle">store / stream</text>
+
+<rect class="box" x="640" y="230" width="200" height="70" rx="6"/>
+<text class="b" x="740" y="258" text-anchor="middle">Redis + BullMQ</text><text class="mu" x="740" y="278" text-anchor="middle">email · PDF · XLSX jobs</text>
+<line class="e" x1="520" y1="265" x2="638" y2="265"/><text x="579" y="257" text-anchor="middle">enqueue</text>
+
+<rect class="acc" x="270" y="370" width="250" height="70" rx="6"/>
+<text class="b" x="395" y="398" text-anchor="middle">Worker process</text><text class="mu" x="395" y="418" text-anchor="middle">builds documents · sends mail</text>
+<path class="e" d="M740 300 V385 H522"/><text x="748" y="350">consume</text>
+
+<rect class="box" x="700" y="400" width="180" height="50" rx="6"/>
+<text class="b" x="790" y="421" text-anchor="middle">SMTP server</text><text class="mu" x="790" y="437" text-anchor="middle">approve · return mails</text>
+<line class="e" x1="520" y1="425" x2="698" y2="425"/><text x="609" y="417" text-anchor="middle">send email</text>
+</svg>
+</div>
+<figcaption>Request path on the left, background work on the bottom. Emails and PDF/XLSX files never block a request: the API enqueues, the worker does it, and the result is stored and linked.</figcaption>
+</figure>
+
+<div class="cols">
+  <div><h3>Frontend</h3><ul><li>React 18, Vite, TypeScript</li><li>Tailwind, responsive tables become cards on phones</li><li>TanStack Query for data, React Hook Form + Zod</li><li>PDF.js style viewer for evidence preview</li></ul></div>
+  <div><h3>Backend</h3><ul><li>Express + TypeScript, feature folders</li><li>Prisma ORM and migrations</li><li>Multer for upload, Pino for logs</li><li>PDFKit (documents), ExcelJS (XLSX), fast-csv</li></ul></div>
+  <div><h3>Repo</h3><ul><li>Monorepo: <code>apps/api</code>, <code>apps/web</code>, <code>packages/shared</code></li><li>Shared package holds status enums, permission codes, Zod schemas</li><li>Local dev on XAMPP MySQL, Redis optional (falls back to DB queue)</li></ul></div>
+</div>
+
+<!-- ============ ROLES ============ -->
+<h2 id="roles">Roles and permissions</h2>
+<p class="sub">Permissions are rows, not <code>if (role === 'checker')</code>. Accounting later means one new role and a few permission rows.</p>
+
+<div class="tw"><table>
+<thead><tr><th>Capability</th><th class="c">Med Ref</th><th class="c">Checker</th><th class="c">Approver</th><th class="c">Super Admin</th></tr></thead>
+<tbody>
+<tr><td>Create / edit receipt (Draft, Returned)</td><td class="c y">own</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+<tr><td>Upload / remove evidence (Draft, Returned)</td><td class="c y">own</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+<tr><td>Submit for checking</td><td class="c y">own</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+<tr><td>View receipts</td><td class="c o">own</td><td class="c y">all</td><td class="c o">Checked and later</td><td class="c y">all</td></tr>
+<tr><td>View, download, print evidence <span class="pill">audited</span></td><td class="c o">own</td><td class="c y">yes</td><td class="c y">yes</td><td class="c y">yes</td></tr>
+<tr><td>Check or return with remarks</td><td class="c n">—</td><td class="c y">yes</td><td class="c n">—</td><td class="c n">—</td></tr>
+<tr><td>Approve, disapprove (reason), reserve (note)</td><td class="c n">—</td><td class="c n">—</td><td class="c y">Checked only</td><td class="c n">—</td></tr>
+<tr><td>Release a reserved record</td><td class="c n">—</td><td class="c n">—</td><td class="c y">yes</td><td class="c n">—</td></tr>
+<tr><td>Reimbursement document (approved)</td><td class="c o">own</td><td class="c y">yes</td><td class="c y">yes</td><td class="c y">yes</td></tr>
+<tr><td>Liquidation report (approved only)</td><td class="c o">own</td><td class="c y">yes</td><td class="c y">yes</td><td class="c y">yes</td></tr>
+<tr><td>Import receipts (CSV / XLSX)</td><td class="c y">as Draft</td><td class="c n">—</td><td class="c n">—</td><td class="c y">yes</td></tr>
+<tr><td>Manage users, roles and permissions (access control page)</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td><td class="c y">yes</td></tr>
+<tr><td>Edit own profile, password, preferences</td><td class="c y">yes</td><td class="c y">yes</td><td class="c y">yes</td><td class="c y">yes</td></tr>
+<tr><td>Browse full audit log</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td><td class="c y">yes</td></tr>
+</tbody></table></div>
+<div class="callout warn">Super Admin cannot approve. Separating the person who manages users from the person who decides money is deliberate. Tell me if your organisation wants otherwise.</div>
+
+<!-- ============ ACCESS + PROFILE ============ -->
+<h2 id="access">Access control page and profile page</h2>
+<p class="sub">Two new pages. Access control is for the Super Admin. Profile is for everyone.</p>
+
+<div class="cols">
+  <div>
+    <h3>Access control page <span class="pill">Super Admin</span></h3>
+    <ul>
+      <li><b>Users tab:</b> list, search, filter by role and status. Create user, edit details, assign role, activate or deactivate, reset password, force logout, unlock a locked account.</li>
+      <li><b>Roles tab:</b> list of roles with rank and user count. Create a role, rename it, set its rank.</li>
+      <li><b>Permission matrix:</b> a grid of roles against permissions, grouped by area (Receipts, Evidence, Review, Reports, Users, Audit). Tick or untick, review the pending changes, then save.</li>
+      <li><b>Sessions tab:</b> active logins per user with device and last seen, and a revoke button.</li>
+      <li>Every change is written to the audit log with before and after values.</li>
+    </ul>
+    <h3>Guard rails</h3>
+    <ul>
+      <li>Built-in roles cannot be deleted. Their core review permissions are locked so nobody can remove the only approver path by accident.</li>
+      <li>The last active Super Admin cannot be deactivated or demoted.</li>
+      <li>A role in use cannot be deleted. Its users must be moved first.</li>
+      <li>Permission changes apply to existing sessions within a minute, not only at next login.</li>
+      <li>Rank decides who can manage whom: you can only edit users ranked below you.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Profile page <span class="pill">Everyone</span></h3>
+    <ul>
+      <li><b>Details:</b> name, email, phone, position or branch, profile photo (JPG or PNG, resized on upload). Email and role are read-only for the user; only the Super Admin changes them.</li>
+      <li><b>Security:</b> change password with strength meter, see active sessions and sign out other devices, last login time.</li>
+      <li><b>Notification preferences:</b> mute the optional emails and digests. Required emails (return, approve, disapprove, reserve) cannot be turned off.</li>
+      <li><b>My access:</b> read-only list of what the signed-in role can do, so users know why a button is missing.</li>
+      <li><b>My activity:</b> my recent actions, pulled from the audit log.</li>
+      <li>Appearance: light, dark or follow the device.</li>
+    </ul>
+    <h3>Decision</h3>
+    <p>Permissions are set per role only. There are no per-user overrides in v1. It keeps the matrix easy to read and audit. If someone needs different access, give them a different role.</p>
+  </div>
+</div>
+
+<div class="tw"><table>
+<thead><tr><th>Example permission group</th><th>Codes</th></tr></thead>
+<tbody>
+<tr><td>Receipts</td><td><code>receipt.create</code> <code>receipt.edit_own</code> <code>receipt.submit</code> <code>receipt.view_own</code> <code>receipt.view_all</code> <code>receipt.import</code> <code>receipt.export</code></td></tr>
+<tr><td>Evidence</td><td><code>evidence.upload</code> <code>evidence.view</code> <code>evidence.download</code> <code>evidence.print</code></td></tr>
+<tr><td>Review</td><td><code>review.check</code> <code>review.return</code> <code>review.approve</code> <code>review.disapprove</code> <code>review.reserve</code> <code>review.release</code></td></tr>
+<tr><td>Documents and reports</td><td><code>document.view</code> <code>report.generate</code> <code>report.view</code></td></tr>
+<tr><td>Administration</td><td><code>user.manage</code> <code>role.manage</code> <code>audit.view</code> <code>session.revoke</code></td></tr>
+</tbody></table></div>
+<p>The API checks these codes, not role names. The permission matrix on the access control page edits exactly these rows, which is how Accounting can be added later without code changes.</p>
+
+<!-- ============ WORKFLOW ============ -->
+<h2 id="flow">End-to-end workflow</h2>
+<p class="sub">Who does what, and what the system does in response.</p>
+
+<figure>
+<div class="scroll">
+<svg viewBox="0 0 900 495" role="img" aria-label="Swimlane from Med Ref encoding and submitting, to Checker verifying and either returning or marking checked, to Approver deciding, to the system recording the decision, auditing, emailing and generating the reimbursement document.">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="currentColor"/></marker>
+  <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" style="fill:var(--accent)"/></marker>
+</defs>
+<rect class="lane" x="0" y="0" width="900" height="120"/>
+<rect class="lane" x="0" y="240" width="900" height="130" style="fill-opacity:.04"/>
+<line class="sep" x1="0" y1="120" x2="900" y2="120"/><line class="sep" x1="0" y1="240" x2="900" y2="240"/><line class="sep" x1="0" y1="370" x2="900" y2="370"/><line class="sep" x1="90" y1="0" x2="90" y2="490"/>
+<text class="b" x="14" y="64">Med Ref</text><text class="b" x="14" y="184">Checker</text><text class="b" x="14" y="310">Approver</text><text class="b" x="14" y="430">System</text>
+
+<rect class="box" x="110" y="36" width="150" height="48" rx="5"/><text x="185" y="57" text-anchor="middle">Encode receipt</text><text class="mu" x="185" y="73" text-anchor="middle">+ upload evidence</text>
+<rect class="box" x="290" y="38" width="110" height="44" rx="5"/><text x="345" y="65" text-anchor="middle">Submit</text>
+<line class="e" x1="260" y1="60" x2="288" y2="60"/>
+<rect class="warn" x="450" y="36" width="150" height="48" rx="5"/><text x="525" y="57" text-anchor="middle">Correct and</text><text x="525" y="73" text-anchor="middle">resubmit</text>
+<path class="e d" d="M450 60 H402"/><text x="426" y="30" text-anchor="middle" class="mu">resubmit</text>
+
+<rect class="box" x="290" y="158" width="130" height="50" rx="5"/><text x="355" y="179" text-anchor="middle">Open record,</text><text x="355" y="195" text-anchor="middle">view evidence</text>
+<path class="e" d="M345 82 V156"/>
+<rect class="ok" x="470" y="158" width="130" height="50" rx="5"/><text x="535" y="179" text-anchor="middle">Remarks, mark</text><text x="535" y="195" text-anchor="middle" class="b">Checked</text>
+<line class="e" x1="420" y1="183" x2="468" y2="183"/>
+<path class="e d" d="M400 158 V120 H525 V86"/><text x="408" y="114" class="mu">return + remarks</text>
+
+<rect class="box" x="470" y="264" width="180" height="84" rx="5"/>
+<text class="b" x="560" y="285" text-anchor="middle">Decide</text>
+<text x="560" y="305" text-anchor="middle" style="fill:var(--ok)">Approve</text>
+<text x="560" y="321" text-anchor="middle" style="fill:var(--bad)">Disapprove (reason)</text>
+<text x="560" y="337" text-anchor="middle" style="fill:var(--warn)">Reserve (note)</text>
+<path class="e" d="M535 208 V262"/><text x="543" y="238" class="mu">only Checked</text>
+
+<rect class="acc" x="470" y="392" width="180" height="52" rx="5"/><text class="b" x="560" y="414" text-anchor="middle">Save decision</text><text class="mu" x="560" y="431" text-anchor="middle">audit row + queue jobs</text>
+<line class="e a" x1="560" y1="348" x2="560" y2="390"/>
+<rect class="box" x="710" y="382" width="170" height="36" rx="5"/><text x="795" y="405" text-anchor="middle">Email Med Ref</text>
+<rect class="ok" x="710" y="428" width="170" height="36" rx="5"/><text x="795" y="446" text-anchor="middle">Reimbursement doc</text><text class="mu" x="795" y="459" text-anchor="middle" style="font-size:10px">approved only</text>
+<path class="e a" d="M650 410 L708 400"/><path class="e a" d="M650 426 L708 446"/>
+<text class="mu" x="110" y="484">Audit log: every action in every lane above writes one append-only row, including each evidence view.</text>
+</svg>
+</div>
+<figcaption>A reserved record sits with the Approver and can be released back into the approval queue. Dashed arrows are the loop back to the Med Ref.</figcaption>
+</figure>
+
+<!-- ============ STATES ============ -->
+<h2 id="states">Status rules</h2>
+<p class="sub">One module enforces these transitions. Controllers cannot set a status directly.</p>
+
+<figure>
+<div class="scroll">
+<svg viewBox="0 0 860 370" role="img" aria-label="Record status machine. Draft is submitted to Submitted. Submitted is checked to Checked or returned to Returned, which resubmits. Checked becomes Approved, Disapproved, or Reserved. Reserved is released back to Checked.">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="currentColor"/></marker>
+  <marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" style="fill:var(--accent)"/></marker>
+</defs>
+<rect class="box" x="20" y="150" width="120" height="50" rx="6"/><text class="b" x="80" y="180" text-anchor="middle">Draft</text>
+<rect class="acc" x="190" y="150" width="140" height="50" rx="6"/><text class="b" x="260" y="180" text-anchor="middle">Submitted</text>
+<rect class="acc" x="390" y="150" width="140" height="50" rx="6"/><text class="b" x="460" y="180" text-anchor="middle">Checked</text>
+<rect class="warn" x="190" y="290" width="140" height="50" rx="6"/><text class="b" x="260" y="320" text-anchor="middle">Returned</text>
+<rect class="ok" x="690" y="40" width="150" height="50" rx="6"/><text class="b" x="765" y="70" text-anchor="middle">Approved</text>
+<rect class="bad" x="690" y="150" width="150" height="50" rx="6"/><text class="b" x="765" y="180" text-anchor="middle">Disapproved</text>
+<rect class="warn" x="690" y="260" width="150" height="50" rx="6"/><text class="b" x="765" y="290" text-anchor="middle">Reserved</text>
+
+<line class="e" x1="140" y1="175" x2="188" y2="175"/><text x="164" y="167" text-anchor="middle" class="mu">submit</text>
+<line class="e" x1="330" y1="175" x2="388" y2="175"/><text x="359" y="167" text-anchor="middle" class="mu">check</text>
+<line class="e" x1="235" y1="200" x2="235" y2="288"/><text x="227" y="248" text-anchor="end" class="mu">return</text>
+<line class="e" x1="285" y1="288" x2="285" y2="202"/><text x="293" y="248" class="mu">resubmit</text>
+
+<path class="e a" d="M530 175 H610 V65 H688"/><text x="616" y="58" style="fill:var(--ok)">approve</text>
+<path class="e a" d="M530 175 H688"/><text x="616" y="168" style="fill:var(--bad)">disapprove + reason</text>
+<path class="e a" d="M530 175 H610 V285 H688"/><text x="616" y="278" style="fill:var(--warn)">reserve + note</text>
+<path class="e d" d="M765 310 V350 H500 V202"/><text x="640" y="342" text-anchor="middle" class="mu">release to approval queue</text>
+</svg>
+</div>
+<figcaption>Approved and Disapproved are final. A disapproved receipt can be copied into a new Draft, but the original stays on record.</figcaption>
+</figure>
+
+<div class="tw"><table>
+<thead><tr><th>Transition</th><th>Who</th><th>Required input</th><th>Side effects</th></tr></thead>
+<tbody>
+<tr><td><span class="pill">Draft → Submitted</span></td><td>Med Ref (owner)</td><td>At least one evidence file, valid amount and date</td><td>Notify Checkers</td></tr>
+<tr><td><span class="pill">Submitted → Checked</span></td><td>Checker</td><td>Remarks; evidence viewed at least once</td><td>Notify Approvers</td></tr>
+<tr><td><span class="pill warn">Submitted → Returned</span></td><td>Checker</td><td>Remarks (what to fix)</td><td>Email Med Ref</td></tr>
+<tr><td><span class="pill warn">Returned → Submitted</span></td><td>Med Ref</td><td>Edited record</td><td>Notify Checkers, keep earlier remarks</td></tr>
+<tr><td><span class="pill ok">Checked → Approved</span></td><td>Approver</td><td>Optional remark</td><td>Email, build reimbursement document</td></tr>
+<tr><td><span class="pill bad">Checked → Disapproved</span></td><td>Approver</td><td><b>Reason</b> (mandatory)</td><td>Email with reason</td></tr>
+<tr><td><span class="pill warn">Checked → Reserved</span></td><td>Approver</td><td><b>Note</b> (mandatory)</td><td>Email with note</td></tr>
+<tr><td><span class="pill">Reserved → Checked</span></td><td>Approver</td><td>Optional remark</td><td>In-app notice to Med Ref</td></tr>
+</tbody></table></div>
+<p>Each transition carries the record's <code>version</code>. If another reviewer acted first, the request fails with a clear message instead of overwriting.</p>
+
+<!-- ============ DATA ============ -->
+<h2 id="data">Data model</h2>
+<p class="sub">Core tables. Money is <code>DECIMAL(12,2)</code>. Nothing is hard-deleted.</p>
+
+<figure>
+<div class="scroll">
+<svg viewBox="0 0 900 460" role="img" aria-label="Entity relationship diagram: roles have many users and permissions; users encode receipts; receipts have many evidence files, many reviews and one reimbursement document; users appear as actors in audit logs.">
+<!-- row 1 -->
+<rect class="box" x="20" y="20" width="170" height="119" rx="4"/><rect class="hd" x="20" y="20" width="170" height="26" rx="4"/><text class="b" x="30" y="38">roles</text>
+<text class="m" x="30" y="62">id PK</text><text class="m" x="30" y="79">code UQ</text><text class="m" x="30" y="96">name</text><text class="m" x="30" y="113">rank</text><text class="m" x="30" y="130">is_system</text>
+
+<rect class="box" x="250" y="20" width="170" height="136" rx="4"/><rect class="hd" x="250" y="20" width="170" height="26" rx="4"/><text class="b" x="260" y="38">users</text>
+<text class="m" x="260" y="62">id PK</text><text class="m" x="260" y="79">role_id FK</text><text class="m" x="260" y="96">name</text><text class="m" x="260" y="113">email UQ</text><text class="m" x="260" y="130">password_hash</text><text class="m" x="260" y="147">status</text>
+
+<rect class="box" x="480" y="20" width="170" height="170" rx="4"/><rect class="hd" x="480" y="20" width="170" height="26" rx="4"/><text class="b" x="490" y="38">receipts</text>
+<text class="m" x="490" y="62">id PK</text><text class="m" x="490" y="79">ref_no UQ</text><text class="m" x="490" y="96">encoder_id FK</text><text class="m" x="490" y="113">payee</text><text class="m" x="490" y="130">receipt_date</text><text class="m" x="490" y="147">amount</text><text class="m" x="490" y="164">status</text><text class="m" x="490" y="181">version</text>
+
+<rect class="box" x="710" y="20" width="170" height="153" rx="4"/><rect class="hd" x="710" y="20" width="170" height="26" rx="4"/><text class="b" x="720" y="38">receipt_evidence</text>
+<text class="m" x="720" y="62">id PK</text><text class="m" x="720" y="79">receipt_id FK</text><text class="m" x="720" y="96">file_path</text><text class="m" x="720" y="113">mime · size</text><text class="m" x="720" y="130">checksum</text><text class="m" x="720" y="147">uploader_id FK</text><text class="m" x="720" y="164">deleted_at</text>
+
+<!-- row 2 -->
+<rect class="box" x="20" y="260" width="170" height="85" rx="4"/><rect class="hd" x="20" y="260" width="170" height="26" rx="4"/><text class="b" x="30" y="278">permissions</text>
+<text class="m" x="30" y="302">id PK</text><text class="m" x="30" y="319">code UQ</text><text class="m" x="30" y="336">via role_permissions</text>
+
+<rect class="box" x="250" y="260" width="170" height="187" rx="4"/><rect class="hd" x="250" y="260" width="170" height="26" rx="4"/><text class="b" x="260" y="278">audit_logs</text>
+<text class="m" x="260" y="302">id PK</text><text class="m" x="260" y="319">actor_id FK</text><text class="m" x="260" y="336">action</text><text class="m" x="260" y="353">entity_type</text><text class="m" x="260" y="370">entity_id</text><text class="m" x="260" y="387">before_json</text><text class="m" x="260" y="404">after_json</text><text class="m" x="260" y="421">ip · user_agent</text><text class="m" x="260" y="438">created_at</text>
+
+<rect class="box" x="480" y="260" width="170" height="153" rx="4"/><rect class="hd" x="480" y="260" width="170" height="26" rx="4"/><text class="b" x="490" y="278">receipt_reviews</text>
+<text class="m" x="490" y="302">id PK</text><text class="m" x="490" y="319">receipt_id FK</text><text class="m" x="490" y="336">reviewer_id FK</text><text class="m" x="490" y="353">stage check|approve</text><text class="m" x="490" y="370">decision</text><text class="m" x="490" y="387">reason_or_note</text><text class="m" x="490" y="404">created_at</text>
+
+<rect class="box" x="710" y="260" width="170" height="119" rx="4"/><rect class="hd" x="710" y="260" width="170" height="26" rx="4"/><text class="b" x="720" y="278">reimbursement_docs</text>
+<text class="m" x="720" y="302">id PK</text><text class="m" x="720" y="319">receipt_id UQ</text><text class="m" x="720" y="336">doc_no UQ</text><text class="m" x="720" y="353">file_path</text><text class="m" x="720" y="370">generated_at</text>
+
+<!-- relations -->
+<line class="er" x1="190" y1="80" x2="250" y2="80"/><text class="mu" x="220" y="72" text-anchor="middle">1:N</text>
+<line class="er" x1="420" y1="80" x2="480" y2="80"/><text class="mu" x="450" y="72" text-anchor="middle">encodes</text>
+<line class="er" x1="650" y1="80" x2="710" y2="80"/><text class="mu" x="680" y="72" text-anchor="middle">1:N</text>
+<line class="er" x1="105" y1="139" x2="105" y2="260"/><text class="mu" x="113" y="205">N:M</text>
+<line class="er" x1="335" y1="156" x2="335" y2="260"/><text class="mu" x="343" y="215">actor</text>
+<line class="er" x1="565" y1="190" x2="565" y2="260"/><text class="mu" x="573" y="230">1:N</text>
+<path class="er" d="M650 170 H680 V320 H710"/><text class="mu" x="688" y="254">1:1</text>
+</svg>
+</div>
+<figcaption>Audit logs point at any entity by <code>entity_type + entity_id</code>, so the same table covers receipts, evidence, users and reports. Rows are insert-only: the app database user has no UPDATE or DELETE on this table.</figcaption>
+</figure>
+
+<h3>Supporting tables</h3>
+<div class="tw"><table>
+<thead><tr><th>Table</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>notifications</code></td><td>In-app bell: user, type, receipt, read_at.</td></tr>
+<tr><td><code>email_log</code></td><td>Every email queued or sent: recipient, template, status, error, attempts.</td></tr>
+<tr><td><code>liquidation_reports</code></td><td>Filters used, format, stored file, who generated it, row count and total.</td></tr>
+<tr><td><code>import_jobs</code></td><td>Uploaded file, status, rows ok, rows failed, downloadable error report.</td></tr>
+<tr><td><code>sequences</code></td><td>Counters for receipt reference numbers and document numbers, safe under concurrency.</td></tr>
+<tr><td><code>sessions</code> / refresh tokens</td><td>Revocable logins, last seen, device.</td></tr>
+<tr><td><code>user_profiles</code> / preferences</td><td>Phone, position, branch, photo path, theme, muted notification types.</td></tr>
+</tbody></table></div>
+
+<!-- ============ EVIDENCE ============ -->
+<h2 id="evidence">Evidence handling</h2>
+<p class="sub">View, download and print all go through one endpoint. The audit row is written first, so no view goes unrecorded.</p>
+
+<figure>
+<div class="scroll">
+<svg viewBox="0 0 900 150" role="img" aria-label="Evidence access: the user clicks evidence, the API checks permission, writes an audit row, reads the file from storage, and streams it to the browser.">
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 1L9 5L0 9z" fill="currentColor"/></marker></defs>
+<rect class="box" x="10" y="35" width="150" height="62" rx="6"/><text class="b" x="85" y="62" text-anchor="middle">Click evidence</text><text class="mu" x="85" y="80" text-anchor="middle">view · download · print</text>
+<rect class="box" x="190" y="35" width="150" height="62" rx="6"/><text class="b" x="265" y="62" text-anchor="middle">Check permission</text><text class="mu" x="265" y="80" text-anchor="middle">role + record status</text>
+<rect class="acc" x="370" y="35" width="150" height="62" rx="6"/><text class="b" x="445" y="62" text-anchor="middle">Write audit row</text><text class="mu" x="445" y="80" text-anchor="middle">evidence.viewed</text>
+<rect class="box" x="550" y="35" width="150" height="62" rx="6"/><text class="b" x="625" y="62" text-anchor="middle">Read from storage</text><text class="mu" x="625" y="80" text-anchor="middle">never a public URL</text>
+<rect class="box" x="730" y="35" width="150" height="62" rx="6"/><text class="b" x="805" y="62" text-anchor="middle">Stream to browser</text><text class="mu" x="805" y="80" text-anchor="middle">inline or attachment</text>
+<line class="e" x1="160" y1="66" x2="188" y2="66"/><line class="e" x1="340" y1="66" x2="368" y2="66"/><line class="e" x1="520" y1="66" x2="548" y2="66"/><line class="e" x1="700" y1="66" x2="728" y2="66"/>
+<text class="mu" x="10" y="130">The Checker requirement ("audit log if they viewed the evidence") is the third box. It also feeds the rule that Checked needs at least one view.</text>
+</svg>
+</div>
+<figcaption>Each action is logged with its own type: <code>evidence.viewed</code>, <code>evidence.downloaded</code>, <code>evidence.printed</code>.</figcaption>
+</figure>
+
+<div class="cols">
+  <div><h3>Upload rules</h3><ul><li>JPG, PNG, WEBP, HEIC, PDF</li><li>10 MB per file, 10 files per receipt (configurable)</li><li>Check the real file signature, not only the extension</li><li>SHA-256 stored, duplicates flagged</li><li>Random file names on disk, original name kept in the DB</li></ul></div>
+  <div><h3>Preview</h3><ul><li>Images: zoom and rotate inside the app</li><li>PDF: page viewer inside the app</li><li>Print opens the file in a print-ready view</li><li>Phones: camera capture straight into the upload field</li></ul></div>
+  <div><h3>After submission</h3><ul><li>Evidence is locked while Submitted, Checked or Reserved</li><li>It can change only in Draft or Returned</li><li>Removing a file is a soft delete and stays in the audit trail</li></ul></div>
+</div>
+
+<!-- ============ NOTIFICATIONS ============ -->
+<h2 id="notify">Notifications and monitoring</h2>
+<div class="tw"><table>
+<thead><tr><th>Event</th><th>Who is told</th><th>In-app</th><th>Email</th></tr></thead>
+<tbody>
+<tr><td>Receipt submitted</td><td>All Checkers</td><td class="y">yes</td><td class="n">digest, optional</td></tr>
+<tr><td>Returned for correction</td><td>Med Ref</td><td class="y">yes</td><td class="y">yes, with remarks</td></tr>
+<tr><td>Marked Checked</td><td>All Approvers</td><td class="y">yes</td><td class="n">digest, optional</td></tr>
+<tr><td>Approved</td><td>Med Ref, Checker</td><td class="y">yes</td><td class="y">yes, links the document</td></tr>
+<tr><td>Disapproved</td><td>Med Ref, Checker</td><td class="y">yes</td><td class="y">yes, with reason</td></tr>
+<tr><td>Reserved</td><td>Med Ref, Checker</td><td class="y">yes</td><td class="y">yes, with note</td></tr>
+<tr><td>Reservation released</td><td>Med Ref</td><td class="y">yes</td><td class="n">no</td></tr>
+<tr><td>Report or import finished</td><td>Requester</td><td class="y">yes</td><td class="n">no</td></tr>
+</tbody></table></div>
+<p>Emails go through the queue with retries and a row in <code>email_log</code>, so a down SMTP server never blocks an approval. Each user can mute the optional ones.</p>
+
+<h3>Monitoring view</h3>
+<ul>
+  <li><b>Med Ref:</b> my records by status, anything returned or reserved at the top.</li>
+  <li><b>Checker:</b> submitted queue, oldest first, with age badges.</li>
+  <li><b>Approver:</b> checked queue, reserved list, totals pending by amount.</li>
+  <li><b>Super Admin:</b> all of the above plus a live activity feed and the audit browser (filter by user, action, entity, date range; export to CSV).</li>
+</ul>
+
+<!-- ============ DOCUMENTS ============ -->
+<h2 id="docs">Documents, reports, import and export</h2>
+<div class="cols">
+  <div><h3>Reimbursement document</h3><ul><li>One per approved receipt, created by the worker right after approval</li><li>Numbered <code>REIM-2026-000001</code></li><li>Lists receipt details, approver, dates, evidence count</li><li>Download and print from the record page</li><li>Layout is a placeholder until your boss's manual form arrives</li></ul></div>
+  <div><h3>Liquidation report</h3><ul><li>Approved records only, enforced in the query, not the UI</li><li>Filter by date range, Med Ref, category, document number</li><li>PDF, XLSX or CSV, with totals</li><li>Stored and listed, so it can be downloaded again</li><li>Template is also a placeholder for now</li></ul></div>
+  <div><h3>Import / export</h3><ul><li>Import CSV or XLSX as Drafts, with a downloadable template</li><li>Preview shows valid rows and row-level errors before anything is saved</li><li>Every list exports what its filters show</li><li>Imports are audited as one job plus one row per record</li></ul></div>
+</div>
+
+<!-- ============ API ============ -->
+<h2 id="api">API outline</h2>
+<div class="tw"><table>
+<thead><tr><th>Module</th><th>Main endpoints</th></tr></thead>
+<tbody>
+<tr><td>Auth</td><td><code>POST /auth/login</code> <code>POST /auth/logout</code> <code>POST /auth/refresh</code> <code>POST /auth/change-password</code></td></tr>
+<tr><td>Users, roles</td><td><code>GET/POST /users</code> <code>PATCH /users/:id</code> <code>POST /users/:id/reset-password</code> <code>POST /users/:id/unlock</code> <code>GET/POST/PATCH /roles</code></td></tr>
+<tr><td>Permissions</td><td><code>GET /permissions</code> <code>GET /roles/:id/permissions</code> <code>PUT /roles/:id/permissions</code></td></tr>
+<tr><td>Sessions</td><td><code>GET /users/:id/sessions</code> <code>DELETE /sessions/:id</code></td></tr>
+<tr><td>Profile</td><td><code>GET/PATCH /me</code> <code>POST /me/photo</code> <code>GET/PUT /me/preferences</code> <code>GET /me/access</code> <code>GET /me/activity</code></td></tr>
+<tr><td>Receipts</td><td><code>GET/POST /receipts</code> <code>GET/PATCH /receipts/:id</code> <code>POST /receipts/:id/submit</code></td></tr>
+<tr><td>Evidence</td><td><code>POST /receipts/:id/evidence</code> <code>GET /evidence/:id/file?mode=view|download|print</code> <code>DELETE /evidence/:id</code></td></tr>
+<tr><td>Review actions</td><td><code>POST /receipts/:id/check</code> <code>/return</code> <code>/approve</code> <code>/disapprove</code> <code>/reserve</code> <code>/release</code></td></tr>
+<tr><td>Documents</td><td><code>GET /receipts/:id/document</code> <code>GET /documents/:id/file</code></td></tr>
+<tr><td>Reports</td><td><code>POST /reports/liquidation</code> <code>GET /reports</code> <code>GET /reports/:id/file</code></td></tr>
+<tr><td>Import / export</td><td><code>POST /imports</code> <code>GET /imports/:id</code> <code>GET /receipts/export?format=csv|xlsx</code></td></tr>
+<tr><td>Notifications</td><td><code>GET /notifications</code> <code>POST /notifications/read</code></td></tr>
+<tr><td>Audit, dashboard</td><td><code>GET /audit</code> <code>GET /receipts/:id/history</code> <code>GET /dashboard</code></td></tr>
+</tbody></table></div>
+
+<!-- ============ UI ============ -->
+<h2 id="ui">Screens</h2>
+<div class="tw"><table>
+<thead><tr><th>Screen</th><th>Roles</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Login, change password</td><td>All</td><td>Forced password change on first login</td></tr>
+<tr><td>Dashboard</td><td>All</td><td>Role-specific counters, queue shortcuts, activity</td></tr>
+<tr><td>My receipts / All receipts</td><td>All</td><td>Filters, search, status pills, bulk export</td></tr>
+<tr><td>Receipt form</td><td>Med Ref</td><td>Fields, drag-and-drop upload, camera on phones, save draft</td></tr>
+<tr><td>Review workspace</td><td>Checker, Approver</td><td>Record on one side, evidence viewer on the other (stacked on phones), action bar with required reason or note</td></tr>
+<tr><td>Record detail and history</td><td>All</td><td>Timeline of every action, documents, evidence</td></tr>
+<tr><td>Reports</td><td>Checker, Approver, Admin</td><td>Filter builder, format picker, past reports</td></tr>
+<tr><td>Import</td><td>Med Ref, Admin</td><td>Upload, preview, fix errors, confirm</td></tr>
+<tr><td>Access control</td><td>Admin</td><td>Users, roles, permission matrix, sessions; every change audited</td></tr>
+<tr><td>Profile</td><td>All</td><td>Details and photo, password, sessions, notification preferences, my access, my activity</td></tr>
+<tr><td>Audit log</td><td>Admin</td><td>Filters and CSV export</td></tr>
+</tbody></table></div>
+<p>Design rules: mobile first, tables turn into cards under 640px, large tap targets for action buttons, light and dark themes, keyboard-reachable everywhere.</p>
+
+<!-- ============ SECURITY ============ -->
+<h2 id="sec">Security and scalability</h2>
+<div class="cols">
+  <div><h3>Security</h3><ul><li>Argon2 password hashes, httpOnly secure cookies, CSRF token</li><li>Permission check on every route, plus record-level ownership checks</li><li>Rate limit on login and upload, account lockout after repeated failures</li><li>Evidence only through authorised endpoints</li><li>Audit table is insert-only at the database level</li><li>Secrets in environment variables, never in the repo</li></ul></div>
+  <div><h3>Scalability</h3><ul><li>Storage adapter: swap disk for S3 without touching features</li><li>Queue keeps email and reports off the request path</li><li>Indexes on status, encoder, dates and audit entity</li><li>Roles and permissions as data, ready for Accounting</li><li>API is stateless, so it can run as several instances</li></ul></div>
+  <div><h3>Quality</h3><ul><li>Unit tests on the state machine and permission rules</li><li>API tests for every transition, including the forbidden ones</li><li>Playwright for the main journey on phone and desktop sizes</li><li>Seed script with one user per role and sample receipts</li></ul></div>
+</div>
+
+<!-- ============ PHASES ============ -->
+<h2 id="phases">Delivery phases</h2>
+<p class="sub">Estimates assume one full-time developer. They are for ordering the work, not a promise.</p>
+
+<div class="phase"><div class="when">Weeks 1–2</div><div><h3>1 · Foundation</h3><p>Monorepo, MySQL schema and migrations, auth, roles and permissions, audit middleware, base layout with responsive shell, <b>profile page</b> and <b>access control page</b> (users, roles, permission matrix, sessions).</p><div class="done">Done when: all four roles can log in and see an empty dashboard, every login is in the audit log, the Super Admin can change a role's permissions and a user sees the change within a minute, and each user can edit their profile and password.</div></div></div>
+<div class="phase"><div class="when">Weeks 2–3</div><div><h3>2 · Med Ref flow</h3><p>Receipt form, drafts, evidence upload, in-app viewer, download and print, submit.</p><div class="done">Done when: a Med Ref can encode, attach a photo and a PDF, preview both, and submit.</div></div></div>
+<div class="phase"><div class="when">Weeks 3–5</div><div><h3>3 · Checker and Approver</h3><p>State machine, queues, review workspace, remarks, return, approve, disapprove, reserve, release, evidence-view audit.</p><div class="done">Done when: the full flow runs end to end and every forbidden transition is rejected by tests.</div></div></div>
+<div class="phase"><div class="when">Week 6</div><div><h3>4 · Notifications</h3><p>Queue and worker, email templates, in-app bell, email log with retries.</p><div class="done">Done when: approve, disapprove, reserve and return each send the right email.</div></div></div>
+<div class="phase"><div class="when">Weeks 7–8</div><div><h3>5 · Documents and reports</h3><p>Reimbursement document, liquidation report in PDF, XLSX and CSV, print views. Placeholder templates.</p><div class="done">Done when: approving creates the document, and a report contains approved records only.</div></div></div>
+<div class="phase"><div class="when">Weeks 8–9</div><div><h3>6 · Import, monitoring, audit browser</h3><p>CSV and XLSX import with preview, list exports, monitoring dashboards, admin audit log, user management.</p><div class="done">Done when: an import with bad rows reports each error and saves only valid rows after confirmation.</div></div></div>
+<div class="phase"><div class="when">Week 10</div><div><h3>7 · Polish and release</h3><p>Phone and desktop QA, accessibility pass, real templates from your boss, backups, deployment guide.</p><div class="done">Done when: a non-developer completes the full flow on a phone without help.</div></div></div>
+
+<!-- ============ OPEN ============ -->
+<h2 id="open">Decisions I assumed, and open items</h2>
+<div class="tw"><table>
+<thead><tr><th>Item</th><th>Assumed for now</th><th>Needs</th></tr></thead>
+<tbody>
+<tr><td>Report and document layouts</td><td>Clean placeholder layouts</td><td>Your boss's manual forms</td></tr>
+<tr><td>Currency</td><td>PHP only</td><td>Confirm</td></tr>
+<tr><td>Categories on receipts</td><td>Simple managed list (Admin edits it)</td><td>Real category list, budget codes if any</td></tr>
+<tr><td>Disapproved records</td><td>Final, can be copied to a new Draft</td><td>Confirm</td></tr>
+<tr><td>Super Admin approves?</td><td>No</td><td>Confirm</td></tr>
+<tr><td>More than one Approver</td><td>Any Approver can act, first one wins</td><td>Is a second-level approval needed?</td></tr>
+<tr><td>Checker assignment</td><td>Shared queue, any Checker</td><td>Per-Med-Ref or per-branch assignment?</td></tr>
+<tr><td>Email sender</td><td>SMTP via environment variables</td><td>Host, sender address, credentials</td></tr>
+<tr><td>Redis</td><td>Optional in dev, required in production</td><td>Can the server run Redis?</td></tr>
+<tr><td>Data retention</td><td>Keep everything, no purge</td><td>Retention period for receipts and evidence</td></tr>
+<tr><td>Hosting</td><td>One Linux VM, Nginx, PM2</td><td>Where it will run</td></tr>
+</tbody></table></div>
+
+<footer>Source: REIMBURSEMENT MANAGEMENT SYSTEM.docx (initial plan). Accounting is intentionally out of scope for v1; the design leaves room for it.</footer>
+
+</html>
