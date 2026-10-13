@@ -26,6 +26,7 @@ export function ReceiptDetailPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [modal, setModal] = useState<ReceiptAction | null>(null);
+  const [allHistory, setAllHistory] = useState(false);
 
   const q = useQuery({
     queryKey: ['receipt', id],
@@ -119,16 +120,17 @@ export function ReceiptDetailPage() {
             <div className="card-h"><h3>History</h3><small>Every action is recorded</small></div>
             <div className="card-b">
               <ol className="tl">
-                {history.data?.items.slice(0, 40).map((h) => (
+                {history.data?.items.slice(0, allHistory ? 200 : 6).map((h) => (
                   <li key={h.id}><span className="dot" /><div><b>{h.actor}</b> {h.summary ?? h.action}<small>{fmtDateTime(h.createdAt)}</small>{h.note && <q>{h.note}</q>}</div></li>
                 ))}
               </ol>
               {history.data && !history.data.items.length && <span className="muted">Nothing yet.</span>}
+              {history.data && history.data.items.length > 6 && <button className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => setAllHistory(!allHistory)}>{allHistory ? 'Show fewer' : `Show all ${history.data.items.length}`}</button>}
             </div>
           </section>
         </div>
 
-        <section className="card">
+        <section className="card sticky">
           <div className="card-h"><h3>Evidence</h3><small>{r.evidence.length} file{r.evidence.length === 1 ? '' : 's'}</small></div>
           <EvidenceViewer key={r.id + ':' + r.version} receiptId={r.id} files={r.evidence} gated={!r.isOwner} onOpened={() => setTimeout(() => qc.invalidateQueries({ queryKey: ['history', id] }), 900)} />
         </section>

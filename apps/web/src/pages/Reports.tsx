@@ -33,6 +33,9 @@ export function ReportsPage() {
     onError: (e) => toast(errMsg(e), 'bad'),
   });
 
+  const [showAll, setShowAll] = useState(false);
+  const reports = list.data?.reports ?? [];
+  const shown = showAll ? reports : reports.slice(0, 6);
   const bad = !from || !to || from > to;
   return (
     <>
@@ -56,7 +59,7 @@ export function ReportsPage() {
         </section>
         <section className="card">
           <div className="card-h"><h2>Past reports</h2></div>
-          {list.data?.reports.map((r) => (
+          {shown.map((r) => (
             <div className="rep-row" key={r.id}>
               <div style={{ minWidth: 0 }}>
                 <b>{r.format.toUpperCase()} · {fmtDate(r.from)} to {fmtDate(r.to)}</b><br />
@@ -74,7 +77,8 @@ export function ReportsPage() {
               )}
             </div>
           ))}
-          {list.data && !list.data.reports.length && <Empty title="No reports yet">Generate one to see it here.</Empty>}
+          {list.data && !reports.length && <Empty title="No reports yet">Generate one to see it here.</Empty>}
+          {reports.length > 6 && <div style={{ padding: 12, textAlign: 'center', borderTop: '1px solid var(--line)' }}><button className="btn sm ghost" onClick={() => setShowAll(!showAll)}>{showAll ? 'Show fewer' : `Show all ${reports.length}`}</button></div>}
         </section>
       </div>
     </>

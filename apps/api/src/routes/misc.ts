@@ -88,7 +88,8 @@ dashboardRouter.get('/', async (req, res) => {
 
   let activity;
   if (p.has('audit.view')) {
-    activity = await prisma.auditLog.findMany({ orderBy: { id: 'desc' }, take: 8 });
+    // Sign-ins and evidence views would drown out the real work, so the feed skips them. The audit log still has everything.
+    activity = await prisma.auditLog.findMany({ where: { NOT: [{ action: { startsWith: 'auth.' } }, { action: { startsWith: 'evidence.' } }] }, orderBy: { id: 'desc' }, take: 8 });
   } else {
     const recent = await prisma.receipt.findMany({ where: scope, select: { id: true }, orderBy: { updatedAt: 'desc' }, take: 50 });
     activity = await prisma.auditLog.findMany({ where: { entityType: 'receipt', entityId: { in: recent.map((r) => String(r.id)) }, action: { notIn: ['evidence.viewed', 'evidence.downloaded', 'evidence.printed'] } }, orderBy: { id: 'desc' }, take: 8 });
