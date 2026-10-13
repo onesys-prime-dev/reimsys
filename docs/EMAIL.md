@@ -67,3 +67,16 @@ Sign in as the administrator, open **Audit log**, then **Emails**:
 | Daily summary (about 8am) | anyone who has it turned on, only if they have something waiting |
 
 New receipts waiting to be checked and checked receipts waiting for approval notify people inside the app only (the bell), not by email, so inboxes do not fill up.
+
+## Changing what the emails say
+
+Sign in as the Super Admin and open **Access, Email templates**.
+
+- **Look and feel** sets the organisation name, a footer line and the brand colour used by every email.
+- Pick an email from the list. You can change its **subject**, **heading**, **message** and **button text**, and switch the receipt details table on or off.
+- Click a detail such as `{{refNo}}` or `{{payee}}` to drop it into the text where your cursor is. Each email only offers the details that make sense for it. A detail it does not have is flagged and Save is blocked, because it would come out empty.
+- In the message, leave a blank line between paragraphs. A line that starts with `>` becomes a highlighted box (used for the reason or note). The box disappears by itself when nothing was written.
+- The **Preview** is built by the server from your unsaved text, so it is exactly what would be sent. Switch between Computer and Phone. **Send a sample** emails it to any address with "[Sample]" in the subject.
+- **Reset to default wording** brings the original text back. Every edit is recorded in the audit log.
+
+Links in emails: the button only appears when REIMSIS has a normal `https://` address. Until then the email says "Sign in to <name> to open it" instead, because mail with links to a bare IP address or plain http is far more likely to be marked as spam.
