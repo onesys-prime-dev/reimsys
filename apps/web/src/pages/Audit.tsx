@@ -98,11 +98,24 @@ function Emails() {
     onSuccess: () => { toast('Queued again.'); qc.invalidateQueries({ queryKey: ['email-log'] }); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
+  const status2 = useQuery({ queryKey: ['email-status'], queryFn: () => api<{ configured: boolean; host: string | null; port: number | null; from: string }>('/email-log/status') });
+  const [testTo, setTestTo] = useState('');
+  const sendTest = useMutation({
+    mutationFn: () => api('/email-log/test', { method: 'POST', body: { to: testTo } }),
+    onSuccess: () => { toast('Test email queued. It appears below in a moment.'); qc.invalidateQueries({ queryKey: ['email-log'] }); setTimeout(() => qc.invalidateQueries({ queryKey: ['email-log'] }), 2500); },
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
   const pages = data.data ? Math.max(1, Math.ceil(data.data.total / 25)) : 1;
   const tone = (s: string) => (s === 'sent' ? 's-app' : s === 'failed' ? 's-dis' : s === 'logged' ? 's-ret' : 's-sub');
   return (
     <>
-      <div className="callout warn" style={{ marginTop: 0 }}><Icon name="info" /><div><b>Emails marked "logged" were not sent</b><span>No SMTP server is configured, so messages are only recorded here. Add the SMTP settings to the server environment to send them.</span></div></div>
+      {status2.data && (status2.data.configured
+        ? <div className="callout ok" style={{ marginTop: 0 }}><Icon name="check" /><div><b>Sending through {status2.data.host}:{status2.data.port}</b><span>Messages go out as {status2.data.from}.</span></div></div>
+        : <div className="callout warn" style={{ marginTop: 0 }}><Icon name="info" /><div><b>Emails marked "logged" were not sent</b><span>No SMTP server is configured, so messages are only recorded here. Add the SMTP settings to the server environment to send them.</span></div></div>)}
+      <form className="tools" onSubmit={(e) => { e.preventDefault(); if (testTo) sendTest.mutate(); }}>
+        <div style={{ flex: '1 1 260px', maxWidth: 380 }}><input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="Send a test email to…" aria-label="Test email address" /></div>
+        <button className="btn pri" type="submit" disabled={!testTo || sendTest.isPending}>Send test email</button>
+      </form>
       <div className="tools"><select style={{ width: 'auto' }} value={status} aria-label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="sent">Sent</option><option value="logged">Logged only</option><option value="failed">Failed</option><option value="queued">Queued</option></select></div>
       <section className="card">
         {data.data?.items.map((e) => (

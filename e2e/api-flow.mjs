@@ -147,7 +147,7 @@ for (const format of ['csv', 'xlsx', 'pdf']) {
     if (format === 'csv') check('csv has the approved receipt but not the disapproved one', b.toString().includes(r.refNo) && !b.toString().includes(d.refNo));
   }
 }
-check('report of another user is private', (await mark.req('GET', '/reports')).data.reports.length === 0);
+check('reports of other people are private', (await mark.req('GET', '/reports')).data.reports.every((x) => x.requestedBy === 'Mark Dela Cruz'));
 
 console.log('\nImport and export');
 const csv = `payee,receipt_date,amount,category,description\nImport Store A ${stamp},2026-10-10,150.25,Medicine,ok\nImport Store B,2026-10-10,abc,Medicine,bad amount\nImport Store C,2026-10-10,99,Nonsense,bad category\n`;

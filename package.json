@@ -16,7 +16,11 @@
     "build": "pnpm --filter @reimsis/web build && pnpm --filter @reimsis/api build"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.9.0",
+    "@types/smtp-server": "^3.5.13",
+    "mailparser": "^3.9.38",
     "playwright": "^1.64.0",
+    "smtp-server": "^3.19.21",
     "vitest": "^5.0.3"
   }
 }

@@ -3,7 +3,9 @@ import type { Prisma } from '@prisma/client';
 import { categorySchema, type ReceiptStatus } from '@reimsis/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
-import { conflict, notFound } from '../lib/errors.js';
+import { badRequest, conflict, notFound } from '../lib/errors.js';
+import { config } from '../config.js';
+import { queueEmail, renderHtml } from '../lib/email.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -127,4 +129,20 @@ emailLogRouter.post('/:id/retry', async (req, res) => {
   await enqueue('email', { emailLogId: id });
   await audit(req, { action: 'email.retried', entityType: 'email', entityId: id, summary: `retried email to ${row.toEmail}` });
   res.json({ ok: true });
+});
+
+emailLogRouter.get('/status', (_req, res) => {
+  res.json({ configured: !!config.smtp, host: config.smtp?.host ?? null, port: config.smtp?.port ?? null, from: config.mailFrom });
+});
+
+/** Sends a short message so an administrator can confirm the mail settings work. It goes through the same queue as real emails. */
+emailLogRouter.post('/test', async (req, res) => {
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw badRequest('Enter a valid email address.');
+  await queueEmail({
+    to, template: 'test', subject: `${config.orgName}: test email`,
+    html: renderHtml('Email is working', [`This is a test message from ${config.orgName}, sent by ${req.auth!.user.name}.`, 'If you can read this, receipt updates will reach you.'], { url: config.webOrigin, label: `Open ${config.orgName}` }),
+  });
+  await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}` });
+  res.status(202).json({ ok: true });
 });

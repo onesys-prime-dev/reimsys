@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const [out, box] = process.argv.slice(2);
+const b = await chromium.launch({ channel: 'chrome' });
+const p = await b.newPage({ viewport: { width: 1280, height: 860 }, baseURL: 'http://localhost:4000' });
+await p.goto('/'); await p.fill('input[type=email]', 'admin@example.com'); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+await p.waitForSelector('.shell'); await p.goto('/audit'); await p.click('button[role=tab]:has-text("Emails")'); await p.waitForSelector('.callout.ok');
+await p.fill('input[aria-label="Test email address"]', 'onesysprimedev@gmail.com'); await p.click('button:has-text("Send test email")');
+await p.waitForSelector('.toast:has-text("Test email queued")'); await p.waitForTimeout(2800);
+await p.screenshot({ path: out + '/emails-tab.png' });
+const e = await b.newPage({ viewport: { width: 700, height: 640 } });
+await e.goto('file:///' + box + '/007.html'); await e.screenshot({ path: out + '/email-approved.png' });
+await b.close();

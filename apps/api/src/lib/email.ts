@@ -44,7 +44,10 @@ registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
     await transport.sendMail({ from: config.mailFrom, to: row.toEmail, subject: row.subject, html: row.body });
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'sent', sentAt: new Date(), error: null } });
   } catch (err) {
-    await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'failed', error: (err instanceof Error ? err.message : String(err)).slice(0, 300) } });
+    // Connection failures arrive as an AggregateError with an empty message, so dig out something readable.
+    const first = err instanceof AggregateError ? err.errors[0] : err;
+    const detail = [first?.code, first?.message || (err as Error)?.message, first?.address && `${first.address}:${first.port}`].filter(Boolean).join(' ');
+    await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'failed', error: (detail || 'Could not reach the mail server').slice(0, 300) } });
     throw err;
   }
 });
