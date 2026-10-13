@@ -20,8 +20,8 @@ settingsRouter.put('/mail', async (req, res) => {
   // The password itself is never written to the audit log, only whether it changed.
   await audit(req, {
     action: 'settings.mail_saved', entityType: 'settings', entityId: 'mail', summary: `saved the mail account (${input.host}:${input.port})`,
-    before: { host: before.host, port: before.port, user: before.user, fromAddress: before.fromAddress },
-    after: { host: input.host, port: input.port, secure: input.secure, user: input.user, fromAddress: input.fromAddress, passwordChanged: !!input.pass },
+    before: { host: before.host, port: before.port, user: before.user, fromAddress: before.fromAddress, testRedirect: before.testRedirect },
+    after: { host: input.host, port: input.port, secure: input.secure, user: input.user, fromAddress: input.fromAddress, testRedirect: input.testRedirect, passwordChanged: !!input.pass },
   });
   res.json({ mail: await mailView() });
 });

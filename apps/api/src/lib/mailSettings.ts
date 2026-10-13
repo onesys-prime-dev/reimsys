@@ -5,11 +5,13 @@ import { decrypt, encrypt } from './secrets.js';
 
 const KEY = 'mail';
 
-interface Stored { host: string; port: number; secure: boolean; user: string; passEnc: string | null; fromName: string; fromAddress: string }
+interface Stored { host: string; port: number; secure: boolean; user: string; passEnc: string | null; fromName: string; fromAddress: string; testRedirect?: string }
 export interface ResolvedMail {
   source: 'database' | 'environment' | 'none';
   smtp: { host: string; port: number; secure: boolean; user?: string; pass?: string } | null;
   from: string;
+  /** Test mode: every email is delivered here instead of to its real recipient. */
+  redirectTo?: string;
 }
 
 const fromHeader = (name: string, address: string) => (name ? `"${name.replace(/"/g, '')}" <${address}>` : address);
@@ -31,7 +33,7 @@ export async function resolveMail(): Promise<ResolvedMail> {
   if (s) {
     let pass: string | undefined;
     try { pass = s.passEnc ? decrypt(s.passEnc) : undefined; } catch { pass = undefined; }
-    value = { source: 'database', smtp: { host: s.host, port: s.port, secure: s.secure, user: s.user || undefined, pass }, from: fromHeader(s.fromName, s.fromAddress) };
+    value = { source: 'database', smtp: { host: s.host, port: s.port, secure: s.secure, user: s.user || undefined, pass }, from: fromHeader(s.fromName, s.fromAddress), redirectTo: s.testRedirect || undefined };
   } else if (config.smtp) {
     value = { source: 'environment', smtp: config.smtp, from: config.mailFrom };
   } else {
@@ -44,19 +46,19 @@ export async function resolveMail(): Promise<ResolvedMail> {
 /** What the settings page may see. The password is never included. */
 export async function mailView(): Promise<MailSettingsView> {
   const s = await readStored();
-  if (s) return { source: 'database', host: s.host, port: s.port, secure: s.secure, user: s.user, hasPassword: !!s.passEnc, fromName: s.fromName, fromAddress: s.fromAddress };
+  if (s) return { source: 'database', host: s.host, port: s.port, secure: s.secure, user: s.user, hasPassword: !!s.passEnc, fromName: s.fromName, fromAddress: s.fromAddress, testRedirect: s.testRedirect ?? '' };
   if (config.smtp) {
     const m = /^"?([^"<]*?)"?\s*<([^>]+)>$/.exec(config.mailFrom);
-    return { source: 'environment', host: config.smtp.host, port: config.smtp.port, secure: config.smtp.secure, user: config.smtp.user ?? '', hasPassword: !!config.smtp.pass, fromName: m?.[1]?.trim() ?? '', fromAddress: m?.[2] ?? config.mailFrom };
+    return { source: 'environment', host: config.smtp.host, port: config.smtp.port, secure: config.smtp.secure, user: config.smtp.user ?? '', hasPassword: !!config.smtp.pass, fromName: m?.[1]?.trim() ?? '', fromAddress: m?.[2] ?? config.mailFrom, testRedirect: '' };
   }
-  return { source: 'none', host: '', port: 587, secure: false, user: '', hasPassword: false, fromName: config.orgName, fromAddress: '' };
+  return { source: 'none', host: '', port: 587, secure: false, user: '', hasPassword: false, fromName: config.orgName, fromAddress: '', testRedirect: '' };
 }
 
 export async function saveMail(input: MailSettingsInput, userId: number) {
   const prev = await readStored();
   const keepOld = input.pass === undefined || input.pass === '';
   const passEnc = keepOld ? prev?.passEnc ?? null : encrypt(input.pass!);
-  const value: Stored = { host: input.host, port: input.port, secure: input.secure, user: input.user, passEnc, fromName: input.fromName, fromAddress: input.fromAddress };
+  const value: Stored = { host: input.host, port: input.port, secure: input.secure, user: input.user, passEnc, fromName: input.fromName, fromAddress: input.fromAddress, testRedirect: input.testRedirect };
   await prisma.setting.upsert({ where: { key: KEY }, update: { value: JSON.stringify(value), updatedById: userId }, create: { key: KEY, value: JSON.stringify(value), updatedById: userId } });
   invalidateMailCache();
 }

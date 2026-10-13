@@ -141,10 +141,12 @@ export const mailSettingsSchema = z.object({
   pass: z.string().max(500).optional(),
   fromName: z.string().trim().max(80).default(''),
   fromAddress: z.string().trim().toLowerCase().email('Enter the address emails are sent from.'),
+  /** Test mode: when set, every email goes to this address instead of its real recipient. */
+  testRedirect: z.union([z.literal(''), z.string().trim().toLowerCase().email('Enter a valid test address.')]).default(''),
 });
 export type MailSettingsInput = z.infer<typeof mailSettingsSchema>;
 
 export interface MailSettingsView {
   source: 'database' | 'environment' | 'none';
-  host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string;
+  host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string; testRedirect: string;
 }

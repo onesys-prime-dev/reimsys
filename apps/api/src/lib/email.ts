@@ -107,7 +107,12 @@ registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
     return;
   }
   try {
-    await transportFor(mail.smtp).sendMail(buildMessage({ id: row.id, from: mail.from, to: row.toEmail, subject: row.subject, html: row.body }));
+    // Test mode: deliver to the test address, and say who it was really for so nobody is confused.
+    const redirected = mail.redirectTo && mail.redirectTo !== row.toEmail;
+    const to = redirected ? mail.redirectTo! : row.toEmail;
+    const subject = redirected ? `[TEST for ${row.toEmail}] ${row.subject}` : row.subject;
+    const html = redirected ? row.body.replace('<td style="padding:24px">', `<td style="padding:24px"><p style="margin:0 0 14px;padding:8px 10px;background:#fbf0d3;color:#8a5a00;border-radius:6px;font-size:13px">Test mode: this email was meant for ${esc(row.toEmail)}.</p>`) : row.body;
+    await transportFor(mail.smtp).sendMail(buildMessage({ id: row.id, from: mail.from, to, subject, html }));
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'sent', sentAt: new Date(), error: null } });
   } catch (err) {
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'failed', error: explainMailError(err).slice(0, 300) } });

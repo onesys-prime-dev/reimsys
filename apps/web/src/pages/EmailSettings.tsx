@@ -5,7 +5,7 @@ import { Field, Icon, Switch, useToast } from '../ui';
 
 interface MailView {
   source: 'database' | 'environment' | 'none';
-  host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string;
+  host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string; testRedirect: string;
 }
 
 const PRESETS: Record<string, { label: string; host: string; port: number; secure: boolean; hint: string }> = {
@@ -18,7 +18,7 @@ export function EmailSettingsTab() {
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['mail-settings'], queryFn: () => api<{ mail: MailView }>('/settings/mail') });
-  const [f, setF] = useState({ host: '', port: '587', secure: false, user: '', pass: '', fromName: '', fromAddress: '' });
+  const [f, setF] = useState({ host: '', port: '587', secure: false, user: '', pass: '', fromName: '', fromAddress: '', testRedirect: '' });
   const [preset, setPreset] = useState('other');
   const [loaded, setLoaded] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -26,7 +26,7 @@ export function EmailSettingsTab() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fill = (m: MailView) => {
-    setF({ host: m.host, port: String(m.port), secure: m.secure, user: m.user, pass: '', fromName: m.fromName, fromAddress: m.fromAddress });
+    setF({ host: m.host, port: String(m.port), secure: m.secure, user: m.user, pass: '', fromName: m.fromName, fromAddress: m.fromAddress, testRedirect: m.testRedirect });
     setPreset(m.host === PRESETS.gmail!.host ? 'gmail' : m.host === PRESETS.microsoft!.host ? 'microsoft' : 'other');
   };
   // Fill the form once, the first time the saved settings arrive. After that the form belongs to the person typing.
@@ -38,7 +38,7 @@ export function EmailSettingsTab() {
   }, [q.data, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const m = q.data?.mail;
-  const body = () => ({ host: f.host.trim(), port: Number(f.port), secure: f.secure, user: f.user.trim(), pass: f.pass || undefined, fromName: f.fromName.trim(), fromAddress: f.fromAddress.trim() });
+  const body = () => ({ host: f.host.trim(), port: Number(f.port), secure: f.secure, user: f.user.trim(), pass: f.pass || undefined, fromName: f.fromName.trim(), fromAddress: f.fromAddress.trim(), testRedirect: f.testRedirect.trim() });
   const set = (k: keyof typeof f, v: string | boolean) => { setF((x) => ({ ...x, [k]: v })); setErrors((e) => ({ ...e, [k]: '' })); setResult(null); };
   const pick = (k: string) => {
     const p = PRESETS[k]!;
@@ -73,6 +73,7 @@ export function EmailSettingsTab() {
     if (!f.host.trim()) e.host = 'Enter the mail server address.';
     if (!(Number(f.port) >= 1 && Number(f.port) <= 65535)) e.port = 'Enter a port between 1 and 65535.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.fromAddress.trim())) e.fromAddress = 'Enter the address emails are sent from.';
+    if (f.testRedirect.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.testRedirect.trim())) e.testRedirect = 'Enter a valid email address, or leave this empty.';
     if (f.user.trim() && !f.pass && !m?.hasPassword) e.pass = 'Enter the password for this account.';
     setErrors(e);
     return !Object.keys(e).length;
@@ -81,10 +82,10 @@ export function EmailSettingsTab() {
   if (!m) return <div className="empty">Loading…</div>;
   return (
     <>
-      <div className={`callout ${m.source === 'none' ? 'warn' : 'ok'}`} style={{ marginTop: 0 }}>
+      <div className={`callout ${m.source === 'none' || m.testRedirect ? 'warn' : 'ok'}`} style={{ marginTop: 0 }}>
         <Icon name={m.source === 'none' ? 'info' : 'check'} />
         <div>
-          <b>{m.source === 'database' ? `Sending through ${m.host}` : m.source === 'environment' ? `Using the server's own settings (${m.host})` : 'No email account is set up yet'}</b>
+          <b>{m.testRedirect ? `TEST MODE: all email goes to ${m.testRedirect}` : m.source === 'database' ? `Sending through ${m.host}` : m.source === 'environment' ? `Using the server's own settings (${m.host})` : 'No email account is set up yet'}</b>
           <span>
             {m.source === 'none' ? 'Emails are recorded but not sent until you save an account below.'
               : m.source === 'environment' ? 'Saving an account here replaces them.'
@@ -120,6 +121,13 @@ export function EmailSettingsTab() {
               <Switch checked={f.secure} onChange={(v) => set('secure', v)} label="Secure connection" />
               <span>Secure connection from the start <span className="hint" style={{ fontWeight: 400 }}>(on for port 465, off for port 587)</span></span>
             </div>
+          </div>
+
+          <div className="form" style={{ marginTop: 16 }}>
+            <Field label="Test mode" hint="optional" error={errors.testRedirect} className="full">
+              <input type="email" value={f.testRedirect} onChange={(e) => set('testRedirect', e.target.value)} placeholder="Send every email to this address instead" />
+              <span className="hint" style={{ fontWeight: 400 }}>While this is filled in, nobody else receives email. Each message goes here with "[TEST for name@…]" in the subject. Empty it to send to real recipients.</span>
+            </Field>
           </div>
 
           {(preset === 'gmail' || preset === 'microsoft') && f.user.trim() && f.fromAddress.trim() && f.user.trim().toLowerCase() !== f.fromAddress.trim().toLowerCase() && (

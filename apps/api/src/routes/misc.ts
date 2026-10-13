@@ -7,6 +7,7 @@ import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { config } from '../config.js';
 import { queueEmail, renderHtml } from '../lib/email.js';
 import { resolveMail } from '../lib/mailSettings.js';
+import { sendDigestNow } from '../lib/digest.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -134,7 +135,7 @@ emailLogRouter.post('/:id/retry', async (req, res) => {
 
 emailLogRouter.get('/status', async (_req, res) => {
   const mail = await resolveMail();
-  res.json({ configured: !!mail.smtp, source: mail.source, host: mail.smtp?.host ?? null, port: mail.smtp?.port ?? null, from: mail.from });
+  res.json({ configured: !!mail.smtp, source: mail.source, testRedirect: mail.redirectTo ?? null, host: mail.smtp?.host ?? null, port: mail.smtp?.port ?? null, from: mail.from });
 });
 
 /** Sends a short message so an administrator can confirm the mail settings work. It goes through the same queue as real emails. */
@@ -147,4 +148,13 @@ emailLogRouter.post('/test', async (req, res) => {
   });
   await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}` });
   res.status(202).json({ ok: true });
+});
+
+/** Sends one person their daily summary right now, so an administrator can see what it looks like. */
+emailLogRouter.post('/digest-now', async (req, res) => {
+  const userId = Number(req.body?.userId);
+  if (!Number.isInteger(userId) || userId <= 0) throw badRequest('Choose a person.');
+  const sent = await sendDigestNow(userId);
+  if (sent) await audit(req, { action: 'email.digest_sent', entityType: 'email', summary: `sent the daily summary to user #${userId} now` });
+  res.json({ sent });
 });
