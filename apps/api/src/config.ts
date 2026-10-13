@@ -24,7 +24,8 @@ const env = z
 export const config = {
   isProd: env.NODE_ENV === 'production',
   port: env.PORT,
-  webOrigin: env.WEB_ORIGIN,
+  webOrigin: env.WEB_ORIGIN.split(',')[0]!.trim(),
+  webOrigins: env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
   sessionMs: env.SESSION_DAYS * 24 * 60 * 60 * 1000,
   storageDir: path.resolve(env.STORAGE_DIR),
   cookieName: 'reimsis_sid',

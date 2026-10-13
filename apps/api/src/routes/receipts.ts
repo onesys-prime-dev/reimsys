@@ -239,6 +239,10 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
     if (!n) throw badRequest('Add at least one photo or PDF of the receipt before submitting.', 'NO_EVIDENCE');
   }
   const now = new Date();
+  // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.
+  if ((action === 'approve' || action === 'disapprove' || action === 'reserve') && (!r.checkedById || !r.checkedAt)) {
+    throw conflict('This receipt has not been checked yet, so it cannot be decided.', 'NOT_CHECKED');
+  }
   if (action === 'check') {
     const viewed = await prisma.auditLog.count({
       where: { actorId: auth.user.id, entityType: 'receipt', entityId: String(r.id), action: 'evidence.viewed', createdAt: { gte: r.submittedAt ?? new Date(0) } },

@@ -37,6 +37,7 @@ export function receiptBrief(r: ReceiptRow) {
     category: { id: r.category.id, name: r.category.name },
     encoder: r.encoder,
     submittedAt: r.submittedAt,
+    checkedAt: r.checkedAt,
     updatedAt: r.updatedAt,
     docNo: r.document?.docNo ?? null,
   };

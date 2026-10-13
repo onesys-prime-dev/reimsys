@@ -16,7 +16,7 @@ export function ReceiptRow({ r, showEncoder }: { r: ReceiptBrief; showEncoder: b
       <span className="c-cat">{r.category.name}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
-      <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className="age" style={{ display: 'block', marginTop: 2 }}>{ago(r.submittedAt)}</span>}</span>
+      <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className="age" style={{ display: 'block', marginTop: 2 }}>{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className="age" style={{ display: 'block', marginTop: 2 }}>checked {ago(r.checkedAt)}</span>}</span>
     </Link>
   );
 }

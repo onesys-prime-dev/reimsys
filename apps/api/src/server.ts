@@ -38,6 +38,8 @@ app.use(
         frameSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'self'"],
+        // Only force https in production. On a home or office network the app runs over plain http.
+        upgradeInsecureRequests: config.isProd ? [] : null,
       },
     },
   }),

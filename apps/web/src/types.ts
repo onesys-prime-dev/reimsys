@@ -11,6 +11,7 @@ export interface ReceiptBrief {
   category: { id: number; name: string };
   encoder: { id: number; name: string };
   submittedAt: string | null;
+  checkedAt: string | null;
   updatedAt: string;
   docNo: string | null;
 }

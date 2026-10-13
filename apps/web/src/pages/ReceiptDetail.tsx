@@ -136,16 +136,25 @@ export function ReceiptDetailPage() {
         </section>
       </div>
 
-      {modal && modalCfg && <NoteModal action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note) => act.mutate({ action: modal, note })} />}
+      {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note) => act.mutate({ action: modal, note })} />}
     </>
   );
 }
 
-function NoteModal({ action, cfg, required, busy, onClose, onSubmit }: { action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string) => void }) {
+function NoteModal({ receipt, action, cfg, required, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string) => void }) {
   const [text, setText] = useState('');
   const ok = !required || text.trim().length >= 4;
   return (
     <Modal title={cfg.title} onClose={onClose}>
+      <div className="callout" style={{ margin: '0 0 14px', display: 'block' }}>
+        <b>{receipt.payee}</b>
+        <span style={{ display: 'block' }}>{receipt.refNo} · {money(receipt.amount)}</span>
+        {(action === 'approve' || action === 'disapprove' || action === 'reserve' || action === 'release') && (
+          <span style={{ display: 'block', color: 'var(--muted)' }}>
+            {receipt.checkedBy ? `Checked by ${receipt.checkedBy}${receipt.checkedAt ? ` on ${fmtDateTime(receipt.checkedAt)}` : ''}` : 'Not checked yet'}
+          </span>
+        )}
+      </div>
       <p>{cfg.desc}</p>
       <label className="f">
         <span>{cfg.field}{!required && <span className="hint"> Optional</span>}</span>

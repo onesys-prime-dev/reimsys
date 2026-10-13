@@ -10,6 +10,6 @@ export function csrfGuard(req: Request, _res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   if (req.get('x-requested-with') !== 'reimsis') return next(forbidden('Missing request header.', 'CSRF'));
   const origin = req.get('origin');
-  if (origin && origin !== config.webOrigin) return next(forbidden('Origin not allowed.', 'CSRF'));
+  if (origin && !config.webOrigins.includes(origin)) return next(forbidden('Origin not allowed.', 'CSRF'));
   next();
 }
