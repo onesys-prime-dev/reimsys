@@ -39,3 +39,20 @@ auditRouter.get('/', async (req, res) => {
     })),
   });
 });
+
+auditRouter.get('/export', async (req, res) => {
+  const q = str(req.query.q);
+  const where: Prisma.AuditLogWhereInput = {};
+  if (q) where.OR = [{ actorName: { contains: q } }, { action: { contains: q } }, { summary: { contains: q } }, { entityId: { contains: q } }];
+  if (str(req.query.action)) where.action = { startsWith: str(req.query.action)! };
+  const from = str(req.query.from), to = str(req.query.to);
+  if (from || to) {
+    where.createdAt = {};
+    if (from) where.createdAt.gte = new Date(from + 'T00:00:00');
+    if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999');
+  }
+  const rows = await prisma.auditLog.findMany({ where, orderBy: { id: 'desc' }, take: 50000 });
+  const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = '﻿' + [['Time', 'Person', 'Action', 'Summary', 'Record', 'IP'].join(','), ...rows.map((r) => [r.createdAt.toISOString(), r.actorName, r.action, r.summary, `${r.entityType}${r.entityId ? ' #' + r.entityId : ''}`, r.ip].map(esc).join(','))].join('\r\n');
+  res.type('text/csv').attachment(`audit-log-${new Date().toISOString().slice(0, 10)}.csv`).send(csv);
+});

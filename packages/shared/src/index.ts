@@ -27,6 +27,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'user.manage', label: 'Manage users', group: 'Administration' },
   { code: 'role.manage', label: 'Manage roles and permissions', group: 'Administration' },
   { code: 'audit.view', label: 'Browse the audit log', group: 'Administration' },
+  { code: 'category.manage', label: 'Manage receipt categories', group: 'Administration' },
 ];
 export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 
@@ -44,6 +45,7 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'user.manage': ['admin'],
   'role.manage': ['admin'],
   'audit.view': ['admin'],
+  'category.manage': ['admin'],
 };
 
 /** Grants that can never be removed, so the system always has a review path and an administrator. */
@@ -56,9 +58,6 @@ export const LOCKED_GRANTS: { role: RoleCode; permission: string }[] = [
 export const isLockedGrant = (role: string, permission: string) =>
   LOCKED_GRANTS.some((g) => g.role === role && g.permission === permission);
 
-/* ---------- receipt statuses (used from phase 2) ---------- */
-export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved'] as const;
-export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
 /* ---------- validation ---------- */
 export const passwordSchema = z
@@ -128,3 +127,4 @@ export interface MeResponse {
   };
   permissions: string[];
 }
+export * from './receipts';

@@ -4,34 +4,27 @@ import { hashPassword } from '../src/lib/password.js';
 
 /** Development password for the seeded accounts. Change or remove before any real deployment. */
 const DEV_PASSWORD = 'Reimsis#2026';
+const CATEGORIES = ['Medicine', 'Transport', 'Meals', 'Supplies', 'Lodging'];
 
 async function main() {
-  for (const p of PERMISSIONS) {
-    await prisma.permission.upsert({
-      where: { code: p.code },
-      update: { label: p.label, groupName: p.group },
-      create: { code: p.code, label: p.label, groupName: p.group },
-    });
-  }
+  const roleRows = [];
   for (const r of DEFAULT_ROLES) {
-    await prisma.role.upsert({
-      where: { code: r.code },
-      update: { name: r.name },
-      create: { code: r.code, name: r.name, rank: r.rank, isSystem: true },
-    });
+    roleRows.push(await prisma.role.upsert({ where: { code: r.code }, update: { name: r.name }, create: { code: r.code, name: r.name, rank: r.rank, isSystem: true } }));
   }
-  const roles = await prisma.role.findMany();
-  const perms = await prisma.permission.findMany();
-  const roleId = new Map(roles.map((r) => [r.code, r.id]));
-  const permId = new Map(perms.map((p) => [p.code, p.id]));
+  const roleId = new Map(roleRows.map((r) => [r.code, r.id]));
 
-  // Only set default grants on a fresh database, so edits made on the access control page survive re-seeding.
-  if ((await prisma.rolePermission.count()) === 0) {
-    const rows: { roleId: number; permissionId: number }[] = [];
-    for (const [code, rs] of Object.entries(DEFAULT_GRANTS)) {
-      for (const r of rs) rows.push({ roleId: roleId.get(r)!, permissionId: permId.get(code)! });
+  // Permissions added in a later release get their default grants once. Edits made on the access control page survive re-seeding.
+  for (const p of PERMISSIONS) {
+    const existing = await prisma.permission.findUnique({ where: { code: p.code } });
+    const row = await prisma.permission.upsert({ where: { code: p.code }, update: { label: p.label, groupName: p.group }, create: { code: p.code, label: p.label, groupName: p.group } });
+    if (!existing) {
+      const roles = DEFAULT_GRANTS[p.code] ?? [];
+      if (roles.length) await prisma.rolePermission.createMany({ data: roles.map((r) => ({ roleId: roleId.get(r)!, permissionId: row.id })), skipDuplicates: true });
     }
-    await prisma.rolePermission.createMany({ data: rows });
+  }
+
+  for (const [i, name] of CATEGORIES.entries()) {
+    await prisma.category.upsert({ where: { name }, update: {}, create: { name, sortOrder: i } });
   }
 
   const demo = [
@@ -49,7 +42,7 @@ async function main() {
       create: { email: u.email, name: u.name, branch: u.branch, roleId: roleId.get(u.role)!, passwordHash, mustChangePassword: false },
     });
   }
-  console.log(`Seeded ${PERMISSIONS.length} permissions, ${DEFAULT_ROLES.length} roles, ${demo.length} users.`);
+  console.log(`Seeded ${PERMISSIONS.length} permissions, ${DEFAULT_ROLES.length} roles, ${CATEGORIES.length} categories, ${demo.length} users.`);
   console.log(`Dev password for every seeded user: ${DEV_PASSWORD}`);
 }
 

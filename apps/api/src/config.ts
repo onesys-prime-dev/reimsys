@@ -10,6 +10,13 @@ const env = z
     WEB_ORIGIN: z.string().default('http://localhost:5173'),
     SESSION_DAYS: z.coerce.number().default(7),
     STORAGE_DIR: z.string().default('./storage'),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().default(587),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_SECURE: z.enum(['true', 'false']).default('false'),
+    MAIL_FROM: z.string().default('REIMSIS <no-reply@example.com>'),
+    ORG_NAME: z.string().default('REIMSIS'),
   })
   .parse(process.env);
 
@@ -20,6 +27,9 @@ export const config = {
   sessionMs: env.SESSION_DAYS * 24 * 60 * 60 * 1000,
   storageDir: path.resolve(env.STORAGE_DIR),
   cookieName: 'reimsis_sid',
+  orgName: env.ORG_NAME,
+  mailFrom: env.MAIL_FROM,
+  smtp: env.SMTP_HOST ? { host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_SECURE === 'true', user: env.SMTP_USER, pass: env.SMTP_PASS } : null,
   maxFailedAttempts: 5,
   lockMinutes: 15,
 };
