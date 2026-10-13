@@ -72,7 +72,8 @@ export async function buildReimbursementPdf(receiptId: number) {
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#12232b').text(name!, x + 6, sy + 6, { width: cw - 26 });
     doc.font('Helvetica').fontSize(8).fillColor('#546770').text(label!, x + 6, sy + 22);
   });
-  doc.font('Helvetica').fontSize(8).fillColor('#8a9aa1').text(`Generated ${new Date().toLocaleString('en-PH')} by ${config.orgName}`, L, 790, { width: W, align: 'center' });
+  doc.page.margins.bottom = 0;
+  doc.font('Helvetica').fontSize(8).fillColor('#8a9aa1').text(`Generated ${new Date().toLocaleString('en-PH')} by ${config.orgName}`, L, 790, { width: W, align: 'center', lineBreak: false });
   return toBuffer(doc);
 }
 

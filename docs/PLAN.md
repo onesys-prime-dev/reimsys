@@ -51,7 +51,7 @@ All transitions go through one state-machine module. Each writes an audit row an
 
 `roles`, `permissions`, `role_permissions`, `users`, `user_profiles`, `sessions`, `receipts`, `receipt_evidence`, `receipt_reviews`, `reimbursement_documents`, `liquidation_reports`, `import_jobs`, `notifications`, `email_log`, `audit_logs`, `sequences`.
 
-## 5. Delivery phases
+## 5. Delivery phases (all built)
 
 1. **Foundation** (weeks 1-2): monorepo, schema + migrations, auth, roles/permissions, audit middleware, app shell, profile page, access control page. *Done when:* all four roles sign in, a permission change takes effect within a minute, every login is audited.
 2. **Med Ref flow** (weeks 2-3): receipt form, drafts, evidence upload and viewer, download/print, submit.
@@ -60,6 +60,14 @@ All transitions go through one state-machine module. Each writes an audit row an
 5. **Documents and reports** (weeks 7-8): reimbursement document, liquidation report (PDF/XLSX/CSV).
 6. **Import, monitoring, audit browser** (weeks 8-9).
 7. **Polish and release** (week 10): phone/desktop QA, accessibility, real templates, backups, deployment guide.
+
+## 5a. Differences from the first plan
+
+- Redis is not used. The job queue (email, documents, reports) lives in MySQL and runs in the API process. Swap in BullMQ later if the load needs it.
+- Receipt history is read from the audit log instead of a separate reviews table.
+- Reviewers cannot act on receipts they encoded.
+- Evidence views by a Checker are required before checking, counted since the latest submission.
+- Added: category list managed by the administrator, email log with retry, daily digest email, audit export.
 
 ## 6. Still needed from the client side
 

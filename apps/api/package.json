@@ -5,16 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "db:reset": "prisma migrate reset --force",
+    "build": "tsup",
+    "start:dev": "tsx src/server.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
@@ -40,6 +39,7 @@
     "@types/nodemailer": "^8.0.2",
     "@types/pdfkit": "^0.17.6",
     "prisma": "^6.0.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

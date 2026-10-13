@@ -18,6 +18,16 @@ const PATHS: Record<string, string> = {
   user: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21c0-4 3.6-7 8-7s8 3 8 7',
   copy: 'M9 9h10v10H9zM5 15V5h10',
   key: 'M14 10a4 4 0 1 1-3.5 6L3 20v-3l2-2h2v-2l3.5-.5A4 4 0 0 1 14 10z',
+  download: 'M12 4v11M7 11l5 5 5-5M5 20h14',
+  print: 'M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z',
+  camera: 'M3 8h4l2-3h6l2 3h4v12H3zM12 9a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
+  pause: 'M9 5v14M15 5v14',
+  back: 'M15 5l-7 7 7 7',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01',
+  edit: 'M4 20h4l10-10-4-4L4 16zM13 7l4 4',
+  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 21a2 2 0 0 0 3.4 0',
 };
 export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; size?: number }) {
   return (
@@ -109,3 +119,8 @@ export function CopyBox({ value }: { value: string }) {
     </div>
   );
 }
+
+/* ---------- status pill ---------- */
+import { STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+const PILL: Record<ReceiptStatus, string> = { draft: 's-draft', submitted: 's-sub', returned: 's-ret', checked: 's-chk', approved: 's-app', disapproved: 's-dis', reserved: 's-res' };
+export const StatusPill = ({ status }: { status: ReceiptStatus }) => <span className={`pill ${PILL[status]}`}>{STATUS_LABEL[status]}</span>;

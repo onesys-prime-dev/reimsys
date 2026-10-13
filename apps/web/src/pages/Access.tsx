@@ -12,15 +12,16 @@ interface UserRow {
 
 export function AccessPage() {
   const { can } = useAuth();
-  const [tab, setTab] = useState<'users' | 'perms'>(can('user.manage') ? 'users' : 'perms');
+  const [tab, setTab] = useState<'users' | 'perms' | 'cats'>(can('user.manage') ? 'users' : 'perms');
   return (
     <>
       <div className="ph"><div><h1>Access control</h1><p>Manage who can sign in and what each role can do.</p></div></div>
       <div className="tabs" role="tablist">
         {can('user.manage') && <button role="tab" aria-selected={tab === 'users'} className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Users</button>}
         <button role="tab" aria-selected={tab === 'perms'} className={tab === 'perms' ? 'on' : ''} onClick={() => setTab('perms')}>Roles and permissions</button>
+        {can('category.manage') && <button role="tab" aria-selected={tab === 'cats'} className={tab === 'cats' ? 'on' : ''} onClick={() => setTab('cats')}>Categories</button>}
       </div>
-      {tab === 'users' ? <UsersTab /> : <PermsTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'cats' ? <CategoriesTab /> : <PermsTab />}
     </>
   );
 }
@@ -294,5 +295,44 @@ function AddRole({ maxRank, onClose, onDone }: { maxRank: number; onClose: () =>
         <div className="btns"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn pri" type="submit" disabled={create.isPending}>Create role</button></div>
       </form>
     </Modal>
+  );
+}
+
+/* ================= categories ================= */
+
+function CategoriesTab() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const list = useQuery({ queryKey: ['categories', 'all'], queryFn: () => api<{ categories: { id: number; name: string; isActive: boolean; receiptCount: number }[] }>('/categories?all=true') });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['categories'] }); };
+  const add = useMutation({
+    mutationFn: () => api('/categories', { method: 'POST', body: { name } }),
+    onSuccess: () => { setName(''); toast('Category added.'); refresh(); },
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
+  const patch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: object }) => api(`/categories/${id}`, { method: 'PATCH', body }),
+    onSuccess: refresh,
+    onError: (e) => { toast(errMsg(e), 'bad'); refresh(); },
+  });
+  return (
+    <>
+      <form className="tools" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate(); }}>
+        <div style={{ flex: '1 1 240px', maxWidth: 360 }}><input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category name" aria-label="New category name" /></div>
+        <button className="btn pri" type="submit" disabled={name.trim().length < 2 || add.isPending}><Icon name="plus" size={18} />Add category</button>
+      </form>
+      <section className="card cats">
+        {list.data?.categories.map((c) => (
+          <div className="urow" key={c.id}>
+            <b>{c.name}</b>
+            <span className="muted">{c.receiptCount} receipt{c.receiptCount === 1 ? '' : 's'}</span>
+            <span><Switch checked={c.isActive} label={`Active: ${c.name}`} onChange={(v) => patch.mutate({ id: c.id, body: { isActive: v } })} /></span>
+          </div>
+        ))}
+        {!list.data && <div className="empty">Loading…</div>}
+      </section>
+      <p className="muted" style={{ fontSize: '.84rem' }}>Turning a category off hides it from new receipts. Existing receipts and reports keep it.</p>
+    </>
   );
 }

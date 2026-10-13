@@ -1,51 +1,95 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+import { ago, api, money } from '../api';
 import { useAuth } from '../auth';
+import type { ReceiptBrief } from '../types';
+import { Empty, Icon } from '../ui';
+import { ReceiptRow } from './Receipts';
+
+interface Dash {
+  counts: Record<string, number>;
+  sums: Record<string, number>;
+  queueTitle: string;
+  queueTotal: number;
+  queue: ReceiptBrief[];
+  activity: { id: number; actor: string; summary: string; receiptId: number | null; refNo: string | null; createdAt: string }[];
+}
 
 const BLURB: Record<string, string> = {
-  medref: 'Encode receipts, attach evidence and track each one.',
-  checker: 'Verify receipts and evidence, oldest first.',
-  approver: 'Only checked records reach you.',
-  admin: 'Manage who can sign in and what each role can do.',
+  receipt: 'Encode receipts, attach evidence and track each one.',
+  check: 'Verify receipts and evidence, oldest first.',
+  decide: 'Only checked records reach you.',
+  admin: 'A read-only view of the whole system.',
 };
 
 export function DashboardPage() {
   const { me, can } = useAuth();
-  const manage = can('user.manage');
-  const users = useQuery({ queryKey: ['users', 'summary'], enabled: manage, queryFn: () => api<{ users: { isActive: boolean }[] }>('/users') });
-  const roles = useQuery({ queryKey: ['roles'], enabled: manage, queryFn: () => api<{ roles: unknown[] }>('/roles') });
-  const audit = useQuery({ queryKey: ['audit', 'count'], enabled: can('audit.view'), queryFn: () => api<{ total: number }>('/audit?pageSize=1') });
+  const d = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dash>('/dashboard'), refetchInterval: 30_000 });
+  const users = useQuery({ queryKey: ['users', 'summary'], enabled: can('user.manage'), queryFn: () => api<{ users: { isActive: boolean }[] }>('/users') });
   if (!me) return null;
   const hr = new Date().getHours();
   const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const kind = can('review.check') ? 'check' : can('review.decide') ? 'decide' : can('receipt.create') ? 'receipt' : 'admin';
+  const c = d.data?.counts ?? {};
+  const n = (...s: ReceiptStatus[]) => s.reduce((t, k) => t + (c[k] ?? 0), 0);
+
+  const tiles: { label: string; value: string | number; to: string; alert?: boolean }[] =
+    kind === 'receipt' ? [
+      { label: 'Needs your action', value: n('returned', 'reserved'), to: '/receipts', alert: true },
+      { label: 'Drafts', value: n('draft'), to: '/receipts' },
+      { label: 'In review', value: n('submitted', 'checked'), to: '/receipts' },
+      { label: 'Approved', value: n('approved'), to: '/receipts' },
+    ] : kind === 'check' ? [
+      { label: 'To check', value: n('submitted'), to: '/receipts', alert: true },
+      { label: 'Returned', value: n('returned'), to: '/receipts' },
+      { label: 'Checked', value: n('checked'), to: '/receipts' },
+      { label: 'All records', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
+    ] : kind === 'decide' ? [
+      { label: 'To decide', value: n('checked'), to: '/receipts', alert: true },
+      { label: 'On hold', value: n('reserved'), to: '/receipts' },
+      { label: 'Approved', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
+      { label: 'Disapproved', value: n('disapproved'), to: '/receipts' },
+    ] : [
+      { label: 'Waiting for review', value: n('submitted', 'checked'), to: '/receipts', alert: true },
+      { label: 'All receipts', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
+      { label: 'Active users', value: users.data ? users.data.users.filter((u) => u.isActive).length : '–', to: '/access' },
+      { label: 'Approved total', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
+    ];
 
   return (
     <>
       <div className="ph">
-        <div>
-          <h1>{greet}, {me.name.split(' ')[0]}</h1>
-          <p>{BLURB[me.role.code] ?? 'Welcome to REIMSIS.'}</p>
-        </div>
+        <div><h1>{greet}, {me.name.split(' ')[0]}</h1><p>{BLURB[kind]}</p></div>
+        {can('receipt.create') && <Link className="btn pri" to="/receipts/new"><Icon name="plus" size={18} />New receipt</Link>}
       </div>
 
-      {manage && (
-        <div className="tiles">
-          <Link className="tile alert" to="/access"><small>Active users</small><b>{users.data ? users.data.users.filter((u) => u.isActive).length : '–'}</b></Link>
-          <Link className="tile" to="/access"><small>Roles</small><b>{roles.data?.roles.length ?? '–'}</b></Link>
-          {can('audit.view') && <Link className="tile" to="/audit"><small>Audit events</small><b>{audit.data?.total ?? '–'}</b></Link>}
-        </div>
-      )}
+      <div className="tiles">
+        {tiles.map((t) => <Link key={t.label} className={`tile ${t.alert ? 'alert' : ''}`} to={t.to}><small>{t.label}</small><b>{d.data ? t.value : '–'}</b></Link>)}
+      </div>
 
-      <section className="card">
-        <div className="card-h"><h2>What is available now</h2></div>
-        <div className="card-b">
-          <p style={{ margin: 0 }}>Sign in, profile, and access control are ready. Receipts, evidence, review and reports arrive in the next build phases.</p>
-          <p className="muted" style={{ margin: '10px 0 0' }}>
-            You are signed in as <b>{me.role.name}</b>. See your own permissions on your <Link to="/profile" style={{ color: 'var(--accent)' }}>profile</Link>.
-          </p>
-        </div>
-      </section>
+      <div className="grid2">
+        <section className="card">
+          <div className="card-h"><h2>{d.data?.queueTitle ?? 'Your queue'}</h2>{d.data && d.data.queueTotal > d.data.queue.length && <Link className="btn sm ghost" to="/receipts">View all {d.data.queueTotal}</Link>}</div>
+          {d.data?.queue.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={kind !== 'receipt'} />)}
+          {d.data && !d.data.queue.length && <Empty title="You are all caught up">Nothing needs your attention right now.</Empty>}
+          {!d.data && <div className="empty">Loading…</div>}
+        </section>
+        <section className="card">
+          <div className="card-h"><h2>Recent activity</h2>{can('audit.view') && <Link className="btn sm ghost" to="/audit">Audit log</Link>}</div>
+          <div className="card-b">
+            <ol className="tl">
+              {d.data?.activity.map((a) => (
+                <li key={a.id}><span className="dot" /><div><b>{a.actor}</b> {a.summary.charAt(0).toLowerCase() + a.summary.slice(1)} {a.receiptId && a.refNo && <Link to={`/receipts/${a.receiptId}`} style={{ color: 'var(--accent)' }}>{a.refNo}</Link>}<small>{ago(a.createdAt)}</small></div></li>
+              ))}
+            </ol>
+            {d.data && !d.data.activity.length && <span className="muted">No activity yet.</span>}
+          </div>
+        </section>
+      </div>
+      <p className="muted" style={{ fontSize: '.82rem', marginTop: 16 }}>
+        {RECEIPT_STATUSES.filter((s) => c[s]).map((s) => `${STATUS_LABEL[s]} ${c[s]}`).join(' · ')}
+      </p>
     </>
   );
 }

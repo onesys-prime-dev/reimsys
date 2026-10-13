@@ -9,9 +9,14 @@
     "dev:web": "pnpm --filter @reimsis/web dev",
     "db:migrate": "pnpm --filter @reimsis/api db:migrate",
     "db:seed": "pnpm --filter @reimsis/api db:seed",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:api": "node e2e/api-flow.mjs",
+    "test:ui": "node e2e/ui-flow.mjs",
+    "build": "pnpm --filter @reimsis/web build && pnpm --filter @reimsis/api build"
   },
   "devDependencies": {
-    "playwright": "^1.64.0"
+    "playwright": "^1.64.0",
+    "vitest": "^5.0.3"
   }
 }

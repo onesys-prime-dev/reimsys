@@ -17,6 +17,7 @@ const env = z
     SMTP_SECURE: z.enum(['true', 'false']).default('false'),
     MAIL_FROM: z.string().default('REIMSIS <no-reply@example.com>'),
     ORG_NAME: z.string().default('REIMSIS'),
+    WEB_DIST: z.string().default('../web/dist'),
   })
   .parse(process.env);
 
@@ -28,6 +29,7 @@ export const config = {
   storageDir: path.resolve(env.STORAGE_DIR),
   cookieName: 'reimsis_sid',
   orgName: env.ORG_NAME,
+  webDist: path.resolve(env.WEB_DIST),
   mailFrom: env.MAIL_FROM,
   smtp: env.SMTP_HOST ? { host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_SECURE === 'true', user: env.SMTP_USER, pass: env.SMTP_PASS } : null,
   maxFailedAttempts: 5,

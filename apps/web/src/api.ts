@@ -42,3 +42,30 @@ export function deviceName(ua: string | null) {
   const os = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
   return os ? `${browser} on ${os}` : browser;
 }
+
+export const money = (n: number | string) => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const fmtDate = (d: string) => { const [y, m, day] = d.split('-'); return `${MONTHS[Number(m) - 1]} ${Number(day)}, ${y}`; };
+export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** Time ago in words for queue items. */
+export function ago(iso: string | null) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  const d = Math.round(s / 86400);
+  return `${d} day${d === 1 ? '' : 's'} ago`;
+}
+
+/** Loads a file in a hidden frame and opens the browser print dialog. Same-origin only. */
+export function printUrl(url: string) {
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  f.src = url;
+  f.onload = () => {
+    try { f.contentWindow?.focus(); f.contentWindow?.print(); } catch { window.open(url, '_blank'); }
+    setTimeout(() => f.remove(), 60_000);
+  };
+  document.body.appendChild(f);
+}
