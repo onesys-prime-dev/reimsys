@@ -122,6 +122,13 @@ export function EmailSettingsTab() {
             </div>
           </div>
 
+          {(preset === 'gmail' || preset === 'microsoft') && f.user.trim() && f.fromAddress.trim() && f.user.trim().toLowerCase() !== f.fromAddress.trim().toLowerCase() && (
+            <div className="callout warn" style={{ margin: '16px 0 0' }}>
+              <Icon name="info" />
+              <div><b>The "from" address is different from your username</b><span>{PRESETS[preset]!.label} replaces it with your own address, and mail that looks mismatched is more likely to land in spam. Use the same address as the username.</span></div>
+            </div>
+          )}
+
           {result && (
             <div className={`callout ${result.ok ? 'ok' : 'bad'}`} role="status" style={{ margin: '16px 0 0' }}>
               <Icon name={result.ok ? 'check' : 'x'} />

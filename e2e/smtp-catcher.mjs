@@ -29,7 +29,7 @@ const server = new SMTPServer({
         n += 1;
         const id = String(n).padStart(3, '0');
         fs.writeFileSync(path.join(dir, `${id}.html`), String(mail.html || mail.textAsHtml || ''));
-        const meta = { id, authUser: _session.user ?? null, from: mail.from?.text, to: mail.to?.text, subject: mail.subject, date: mail.date, textPreview: (mail.text || '').slice(0, 300) };
+        const meta = { id, authUser: _session.user ?? null, from: mail.from?.text, to: mail.to?.text, subject: mail.subject, date: mail.date, text: mail.text ?? '', hasHtml: !!mail.html, messageId: mail.messageId, autoSubmitted: mail.headers.get('auto-submitted') ?? null, textPreview: (mail.text || '').slice(0, 300) };
         fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(meta, null, 2));
         console.log(`#${id}  to ${meta.to}  |  ${meta.subject}`);
         done();
