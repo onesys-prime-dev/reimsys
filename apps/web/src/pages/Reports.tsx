@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import type { Category } from '../types';
@@ -12,6 +13,7 @@ const endOfMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getF
 export function ReportsPage() {
   const { can } = useAuth();
   const qc = useQueryClient();
+  const nav = useNavigate();
   const toast = useToast();
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(endOfMonth());
@@ -26,8 +28,8 @@ export function ReportsPage() {
     refetchInterval: (q) => (q.state.data?.reports.some((r) => r.status === 'pending') ? 1500 : false),
   });
   const gen = useMutation({
-    mutationFn: () => api('/reports', { method: 'POST', body: { from, to, format, categoryId: categoryId ? Number(categoryId) : null } }),
-    onSuccess: () => { toast('Building your report…'); qc.invalidateQueries({ queryKey: ['reports'] }); },
+    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, categoryId: categoryId ? Number(categoryId) : null } }),
+    onSuccess: (d) => { toast('Report created.'); qc.invalidateQueries({ queryKey: ['reports'] }); nav(`/reports/${d.report.id}`); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
 
@@ -65,6 +67,7 @@ export function ReportsPage() {
               </div>
               {r.status === 'ready' && (
                 <div className="acts">
+                  <Link className="btn sm" to={`/reports/${r.id}`}><Icon name="eye" size={16} />View</Link>
                   <a className="btn sm" href={`/api/reports/${r.id}/file`} aria-label={`Download report ${r.id}`}><Icon name="download" size={16} /></a>
                   {r.format === 'pdf' && <button className="btn sm" aria-label={`Print report ${r.id}`} onClick={() => printUrl(`/api/reports/${r.id}/file?mode=print`)}><Icon name="print" size={16} /></button>}
                 </div>

@@ -12,12 +12,14 @@ import { ReceiptDetailPage } from './pages/ReceiptDetail';
 import { ReceiptFormPage } from './pages/ReceiptForm';
 import { ReceiptsPage } from './pages/Receipts';
 import { ReportsPage } from './pages/Reports';
+import { ReportViewPage } from './pages/ReportView';
 import { Avatar, Icon } from './ui';
 
 function titleFor(path: string) {
   if (path === '/') return 'Dashboard';
   if (path === '/receipts/new') return 'New receipt';
   if (path === '/receipts/import') return 'Import receipts';
+  if (path.startsWith('/reports/')) return 'Report';
   if (path.startsWith('/receipts/')) return path.endsWith('/edit') ? 'Edit receipt' : 'Receipt';
   return ({ '/receipts': 'Receipts', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSIS';
 }
@@ -69,6 +71,7 @@ function Shell() {
             <Route path="/receipts/import" element={can('receipt.import') ? <ImportPage /> : <Navigate to="/receipts" replace />} />
             <Route path="/receipts/:id" element={<ReceiptDetailPage />} />
             <Route path="/receipts/:id/edit" element={<ReceiptFormPage />} />
+            <Route path="/reports/:id" element={can('report.generate') ? <ReportViewPage /> : <Navigate to="/" replace />} />
             <Route path="/reports" element={can('report.generate') ? <ReportsPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/access" element={can('user.manage') || can('role.manage') ? <AccessPage /> : <Navigate to="/" replace />} />

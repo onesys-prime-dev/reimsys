@@ -307,3 +307,4 @@ a.btn.pri{color:var(--accent-ink)}
 a.back{color:var(--muted)}
 .evimg{min-width:120px;image-rendering:auto}
 div.f{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.84rem;min-width:0}
+a.btn.sm{text-decoration:none}

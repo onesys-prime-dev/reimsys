@@ -56,6 +56,28 @@ reportsRouter.get('/', async (req, res) => {
   });
 });
 
+/** The report as rows on screen, using the filters it was generated with. */
+reportsRouter.get('/:id/data', async (req, res) => {
+  const rep = await prisma.liquidationReport.findUnique({ where: { id: idParam(req.params.id) } });
+  if (!rep) throw notFound('Report not found.');
+  if (rep.requestedById !== req.auth!.user.id && !req.auth!.permissions.has('audit.view')) throw forbidden();
+  const f = JSON.parse(rep.filters);
+  const { rows, total } = await reportRows(f);
+  const byCategory = new Map<string, { count: number; total: number }>();
+  for (const r of rows) {
+    const c = byCategory.get(r.category) ?? { count: 0, total: 0 };
+    c.count += 1;
+    c.total = Math.round((c.total + r.amount) * 100) / 100;
+    byCategory.set(r.category, c);
+  }
+  const requester = await prisma.user.findUnique({ where: { id: rep.requestedById }, select: { name: true } });
+  res.json({
+    report: { id: rep.id, format: rep.format, status: rep.status, from: f.from, to: f.to, createdAt: rep.createdAt, requestedBy: requester?.name ?? '' },
+    rows, total,
+    byCategory: [...byCategory.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.total - a.total),
+  });
+});
+
 reportsRouter.get('/:id/file', async (req, res) => {
   const rep = await prisma.liquidationReport.findUnique({ where: { id: idParam(req.params.id) } });
   if (!rep) throw notFound('Report not found.');
