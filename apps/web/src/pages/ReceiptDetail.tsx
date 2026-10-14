@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { STATUS_LABEL, type ReceiptAction } from '@reimsis/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
@@ -39,6 +39,14 @@ export function ReceiptDetailPage() {
   const history = useQuery({ queryKey: ['history', id], queryFn: () => api<{ items: HistoryItem[] }>(`/receipts/${id}/history`), enabled: q.isSuccess });
   const r = q.data?.receipt;
 
+  // Looking at a receipt is reading what the bell said about it, so clear those notices.
+  useEffect(() => {
+    if (!q.isSuccess) return;
+    api('/notifications/read', { method: 'POST', body: { receiptId: id } })
+      .then(() => qc.invalidateQueries({ queryKey: ['notifications'] }))
+      .catch(() => undefined);
+  }, [id, q.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const refresh = () => { qc.invalidateQueries({ queryKey: ['receipt', id] }); qc.invalidateQueries({ queryKey: ['history', id] }); qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); };
   const act = useMutation({
     mutationFn: ({ action, note }: { action: ReceiptAction; note?: string }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, version: r!.version } }),
@@ -60,9 +68,10 @@ export function ReceiptDetailPage() {
   if (!r || !me) return <div className="empty">Loading…</div>;
 
   // A reviewer must have opened the evidence since the last submission before checking.
-  const viewedSince = !!history.data?.items.some((h) => h.action === 'evidence.viewed' && h.actor === me.name && (!r.submittedAt || new Date(h.createdAt) >= new Date(r.submittedAt)));
+  const since = r.status === 'checked' ? r.checkedAt ?? r.submittedAt : r.submittedAt;
+  const viewedSince = !!history.data?.items.some((h) => h.action === 'evidence.viewed' && h.actor === me.name && (!since || new Date(h.createdAt) >= new Date(since)));
   const actions = [...r.actions].sort((a, b) => ORDER.indexOf(a.action) - ORDER.indexOf(b.action));
-  const needsView = (a: ReceiptAction) => a === 'check' && !viewedSince && r.evidence.length > 0;
+  const needsView = (a: ReceiptAction) => ['check', 'approve', 'disapprove', 'reserve'].includes(a) && !viewedSince && r.evidence.length > 0;
   const note = r.status === 'returned' ? { cls: 'warn', icon: 'undo', title: 'Returned for correction', text: r.lastNote }
     : r.status === 'reserved' ? { cls: 'hold', icon: 'pause', title: 'On hold', text: r.lastNote }
     : r.status === 'disapproved' ? { cls: 'bad', icon: 'x', title: 'Disapproved', text: r.lastNote } : null;
@@ -85,7 +94,7 @@ export function ReceiptDetailPage() {
             const click = () => (a.action === 'submit' ? act.mutate({ action: 'submit' }) : setModal(a.action));
             return <button key={a.action} className={`btn ${c.cls}`} disabled={act.isPending || needsView(a.action)} onClick={click}><Icon name={c.icon} size={18} />{a.action === 'submit' && r.status === 'returned' ? 'Resubmit' : c.label}</button>;
           })}
-          {actions.some((a) => needsView(a.action)) && <span className="hint-line"><Icon name="eye" size={16} />Open the evidence first. Checking unlocks after you view it.</span>}
+          {actions.some((a) => needsView(a.action)) && <span className="hint-line"><Icon name="eye" size={16} />Open the evidence first. The buttons unlock after you view it.</span>}
         </div>
       </div>
 

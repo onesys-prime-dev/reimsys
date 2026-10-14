@@ -61,7 +61,11 @@ notificationsRouter.get('/', async (req, res) => {
 
 notificationsRouter.post('/read', async (req, res) => {
   const ids = Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(Number).filter(Number.isInteger) : null;
-  await prisma.notification.updateMany({ where: { userId: req.auth!.user.id, readAt: null, ...(ids ? { id: { in: ids } } : {}) }, data: { readAt: new Date() } });
+  const receiptId = Number.isInteger(Number(req.body?.receiptId)) && Number(req.body.receiptId) > 0 ? Number(req.body.receiptId) : null;
+  await prisma.notification.updateMany({
+    where: { userId: req.auth!.user.id, readAt: null, ...(ids ? { id: { in: ids } } : {}), ...(receiptId ? { receiptId } : {}) },
+    data: { readAt: new Date() },
+  });
   res.json({ ok: true });
 });
 

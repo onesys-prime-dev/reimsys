@@ -94,6 +94,8 @@ check('approver sees checked receipt', (await paolo.get(`/receipts/${r.id}`)).st
 check('checker cannot approve', (await liza.post(`/receipts/${r.id}/approve`, { version: r.version })).status === 403);
 check('med ref cannot approve', (await ana.post(`/receipts/${r.id}/approve`, { version: r.version })).status === 403);
 check('reserve needs a note', (await paolo.post(`/receipts/${r.id}/reserve`, { version: r.version })).data?.error?.code === 'NOTE_REQUIRED');
+check('approver must open the evidence before deciding', (await paolo.post(`/receipts/${r.id}/approve`, { version: r.version })).data?.error?.code === 'EVIDENCE_NOT_VIEWED');
+await paolo.req('GET', `/receipts/${r.id}/evidence/${r.evidence[0].id}/file?mode=view`, undefined, { raw: true });
 s = await paolo.post(`/receipts/${r.id}/reserve`, { version: r.version, note: 'Waiting for the regional office.' });
 check('reserved', s.data.receipt?.status === 'reserved', JSON.stringify(s.data));
 r = s.data.receipt;
@@ -113,6 +115,12 @@ if (doc) {
   const buf = Buffer.from(await pdf.arrayBuffer());
   check('document is a real PDF', pdf.status === 200 && buf.subarray(0, 5).toString() === '%PDF-' && buf.length > 1500, `${pdf.status} ${buf.length}`);
 }
+{ const h = (await ana.get(`/receipts/${r.id}/history`)).data.items;
+  check('history hides the owner looking at their own photo', !h.some((x) => x.action === 'evidence.viewed' && x.actor === 'Ana Reyes'));
+  const before = (await ana.get('/notifications')).data.unread;
+  await ana.post('/notifications/read', { receiptId: r.id });
+  const after = (await ana.get('/notifications')).data;
+  check('opening a receipt clears its notifications only', after.unread < before && after.items.filter((n) => n.receiptId === r.id).every((n) => n.read), `${before} -> ${after.unread}`); }
 const notes = (await ana.get('/notifications')).data;
 check('med ref notified of return, hold and approval', ['receipt.returned', 'receipt.reserved', 'receipt.approved'].every((t) => notes.items.some((n) => n.type === t && n.text.includes(r.refNo))));
 const emails = (await admin.get('/email-log')).data;
@@ -127,6 +135,7 @@ d = (await ana.post(`/receipts/${d.id}/submit`, { version: d.version })).data.re
 await liza.req('GET', `/receipts/${d.id}/evidence/${d.evidence[0].id}/file?mode=view`, undefined, { raw: true });
 d = (await liza.post(`/receipts/${d.id}/check`, { version: d.version })).data.receipt;
 check('disapprove needs a reason', (await paolo.post(`/receipts/${d.id}/disapprove`, { version: d.version })).data?.error?.code === 'NOTE_REQUIRED');
+await paolo.req('GET', `/receipts/${d.id}/evidence/${d.evidence[0].id}/file?mode=view`, undefined, { raw: true });
 d = (await paolo.post(`/receipts/${d.id}/disapprove`, { version: d.version, note: 'Not reimbursable.' })).data.receipt;
 check('disapproved', d.status === 'disapproved');
 const copy = await ana.post(`/receipts/${d.id}/copy`);
@@ -193,6 +202,15 @@ check('import cannot be confirmed twice', (await ana.post(`/imports/${pv.data.id
 check('checker cannot import', (await liza.post('/imports')).status === 403);
 const ex = await ana.req('GET', '/receipts/export?format=csv', undefined, { raw: true });
 check('export contains imported row', (await ex.text()).includes('Import Store A ' + stamp));
+
+{ const get = async (q) => (await liza.get('/receipts?pageSize=50&' + q)).data.items;
+  const hi = await get('sort=amount_high'), lo = await get('sort=amount_low'), nw = await get('sort=newest'), old = await get('sort=oldest');
+  const sorted = (a, f, dir) => a.every((x, i) => i === 0 || (dir > 0 ? f(a[i - 1]) >= f(x) : f(a[i - 1]) <= f(x)));
+  check('list sorts by amount, high to low', hi.length > 1 && sorted(hi, (x) => x.amount, 1));
+  check('list sorts by amount, low to high', sorted(lo, (x) => x.amount, -1));
+  check('list sorts by receipt date, newest first', sorted(nw, (x) => x.receiptDate, 1));
+  check('list sorts by receipt date, oldest first', sorted(old, (x) => x.receiptDate, -1));
+  check('an unknown sort is refused', (await liza.get('/receipts?sort=bogus')).status === 400); }
 
 console.log('\nDashboard and audit');
 check('dashboard loads for every role', (await Promise.all([ana, liza, paolo, admin].map((c) => c.get('/dashboard')))).every((x) => x.status === 200));

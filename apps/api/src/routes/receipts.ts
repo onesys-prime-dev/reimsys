@@ -36,6 +36,14 @@ async function assertCategory(id: number) {
 
 /* ---------- list, export, create ---------- */
 
+const SORTS: Record<string, Prisma.ReceiptOrderByWithRelationInput[]> = {
+  updated: [{ updatedAt: 'desc' }, { id: 'desc' }],
+  newest: [{ receiptDate: 'desc' }, { id: 'desc' }],
+  oldest: [{ receiptDate: 'asc' }, { id: 'asc' }],
+  amount_high: [{ amount: 'desc' }, { id: 'desc' }],
+  amount_low: [{ amount: 'asc' }, { id: 'asc' }],
+};
+
 receiptsRouter.get('/', async (req, res) => {
   const q = listQuerySchema.parse(req.query);
   const scope = visibleWhere(req.auth!);
@@ -43,7 +51,7 @@ receiptsRouter.get('/', async (req, res) => {
   const where: Prisma.ReceiptWhereInput = { AND: [scope, base, q.status ? { status: q.status } : {}] };
   const [total, rows, grouped] = await Promise.all([
     prisma.receipt.count({ where }),
-    prisma.receipt.findMany({ where, include: receiptInclude, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
+    prisma.receipt.findMany({ where, include: receiptInclude, orderBy: SORTS[q.sort], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
     prisma.receipt.groupBy({ by: ['status'], where: { AND: [scope, base] }, _count: { _all: true } }),
   ]);
   const counts: Record<string, number> = {};
@@ -222,7 +230,10 @@ receiptsRouter.get('/:id/evidence/:eid/file', async (req, res) => {
 
 receiptsRouter.get('/:id/history', async (req, res) => {
   const r = await loadVisible(req.auth!, idParam(req.params.id));
-  const rows = await prisma.auditLog.findMany({ where: { entityType: 'receipt', entityId: String(r.id) }, orderBy: { id: 'desc' }, take: 200 });
+  const rows = await prisma.auditLog.findMany({
+    where: { entityType: 'receipt', entityId: String(r.id), NOT: { action: 'evidence.viewed', actorId: r.encoderId } },
+    orderBy: { id: 'desc' }, take: 200,
+  });
   res.json({
     items: rows.map((a) => {
       let note: string | null = null;
@@ -261,6 +272,12 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.
   if ((action === 'approve' || action === 'disapprove' || action === 'reserve') && (!r.checkedById || !r.checkedAt)) {
     throw conflict('This receipt has not been checked yet, so it cannot be decided.', 'NOT_CHECKED');
+  }
+  if (action === 'approve' || action === 'disapprove' || action === 'reserve') {
+    const seen = await prisma.auditLog.count({
+      where: { actorId: auth.user.id, entityType: 'receipt', entityId: String(r.id), action: 'evidence.viewed', createdAt: { gte: r.checkedAt ?? r.submittedAt ?? new Date(0) } },
+    });
+    if (!seen) throw badRequest('Open the evidence before deciding on this receipt.', 'EVIDENCE_NOT_VIEWED');
   }
   if (action === 'check') {
     const viewed = await prisma.auditLog.count({

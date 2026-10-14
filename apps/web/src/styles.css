@@ -335,3 +335,7 @@ a.btn.sm{text-decoration:none}
 .tpl-frame{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;justify-content:center;overflow-x:auto}
 .tpl-frame iframe{border:0;border-radius:8px;background:#f4f7f8;max-width:100%}
 @media(max-width:900px){.tpl-grid{grid-template-columns:minmax(0,1fr)}.tpl-list{position:static}}
+
+.locked .btn .ic{color:inherit}
+
+.age.late{color:var(--warn);font-weight:600}

@@ -81,6 +81,7 @@ export const listQuerySchema = z.object({
   encoderId: z.coerce.number().int().positive().optional(),
   from: dateString.optional(),
   to: dateString.optional(),
+  sort: z.enum(['updated', 'newest', 'oldest', 'amount_high', 'amount_low']).default('updated'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

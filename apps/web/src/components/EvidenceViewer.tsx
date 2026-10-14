@@ -41,7 +41,7 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
           <Icon name="lock" />
           <b>Evidence is protected</b>
           <span className="muted">Opening it is recorded in the audit log with your name and the time.</span>
-          <div style={{ marginTop: 14 }}><button className="btn pri" onClick={open}><Icon name="check" size={18} />Open evidence</button></div>
+          <div style={{ marginTop: 14 }}><button className="btn pri" onClick={open}><Icon name="eye" size={18} />Open evidence</button></div>
         </div>
       </>
     );

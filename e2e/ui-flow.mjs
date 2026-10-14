@@ -92,7 +92,7 @@ ok('checked', true);
 
 const paolo = await open('paolo.v@example.com');
 await paolo.page.goto('/');
-await paolo.page.waitForSelector(`text=${payee}`);
+await paolo.page.waitForSelector('text=Ready for your decision');
 ok('approver queue shows it', true);
 await shot(paolo.page, '5-approver-dashboard');
 await paolo.page.goto(receiptUrl);

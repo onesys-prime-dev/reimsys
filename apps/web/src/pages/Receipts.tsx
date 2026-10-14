@@ -9,6 +9,9 @@ import { Empty, Icon, StatusPill } from '../ui';
 
 interface ListData { total: number; page: number; pageSize: number; counts: Record<string, number>; items: ReceiptBrief[] }
 
+/** More than two days waiting for the next person. */
+const late = (iso: string) => Date.now() - new Date(iso).getTime() > 2 * 86_400_000;
+
 export function ReceiptRow({ r, showEncoder }: { r: ReceiptBrief; showEncoder: boolean }) {
   return (
     <Link className="row" to={`/receipts/${r.id}`}>
@@ -16,7 +19,7 @@ export function ReceiptRow({ r, showEncoder }: { r: ReceiptBrief; showEncoder: b
       <span className="c-cat">{r.category.name}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
-      <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className="age" style={{ display: 'block', marginTop: 2 }}>{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className="age" style={{ display: 'block', marginTop: 2 }}>checked {ago(r.checkedAt)}</span>}</span>
+      <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className={`age ${late(r.submittedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.submittedAt) ? 'Waiting ' : ''}{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className={`age ${late(r.checkedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.checkedAt) ? 'Waiting, checked ' : 'checked '}{ago(r.checkedAt)}</span>}</span>
     </Link>
   );
 }
@@ -28,6 +31,7 @@ export function ReceiptsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [sort, setSort] = useState('updated');
   const [page, setPage] = useState(1);
   const own = can('receipt.create') && !can('receipt.view_all');
 
@@ -37,6 +41,8 @@ export function ReceiptsPage() {
   if (categoryId) params.set('categoryId', categoryId);
   if (from) params.set('from', from);
   if (to) params.set('to', to);
+  if (sort !== 'updated') params.set('sort', sort);
+  const filtered = !!(status || q || categoryId || from || to);
   const data = useQuery({ queryKey: ['receipts', params.toString()], queryFn: () => api<ListData>(`/receipts?${params}`), placeholderData: (p) => p, refetchInterval: 30_000 });
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => api<{ categories: Category[] }>('/categories') });
   const pages = data.data ? Math.max(1, Math.ceil(data.data.total / data.data.pageSize)) : 1;
@@ -63,6 +69,11 @@ export function ReceiptsPage() {
         </select>
         <input type="date" style={{ width: 'auto' }} value={from} aria-label="From date" onChange={(e) => { setFrom(e.target.value); reset(); }} />
         <input type="date" style={{ width: 'auto' }} value={to} aria-label="To date" onChange={(e) => { setTo(e.target.value); reset(); }} />
+        <select style={{ width: 'auto' }} value={sort} aria-label="Sort by" onChange={(e) => { setSort(e.target.value); reset(); }}>
+          <option value="updated">Recently changed</option><option value="newest">Newest receipt date</option><option value="oldest">Oldest receipt date</option>
+          <option value="amount_high">Amount, high to low</option><option value="amount_low">Amount, low to high</option>
+        </select>
+        {filtered && <button className="btn sm ghost" onClick={() => { setStatus(''); setQ(''); setCategoryId(''); setFrom(''); setTo(''); setPage(1); }}><Icon name="x" size={16} />Clear filters</button>}
       </div>
       <div className="chips" style={{ marginBottom: 14 }}>
         <button className={`chip ${status === '' ? 'on' : ''}`} onClick={() => { setStatus(''); reset(); }}>All<span className="n">{all}</span></button>
