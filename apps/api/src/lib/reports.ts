@@ -60,6 +60,17 @@ export function neutraliseFormula(v: string | number | null | undefined): string
   return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
 }
 
+/**
+ * A spreadsheet program treats a cell that starts with = + - @ (or a tab or line break) as a formula, so someone could save
+ * a receipt called =HYPERLINK(...) and have it run on whoever opens the export. A leading apostrophe makes it plain text.
+ * Numbers are left alone so totals still add up.
+ */
+export function neutraliseFormula(v: string | number | null | undefined): string | number {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '');
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
 export function toCsv(rows: (string | number)[][]) {
   const q = (v: string | number) => {
     const s = String(neutraliseFormula(v));
