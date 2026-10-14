@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { protectSettings } from './protect-settings.mjs';
 
 const OUT = process.argv[2];
 fs.mkdirSync(OUT, { recursive: true });
@@ -12,6 +13,7 @@ const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : 
 const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 
 // start clean so the test is repeatable
+protectSettings(); // puts every saved setting back when this test ends, however it ends
 sql("DELETE FROM setting WHERE `key` IN ('email.templates','email.branding')");
 
 const b = await chromium.launch({ channel: 'chrome' });
@@ -30,7 +32,7 @@ const frame = (p) => p.frameLocator('iframe[title="Email preview"]');
 const p = await login('admin@example.com');
 await p.goto('/access'); await p.click('button[role=tab]:has-text("Email templates")');
 await p.waitForSelector('.tpl-list');
-ok('lists all seven emails', (await p.locator('.tpl-list button').count()) === 7);
+ok('lists every email the system sends (ten)', (await p.locator('.tpl-list button').count()) === 10);
 await p.waitForSelector('iframe[title="Email preview"]');
 await frame(p).locator('h1').waitFor();
 ok('preview shows the heading with the real organisation name', (await frame(p).locator('h1').innerText()) === 'Please correct this receipt');

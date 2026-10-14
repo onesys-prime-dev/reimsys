@@ -1,3 +1,5 @@
+import { isActive } from './activity';
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
     super(message);
@@ -13,6 +15,8 @@ interface Options {
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   const headers: Record<string, string> = { 'x-requested-with': 'reimsys' };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
+  // Marks the request as coming from a person at the keyboard, not the page refreshing itself.
+  if (isActive(45_000)) headers['x-user-activity'] = '1';
   const res = await fetch('/api' + path, {
     method: opts.method ?? 'GET',
     credentials: 'same-origin',

@@ -7,7 +7,7 @@ import { audit } from '../lib/audit.js';
 import { HttpError, unauthorized } from '../lib/errors.js';
 import { hashPassword, newToken, sha256, verifyPassword } from '../lib/password.js';
 import { checkToken, sendPasswordLink } from '../lib/passwordLinks.js';
-import { meResponse } from '../lib/serialize.js';
+import { meResponse, sessionInfo } from '../lib/serialize.js';
 import { requireAuth } from '../middleware/auth.js';
 
 export const authRouter = Router();
@@ -106,6 +106,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   }
 
   const token = newToken();
+  const created: { expiresAt: Date; createdAt: Date } = { createdAt: now, expiresAt: new Date(now.getTime() + Math.min(config.sessionIdleMs, config.sessionMaxMs)) };
   await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: now } }),
     prisma.session.create({
@@ -114,14 +115,20 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
         userId: user.id,
         userAgent: req.get('user-agent')?.slice(0, 255) ?? null,
         ip: req.ip?.slice(0, 64) ?? null,
-        expiresAt: new Date(now.getTime() + config.sessionMs),
+        createdAt: created.createdAt,
+        expiresAt: created.expiresAt,
       },
     }),
   ]);
-  res.cookie(config.cookieName, token, { ...cookieOptions(), maxAge: config.sessionMs });
+  res.cookie(config.cookieName, token, { ...cookieOptions(), maxAge: config.sessionMaxMs });
   await audit(req, { action: 'auth.login', entityType: 'user', entityId: user.id, summary: "signed in", actor: { id: user.id, name: user.name } });
   const { permissions, ...role } = user.role;
-  res.json(meResponse({ ...user, role }, permissions.map((p) => p.permission.code)));
+  res.json(meResponse({ ...user, role }, permissions.map((p) => p.permission.code), created));
+});
+
+/** "Stay signed in": a write, so it counts as activity and pushes the end of the session forward. */
+authRouter.post('/keepalive', requireAuth, (req, res) => {
+  res.json({ session: sessionInfo(req.auth!.session) });
 });
 
 authRouter.post('/logout', requireAuth, async (req, res) => {

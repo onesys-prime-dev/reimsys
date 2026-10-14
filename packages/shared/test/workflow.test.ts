@@ -99,6 +99,26 @@ describe('validation', () => {
     expect(t('short1')).toBe(false);
     expect(t('nonumbersatall')).toBe(false);
     expect(t('12345678')).toBe(false);
-    expect(t('Reimsys2026')).toBe(true);
+    expect(t('Cebu-Blue-River7')).toBe(true);
+    expect(t('Reimbursed2026')).toBe(true);
+  });
+
+  it('asks for at least ten characters', () => {
+    const t = (p: string) => changePasswordSchema.safeParse({ currentPassword: 'x', newPassword: p }).success;
+    expect(t('Abcdefgh1')).toBe(false); // nine
+    expect(t('Abcdefghi1')).toBe(true); // ten
+  });
+
+  it('refuses the passwords attackers try first, including the public demo one', () => {
+    const t = (p: string) => changePasswordSchema.safeParse({ currentPassword: 'x', newPassword: p }).success;
+    for (const p of ['Password123456', 'password2026', 'Qwerty123456', 'Welcome2026!', 'Reimsis#2026', 'Reimsys#2026', 'Reimsys2026', 'Changeme12345', 'Admin12345678', 'aaaaaaaaaa1', '1234567890a', 'Pharmacy2026']) {
+      expect(t(p), p).toBe(false);
+    }
+  });
+
+  it('does not refuse an ordinary strong password that merely contains a common word', () => {
+    const t = (p: string) => changePasswordSchema.safeParse({ currentPassword: 'x', newPassword: p }).success;
+    expect(t('Purple-Welcome-Mat-88')).toBe(true);
+    expect(t('Dragonfruit-Smoothie5')).toBe(true);
   });
 });

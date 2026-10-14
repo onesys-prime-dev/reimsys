@@ -120,7 +120,7 @@ await step(ana, 'draft, edit, remove evidence, submit', async (p) => {
   await p.click('button:has-text("Save draft")');
   await p.waitForURL(/\/receipts\/\d+$/); draftUrl = p.url();
   if (!(await visible(p, '.pill:has-text("Draft")'))) flag('medref', 'draft', 'no Draft pill after saving');
-  await p.click('a:has-text("Edit")'); await p.waitForSelector('form');
+  await p.click('a:has-text("Edit")'); await p.waitForSelector('h1:has-text("Edit receipt")');
   if ((await p.locator('.file').count()) !== 2) flag('medref', 'edit', 'saved evidence not listed when editing');
   if ((await p.inputValue('input[placeholder="0.00"]')) !== '777.77') flag('medref', 'edit', 'amount not prefilled');
   await p.click('button[aria-label^="Remove img-one"]'); await p.waitForTimeout(500);

@@ -63,7 +63,7 @@ try {
   await p1.fill('input[autocomplete="new-password"] >> nth=1', 'abc');
   await p1.click('button:has-text("Save password")');
   await p1.waitForSelector('.err');
-  ok('a weak password is refused with a plain message', /8 characters/.test(await p1.locator('.err').innerText()), await p1.locator('.err').innerText());
+  ok('a weak password is refused with a plain message', /10 characters/.test(await p1.locator('.err').innerText()), await p1.locator('.err').innerText());
   await p1.fill('input[autocomplete="new-password"] >> nth=0', 'InviteOne123');
   await p1.fill('input[autocomplete="new-password"] >> nth=1', 'InviteTwo123');
   await p1.click('button:has-text("Save password")');

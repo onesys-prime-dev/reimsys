@@ -43,9 +43,20 @@ const php = (n: number) => 'PHP ' + n.toLocaleString('en-PH', { minimumFractionD
 const HEAD = ['Document no.', 'Receipt ref.', 'Receipt date', 'Paid to', 'Category', 'Encoded by', 'Approved', 'Amount (PHP)'];
 const cells = (r: Row) => [r.docNo, r.refNo, r.date, r.payee, r.category, r.encoder, r.approvedAt, r.amount];
 
+/**
+ * A spreadsheet program treats a cell that starts with = + - @ (or a tab or line break) as a formula, so someone could save
+ * a receipt called =HYPERLINK(...) and have it run on whoever opens the export. A leading apostrophe makes it plain text.
+ * Numbers are left alone so totals still add up.
+ */
+export function neutraliseFormula(v: string | number | null | undefined): string | number {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '');
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
+
 export function toCsv(rows: (string | number)[][]) {
   const q = (v: string | number) => {
-    const s = String(v ?? '');
+    const s = String(neutraliseFormula(v));
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return '﻿' + rows.map((r) => r.map(q).join(',')).join('\r\n') + '\r\n';

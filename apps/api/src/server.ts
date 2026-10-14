@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { errorHandler } from './middleware/error.js';
-import { loadAuth, requireAuth } from './middleware/auth.js';
+import { loadAuth, requireAuth, sessionAlive } from './middleware/auth.js';
 import { hub } from './lib/realtime.js';
 import { csrfGuard } from './middleware/security.js';
 import { auditRouter } from './routes/audit.js';
@@ -61,7 +61,7 @@ app.use('/api', rateLimit({
 app.use('/api', csrfGuard, loadAuth);
 app.use('/api/auth', authRouter);
 /** Live updates for the signed-in browser. See lib/realtime.ts. */
-app.get('/api/events', requireAuth, (req, res) => void hub.connect(req.auth!.user.id, req, res));
+app.get('/api/events', requireAuth, (req, res) => void hub.connect(req.auth!.user.id, req, res, req.auth!.session.id));
 app.use('/api/me', meRouter);
 app.use('/api/users', usersRouter);
 app.use('/api', rolesRouter);
@@ -88,3 +88,15 @@ app.use(errorHandler);
 app.listen(config.port, () => console.log(`REIMSYS API listening on http://localhost:${config.port}`));
 void startWorker();
 startDigest();
+
+// Every half minute, close live connections that belong to sessions which have ended, so a timed-out or signed-out browser cannot keep listening.
+setInterval(async () => {
+  try {
+    const ids = hub.sessionIds();
+    if (!ids.length) return;
+    const rows = await prisma.session.findMany({ where: { id: { in: ids } }, select: { id: true, revokedAt: true, expiresAt: true, createdAt: true } });
+    const alive = new Set(rows.filter((r) => sessionAlive(r)).map((r) => r.id));
+    const dead = new Set(ids.filter((i) => !alive.has(i)));
+    if (dead.size) hub.closeSessions(dead);
+  } catch (e) { console.error('session sweep', e); }
+}, 30_000).unref();

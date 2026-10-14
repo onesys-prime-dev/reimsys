@@ -2,6 +2,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import { useAuth } from './auth';
 import { NotificationBell } from './components/Notifications';
 import { LiveLight, useLive } from './live';
+import { SessionGuard } from './components/SessionGuard';
 import { AccessPage } from './pages/Access';
 import { AuditPage } from './pages/Audit';
 import { DashboardPage } from './pages/Dashboard';
@@ -68,6 +69,7 @@ function Shell() {
           <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} size={30} /></button>
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
+        <SessionGuard />
         <main className="page">
           <Routes>
             <Route path="/" element={<DashboardPage />} />

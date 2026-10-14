@@ -17,7 +17,7 @@ meRouter.use(requireAuth);
 const reload = async (id: number) => prisma.user.findUniqueOrThrow({ where: { id }, include: { role: true } });
 
 meRouter.get('/', (req, res) => {
-  res.json(meResponse(req.auth!.user, req.auth!.permissions));
+  res.json(meResponse(req.auth!.user, req.auth!.permissions, req.auth!.session));
 });
 
 meRouter.patch('/', async (req, res) => {
@@ -28,7 +28,7 @@ meRouter.patch('/', async (req, res) => {
     action: 'profile.updated', entityType: 'user', entityId: u.id, summary: 'updated own profile',
     before: { name: u.name, phone: u.phone, branch: u.branch }, after: data,
   });
-  res.json(meResponse(await reload(u.id), req.auth!.permissions));
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
 meRouter.patch('/preferences', async (req, res) => {
@@ -38,7 +38,7 @@ meRouter.patch('/preferences', async (req, res) => {
     where: { id: u.id },
     data: { theme: p.theme, dailyDigest: p.dailyDigest, reservationReleased: p.reservationReleased },
   });
-  res.json(meResponse(await reload(u.id), req.auth!.permissions));
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
 meRouter.post('/password', async (req, res) => {
@@ -49,7 +49,7 @@ meRouter.post('/password', async (req, res) => {
   await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(newPassword), mustChangePassword: false } });
   await prisma.session.updateMany({ where: { userId: u.id, revokedAt: null, NOT: { id: req.auth!.session.id } }, data: { revokedAt: new Date() } });
   await audit(req, { action: 'auth.password_changed', entityType: 'user', entityId: u.id, summary: 'changed own password' });
-  res.json(meResponse(await reload(u.id), req.auth!.permissions));
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
 meRouter.get('/sessions', async (req, res) => {
@@ -92,7 +92,7 @@ meRouter.post('/photo', upload.single('photo'), async (req, res) => {
   if (u.photoFile) await fs.rm(path.join(avatarDir(), u.photoFile), { force: true });
   await prisma.user.update({ where: { id: u.id }, data: { photoFile: name } });
   await audit(req, { action: 'profile.photo_changed', entityType: 'user', entityId: u.id, summary: 'changed profile photo' });
-  res.json(meResponse(await reload(u.id), req.auth!.permissions));
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
 export async function sendAvatar(userId: number, res: import('express').Response) {

@@ -7,3 +7,6 @@ allowBuilds:
   prisma: true
   esbuild: true
   '@node-rs/argon2': true
+# Security: exceljs pulls in an old "uuid" with a known buffer-bounds flaw. Use the patched release everywhere.
+overrides:
+  uuid: '>=11.1.1'

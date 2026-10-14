@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { parse } from 'csv-parse/sync';
+import { assertSafeZip } from '../lib/zipGuard.js';
 import { receiptInputSchema } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -43,6 +44,7 @@ async function readRows(file: Express.Multer.File): Promise<Record<string, strin
   let table: string[][];
   if (isXlsx) {
     const wb = new ExcelJS.Workbook();
+    assertSafeZip(file.buffer);
     await wb.xlsx.load(file.buffer as never);
     const ws = wb.worksheets[0];
     if (!ws) throw badRequest('The workbook has no sheets.');

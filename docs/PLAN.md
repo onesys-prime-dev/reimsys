@@ -105,3 +105,6 @@ Required on the dev machine: Node.js LTS (20+), npm or pnpm, XAMPP MySQL/MariaDB
 - **Zoom fixed.** Zooming a large photo no longer hides its top and left edges.
 - **Clear upload errors.** A file over the limit now says so, instead of a generic failure.
 - **Retiring the demo accounts.** `pnpm --filter @reimsys/api demo:off` switches off the five shared-password demo accounts. It refuses to run until a real Super Admin exists.
+
+- **Live updates.** Screens update themselves with no refresh (a small "Live" light shows it is connected). See the "Live updates" section in `docs/DEPLOY.md`.
+- Security: see docs/SECURITY.md. Idle timeout (60 min, with warning), 12-hour limit, stronger passwords, formula-safe exports, spreadsheet bomb guard.
