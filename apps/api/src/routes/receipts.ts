@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, receiptInputSchema,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, UNDO_WINDOW_MINUTES, bulkSchema, commentSchema,
+  cleanFormData, VAT_LABEL,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -13,7 +14,7 @@ import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/err
 import { enqueue } from '../lib/jobs.js';
 import { receiptData } from '../lib/emailTemplates.js';
 import { notify, usersWithPermission } from '../lib/notify.js';
-import { assertOwner, dateOnly, filterWhere, loadVisible, receiptBrief, receiptDetail, receiptInclude, visibleWhere } from '../lib/receipts.js';
+import { assertOwner, typeLabel, dateOnly, filterWhere, loadVisible, receiptBrief, receiptDetail, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { nextDocNo, nextReceiptRef } from '../lib/sequence.js';
 import { copyFile, readFile, removeFile, saveFile, sha256Of, sniff } from '../lib/storage.js';
 import { toCsv } from '../lib/reports.js';
@@ -28,10 +29,15 @@ const idParam = (v: unknown) => {
   return n;
 };
 
-async function assertCategory(id: number) {
-  const c = await prisma.category.findUnique({ where: { id } });
-  if (!c || !c.isActive) throw badRequest('Choose an active category.', 'BAD_CATEGORY');
-  return c;
+const yn = (v: boolean | null) => (v === null ? '' : v ? 'Yes' : 'No');
+const num = (v: { toString(): string } | null) => (v === null ? '' : Number(v));
+
+/** The fields of the form as they are written to the database. */
+function formColumns(data: ReturnType<typeof receiptInputSchema.parse>) {
+  return {
+    payee: data.payee, receiptDate: new Date(data.receiptDate + 'T00:00:00Z'), amount: data.amount, description: data.description || null,
+    ...cleanFormData(data),
+  };
 }
 
 /* ---------- list, export, create ---------- */
@@ -70,8 +76,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Receipt date', 'Paid to', 'Category', 'Description', 'Encoded by', 'Amount (PHP)', 'Document no.'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.payee, r.category.name, r.description ?? '', r.encoder.name, Number(r.amount), r.document?.docNo ?? '']);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'No-BIR reason', 'Description', 'Encoded by', 'Document no.'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), r.noBirReason ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '']);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -82,23 +88,16 @@ receiptsRouter.get('/export', async (req, res) => {
   const ws = wb.addWorksheet('Receipts');
   ws.addRow(head).font = { bold: true };
   data.forEach((d) => ws.addRow(d));
-  ws.getColumn(8).numFmt = '#,##0.00';
-  [16, 12, 14, 30, 16, 36, 22, 16, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  for (const c of [10, 12, 13, 15, 16]) ws.getColumn(c).numFmt = '#,##0.00';
+  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 28, 30, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`receipts-${stamp}.xlsx`).send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
 
 receiptsRouter.post('/', requirePerm('receipt.create'), async (req, res) => {
   const data = receiptInputSchema.parse(req.body);
-  await assertCategory(data.categoryId);
   const r = await prisma.$transaction(async (tx) =>
-    tx.receipt.create({
-      data: {
-        refNo: await nextReceiptRef(tx), encoderId: req.auth!.user.id, payee: data.payee, receiptDate: new Date(data.receiptDate + 'T00:00:00Z'),
-        amount: data.amount, categoryId: data.categoryId, description: data.description || null,
-      },
-      include: receiptInclude,
-    }),
+    tx.receipt.create({ data: { refNo: await nextReceiptRef(tx), encoderId: req.auth!.user.id, ...formColumns(data) }, include: receiptInclude }),
   );
   await audit(req, { action: 'receipt.created', entityType: 'receipt', entityId: r.id, summary: `created the draft ${r.refNo}`, after: { payee: r.payee, amount: data.amount } });
   res.status(201).json({ receipt: await receiptDetail(req.auth!, r) });
@@ -116,16 +115,11 @@ receiptsRouter.patch('/:id', requirePerm('receipt.create'), async (req, res) => 
   assertOwner(req.auth!, r);
   if (!canEditReceipt(r.status as ReceiptStatus)) throw conflict('This receipt can no longer be edited.', 'INVALID_STATE');
   const data = receiptInputSchema.parse(req.body);
-  await assertCategory(data.categoryId);
-  const updated = await prisma.receipt.update({
-    where: { id: r.id },
-    data: { payee: data.payee, receiptDate: new Date(data.receiptDate + 'T00:00:00Z'), amount: data.amount, categoryId: data.categoryId, description: data.description || null },
-    include: receiptInclude,
-  });
+  const updated = await prisma.receipt.update({ where: { id: r.id }, data: formColumns(data), include: receiptInclude });
   await audit(req, {
     action: 'receipt.updated', entityType: 'receipt', entityId: r.id, summary: 'updated the receipt',
-    before: { payee: r.payee, amount: Number(r.amount), date: dateOnly(r.receiptDate), categoryId: r.categoryId },
-    after: { payee: data.payee, amount: data.amount, date: data.receiptDate, categoryId: data.categoryId },
+    before: { vendor: r.payee, amount: Number(r.amount), date: dateOnly(r.receiptDate), invoiceNo: r.invoiceNo, vendorTin: r.vendorTin, type: r.transactionType, bir: r.birInvoice, vatType: r.vatType, vatable: num(r.vatableAmount), vat: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) },
+    after: { vendor: data.payee, amount: data.amount, date: data.receiptDate, invoiceNo: data.invoiceNo ?? null, vendorTin: data.vendorTin ?? null, type: data.transactionType, bir: data.birInvoice, vatType: data.vatType ?? null, vatable: data.vatableAmount ?? null, vat: data.vatAmount ?? null, withheld: data.withheld ?? null, whtRate: data.whtRate ?? null, whtAmount: data.whtAmount ?? null },
   });
   res.json({ receipt: await receiptDetail(req.auth!, updated) });
 });
@@ -148,7 +142,12 @@ receiptsRouter.post('/:id/copy', requirePerm('receipt.create'), async (req, res)
   if (r.status !== 'disapproved') throw conflict('Only disapproved receipts can be copied.', 'INVALID_STATE');
   const copy = await prisma.$transaction(async (tx) =>
     tx.receipt.create({
-      data: { refNo: await nextReceiptRef(tx), encoderId: r.encoderId, payee: r.payee, receiptDate: r.receiptDate, amount: r.amount, categoryId: r.categoryId, description: r.description },
+      data: {
+        refNo: await nextReceiptRef(tx), encoderId: r.encoderId, payee: r.payee, receiptDate: r.receiptDate, amount: r.amount, categoryId: r.categoryId, description: r.description,
+        birInvoice: r.birInvoice, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason, invoiceNo: r.invoiceNo,
+        vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType, vatType: r.vatType, vatableAmount: r.vatableAmount,
+        vatAmount: r.vatAmount, withheld: r.withheld, whtRate: r.whtRate, whtAmount: r.whtAmount,
+      },
       include: receiptInclude,
     }),
   );
@@ -267,6 +266,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'submit') {
     const n = await prisma.receiptEvidence.count({ where: { receiptId: r.id, deletedAt: null } });
     if (!n) throw badRequest('Add at least one photo or PDF of the receipt before submitting.', 'NO_EVIDENCE');
+    // Receipts made before the form changed, or imported from the old template, have no invoice answers yet.
+    if (r.birInvoice === null || !r.transactionType) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
   }
   const now = new Date();
   // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.
@@ -290,15 +291,20 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
       where: { actorId: auth.user.id, entityType: 'receipt', entityId: String(r.id), action: 'evidence.viewed', createdAt: { gte: r.submittedAt ?? new Date(0) } },
     });
     if (!viewed) throw badRequest('Open the evidence before marking this checked.', 'EVIDENCE_NOT_VIEWED');
+    // A receipt with a BIR invoice needs the Checker's own answer on the company name, TIN and address. Anything not seen needs a reason.
+    if (r.birInvoice) {
+      if (!body.seen) throw badRequest('Confirm whether the company name, TIN and address can be seen completely on the invoice.', 'SEEN_REQUIRED');
+      if ((!body.seen.company || !body.seen.tin || !body.seen.address) && !note) throw badRequest('Say what could not be seen on the invoice.', 'NOTE_REQUIRED');
+    }
   }
 
   const data: Prisma.ReceiptUncheckedUpdateManyInput = { status: t.to, version: { increment: 1 } };
   if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null });
-  if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null });
-  if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note });
+  if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null, ckCompany: null, ckTin: null, ckAddress: null });
+  if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note, ckCompany: body.seen?.company ?? null, ckTin: body.seen?.tin ?? null, ckAddress: body.seen?.address ?? null });
   if (action === 'return' || action === 'reserve' || action === 'request') data.lastNote = note;
   // Asking for more proof sends it back to be checked again from the start.
-  if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null });
+  if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'release') data.lastNote = null;
   if (action === 'undo') Object.assign(data, { decidedById: null, decidedAt: null, decisionNote: null, lastNote: null });
   if (action === 'approve' || action === 'disapprove') Object.assign(data, { decidedById: auth.user.id, decidedAt: now, decisionNote: note, lastNote: action === 'disapprove' ? note : null });
@@ -318,14 +324,14 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
 
   await audit(req, {
     action: `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
-    before: { status: r.status }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}) },
+    before: { status: r.status }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
 
   /* notifications */
   const who = auth.user.name;
   const ref = `${r.refNo} (${r.payee})`;
   const others = (ids: (number | null | undefined)[]) => ids.filter((x): x is number => !!x && x !== auth.user.id);
-  const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: r.category.name }, { actorName: who, note, docNo });
+  const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: typeLabel(r) }, { actorName: who, note, docNo });
   if (action === 'withdraw') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.withdrawn', receiptId: r.id, text: `${ref} was withdrawn by ${who}.` });
   if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
   if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });

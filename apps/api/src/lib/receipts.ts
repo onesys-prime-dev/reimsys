@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, type ReceiptStatus } from '@reimsys/shared';
+import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import type { AuthContext } from '../types.js';
@@ -24,6 +24,21 @@ export const receiptInclude = {
 type ReceiptRow = Prisma.ReceiptGetPayload<{ include: typeof receiptInclude }>;
 
 export const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
+/** What the receipt is, for lists, emails and reports: Product or Service, or the old category on receipts made before the form changed. */
+export const typeLabel = (r: { transactionType: string | null; category: { name: string } | null }) =>
+  r.transactionType ? TRANSACTION_LABEL[r.transactionType as keyof typeof TRANSACTION_LABEL] ?? r.transactionType : r.category?.name ?? '';
+const dec = (v: { toString(): string } | null) => (v === null ? null : Number(v));
+
+/** The answers on the client's reimbursement form, in the shape the screens use. Old receipts have these empty. */
+export function receiptForm(r: ReceiptRow) {
+  return {
+    birInvoice: r.birInvoice, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
+    invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType,
+    vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount),
+    withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount),
+    checked: r.ckCompany === null && r.ckTin === null && r.ckAddress === null ? null : { company: r.ckCompany, tin: r.ckTin, address: r.ckAddress },
+  };
+}
 
 export function receiptBrief(r: ReceiptRow) {
   return {
@@ -34,7 +49,10 @@ export function receiptBrief(r: ReceiptRow) {
     payee: r.payee,
     receiptDate: dateOnly(r.receiptDate),
     amount: Number(r.amount),
-    category: { id: r.category.id, name: r.category.name },
+    invoiceNo: r.invoiceNo,
+    transactionType: r.transactionType,
+    birInvoice: r.birInvoice,
+    category: r.category ? { id: r.category.id, name: r.category.name } : null,
     encoder: r.encoder,
     submittedAt: r.submittedAt,
     checkedAt: r.checkedAt,
@@ -57,14 +75,17 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
   const name = (id: number | null) => people.find((p) => p.id === id)?.name ?? null;
   const isOwner = r.encoderId === auth.user.id;
   const status = r.status as ReceiptStatus;
-  // Same payee, amount and date as another receipt this person can see: worth a second look before paying twice.
+  // The same invoice (vendor TIN + invoice no.), or the same vendor, amount and date, as another receipt this person can see: worth a second look before paying twice.
+  const sameInvoice: Prisma.ReceiptWhereInput[] = r.vendorTin && r.invoiceNo ? [{ vendorTin: r.vendorTin, invoiceNo: r.invoiceNo }] : [];
   const dupes = await prisma.receipt.findMany({
-    where: { AND: [visibleWhere(auth), { id: { not: r.id }, payee: r.payee, amount: r.amount, receiptDate: r.receiptDate, status: { not: 'disapproved' } }] },
+    where: { AND: [visibleWhere(auth), { id: { not: r.id }, status: { not: 'disapproved' }, OR: [...sameInvoice, { payee: r.payee, amount: r.amount, receiptDate: r.receiptDate }] }] },
     select: { id: true, refNo: true, status: true, encoder: { select: { name: true } } }, orderBy: { id: 'desc' }, take: 3,
   });
   return {
     ...receiptBrief(r),
     description: r.description,
+    form: receiptForm(r),
+    warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }),
     checkedBy: name(r.checkedById), checkedAt: r.checkedAt, checkNote: r.checkNote,
     decidedBy: name(r.decidedById), decidedAt: r.decidedAt, decisionNote: r.decisionNote,
     lastNote: r.lastNote,
@@ -86,16 +107,18 @@ export const assertOwner = (auth: AuthContext, r: { encoderId: number }) => {
 };
 
 /** Shared list filters used by the list, export and report endpoints. */
-export function filterWhere(q: { status?: string; q?: string; categoryId?: number; encoderId?: number; from?: string; to?: string }): Prisma.ReceiptWhereInput {
+export function filterWhere(q: { status?: string; q?: string; categoryId?: number; transactionType?: string; vatType?: string; encoderId?: number; from?: string; to?: string }): Prisma.ReceiptWhereInput {
   const w: Prisma.ReceiptWhereInput = {};
   if (q.status) w.status = q.status;
   if (q.categoryId) w.categoryId = q.categoryId;
+  if (q.transactionType) w.transactionType = q.transactionType;
+  if (q.vatType) w.vatType = q.vatType;
   if (q.encoderId) w.encoderId = q.encoderId;
   if (q.from || q.to) {
     w.receiptDate = {};
     if (q.from) w.receiptDate.gte = new Date(q.from + 'T00:00:00Z');
     if (q.to) w.receiptDate.lte = new Date(q.to + 'T00:00:00Z');
   }
-  if (q.q) w.OR = [{ payee: { contains: q.q } }, { refNo: { contains: q.q } }, { description: { contains: q.q } }, { encoder: { name: { contains: q.q } } }];
+  if (q.q) w.OR = [{ payee: { contains: q.q } }, { refNo: { contains: q.q } }, { description: { contains: q.q } }, { invoiceNo: { contains: q.q } }, { vendorTin: { contains: q.q } }, { encoder: { name: { contains: q.q } } }];
   return w;
 }
