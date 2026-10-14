@@ -158,3 +158,9 @@ Screens update by themselves: when someone approves a receipt, the person watchi
 Every table has a lower-case name (`user`, `receipt`, `comment` ...). The indexes and foreign keys are lower-case too; the migrations create them that way. This matters on **Linux**, where MySQL treats `User` and `user` as different tables. On Windows it changes nothing.
 
 A new database is built with `pnpm db:migrate` and ends up identical to the schema. This was checked on a fresh database (migrations and database both match the schema exactly).
+
+## Speed
+- The server compresses text (pages, scripts, data) and keeps the fingerprinted files in `/assets` in the browser for a year, so repeat visits download almost nothing. The live-update stream (`/api/events`) is never compressed.
+- Screens people open rarely (Access, Audit, Import, Reports, Profile, the receipt form) load only when opened, so the first page is much smaller.
+- If nginx or Caddy sits in front, it can compress instead; just keep `/api/events` unbuffered and uncompressed (see "Live updates").
+- A small VPS should have at least 1 GB of memory for the database, and sign-in is the heaviest action (the password check is deliberately slow).
