@@ -72,31 +72,29 @@ export function ReportViewPage() {
 
       <section className="card">
         <div className="matrix">
-          <table style={{ minWidth: 980 }}>
+          <table style={{ minWidth: 820 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left' }}>Document</th><th style={{ textAlign: 'left' }}>Receipt</th><th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'left' }}>Encoded by</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Gross</th>
+                <th style={{ textAlign: 'left' }}>Document</th><th style={{ textAlign: 'left' }}>Date</th>
+                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Gross</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((x) => (
                 <tr key={x.refNo}>
-                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}><b>{x.docNo}</b></td>
-                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{x.refNo}</td>
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}><b>{x.docNo}</b><br /><small className="muted">{x.refNo}</small></td>
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{fmtDate(x.date)}</td>
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{x.invoiceNo || '-'}</td>
-                  <td style={{ textAlign: 'left' }}>{x.payee}</td>
+                  <td style={{ textAlign: 'left' }}>{x.payee}<br /><small className="muted">{x.encoder}</small></td>
                   <td style={{ textAlign: 'left' }}>{x.category}</td>
-                  <td style={{ textAlign: 'left' }}>{x.encoder}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.vat)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.wht)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{money(x.amount)}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={10}><Empty title="No approved records in this range" /></td></tr>}
+              {!rows.length && <tr><td colSpan={8}><Empty title="No approved records in this range" /></td></tr>}
             </tbody>
-            {rows.length > 0 && <tfoot><tr><td colSpan={7} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.vat)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.wht)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
+            {rows.length > 0 && <tfoot><tr><td colSpan={5} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.vat)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.wht)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
           </table>
         </div>
       </section>
