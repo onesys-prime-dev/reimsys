@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { STATUS_LABEL, type ReceiptAction } from '@reimsys/shared';
+import { STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -21,6 +21,8 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   undo: { label: 'Take back decision', icon: 'undo', cls: '', title: 'Take back this decision', desc: 'The receipt goes back to Checked and the Med Ref is told to disregard the earlier decision. Any reimbursement document is removed.', field: 'Why are you taking it back', ok: 'Decision taken back. The receipt is back in your queue.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
+type Seen = { company: boolean; tin: boolean; address: boolean };
+const yn = (v: boolean | null) => (v === null ? '-' : v ? 'Yes' : 'No');
 const ORDER: ReceiptAction[] = ['undo', 'request', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
 
 export function ReceiptDetailPage() {
@@ -52,7 +54,7 @@ export function ReceiptDetailPage() {
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ['receipt', id] }); qc.invalidateQueries({ queryKey: ['history', id] }); qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); };
   const act = useMutation({
-    mutationFn: ({ action, note }: { action: ReceiptAction; note?: string }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, version: r!.version } }),
+    mutationFn: ({ action, note, seen }: { action: ReceiptAction; note?: string; seen?: Seen }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, seen, version: r!.version } }),
     onSuccess: (d, v) => {
       toast(COPY[v.action].ok); setModal(null);
       // Sending it back takes the receipt out of the approver's view, so go to the list instead of showing "not found".
@@ -108,12 +110,19 @@ export function ReceiptDetailPage() {
 
       {note?.text && <div className={`callout ${note.cls}`}><Icon name={note.icon} /><div><b>{note.title}</b><span>{note.text}</span></div></div>}
 
+      {r.warnings.length > 0 && r.status !== 'approved' && r.status !== 'disapproved' && (
+        <div className="callout warn">
+          <Icon name="info" />
+          <div><b>Worth a closer look</b>{r.warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</div>
+        </div>
+      )}
+
       {r.possibleDuplicates.length > 0 && r.status !== 'approved' && r.status !== 'disapproved' && (
         <div className="callout warn">
           <Icon name="info" />
           <div>
             <b>Possible duplicate</b>
-            <span>Same payee, amount and date as {r.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link> ({STATUS_LABEL[d.status].toLowerCase()}, {d.encoder})</span>)}. Check it is not the same expense twice.</span>
+            <span>Same invoice (vendor TIN and invoice no.), or same vendor, amount and date, as {r.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link> ({STATUS_LABEL[d.status].toLowerCase()}, {d.encoder})</span>)}. Check it is not the same expense twice.</span>
           </div>
         </div>
       )}
@@ -138,10 +147,13 @@ export function ReceiptDetailPage() {
             <div className="card-h"><h3>Details</h3></div>
             <div className="card-b">
               <dl className="dl">
-                <dt>Paid to</dt><dd>{r.payee}</dd>
-                <dt>Receipt date</dt><dd>{fmtDate(r.receiptDate)}</dd>
-                <dt>Amount</dt><dd>{money(r.amount)}</dd>
-                <dt>Category</dt><dd>{r.category.name}</dd>
+                <dt>Vendor</dt><dd>{r.payee}</dd>
+                {r.form.vendorAddress && <><dt>Vendor address</dt><dd>{r.form.vendorAddress}</dd></>}
+                {r.form.vendorTin && <><dt>Vendor TIN</dt><dd>{r.form.vendorTin}</dd></>}
+                <dt>Invoice no.</dt><dd>{r.form.invoiceNo || '-'}</dd>
+                <dt>Invoice date</dt><dd>{fmtDate(r.receiptDate)}</dd>
+                <dt>Type</dt><dd>{r.form.transactionType ? TRANSACTION_LABEL[r.form.transactionType as keyof typeof TRANSACTION_LABEL] ?? r.form.transactionType : r.category?.name ?? '-'}</dd>
+                <dt>Gross amount</dt><dd>{money(r.amount)}</dd>
                 <dt>Encoded by</dt><dd>{r.encoder.name}</dd>
                 <dt>Description</dt><dd>{r.description || '-'}</dd>
                 {r.checkedBy && <><dt>Checked by</dt><dd>{r.checkedBy}{r.checkedAt ? ` · ${fmtDateTime(r.checkedAt)}` : ''}</dd></>}
@@ -151,6 +163,31 @@ export function ReceiptDetailPage() {
               </dl>
             </div>
           </section>
+          {r.form.birInvoice === null ? (
+            <section className="card"><div className="card-h"><h3>Invoice details</h3></div><div className="card-b muted">This receipt was made before the invoice form, so these answers were not recorded.{r.canEdit ? ' Edit it to add them.' : ''}</div></section>
+          ) : (
+            <section className="card">
+              <div className="card-h"><h3>Invoice details</h3><small>Answers from the reimbursement form</small></div>
+              <div className="card-b">
+                <dl className="dl">
+                  <dt>BIR-registered invoice</dt><dd>{yn(r.form.birInvoice)}</dd>
+                  {r.form.birInvoice === false && <><dt>Reason</dt><dd>{r.form.noBirReason || '-'}</dd></>}
+                  {r.form.birInvoice && (
+                    <>
+                      <dt>Company name seen</dt><dd>{seenText(r.form.seenCompany, r.form.checked?.company)}</dd>
+                      <dt>Company TIN seen</dt><dd>{seenText(r.form.seenTin, r.form.checked?.tin)}</dd>
+                      <dt>Company address seen</dt><dd>{seenText(r.form.seenAddress, r.form.checked?.address)}</dd>
+                      <dt>VAT</dt><dd>{r.form.vatType ? VAT_LABEL[r.form.vatType as keyof typeof VAT_LABEL] ?? r.form.vatType : '-'}</dd>
+                      <dt>Vatable amount</dt><dd>{r.form.vatableAmount === null ? '-' : money(r.form.vatableAmount)}</dd>
+                      <dt>VAT amount</dt><dd>{r.form.vatAmount === null ? '-' : money(r.form.vatAmount)}</dd>
+                      <dt>Withheld tax</dt><dd>{yn(r.form.withheld)}</dd>
+                      {r.form.withheld && <><dt>Withholding</dt><dd>{r.form.whtRate}% · {r.form.whtAmount === null ? '-' : money(r.form.whtAmount)}</dd></>}
+                    </>
+                  )}
+                </dl>
+              </div>
+            </section>
+          )}
           <Comments receiptId={r.id} />
           <section className="card">
             <div className="card-h"><h3>History</h3><small>Every action is recorded</small></div>
@@ -178,14 +215,23 @@ export function ReceiptDetailPage() {
           <div className="btns"><button className="btn" onClick={() => setConfirmDelete(false)}>Keep it</button><button className="btn bad" disabled={del.isPending} onClick={() => del.mutate()}>Delete draft</button></div>
         </Modal>
       )}
-      {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note) => act.mutate({ action: modal, note })} />}
+      {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note, seen) => act.mutate({ action: modal, note, seen })} />}
     </>
   );
 }
 
-function NoteModal({ receipt, action, cfg, required, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string) => void }) {
+const seenText = (ticked: boolean | null, checker: boolean | null | undefined) =>
+  `Med Ref: ${ticked === null ? '-' : ticked ? 'ticked' : 'not ticked'} · Checker: ${checker === undefined || checker === null ? 'not checked yet' : checker ? 'seen' : 'NOT seen'}`;
+
+function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string, seen?: Seen) => void }) {
   const [text, setText] = useState('');
-  const ok = !required || text.trim().length >= 4;
+  // For a receipt with a BIR invoice, the Checker answers for themselves whether the company details can be seen on it.
+  const askSeen = action === 'check' && receipt.form.birInvoice === true;
+  const [seen, setSeen] = useState<Partial<Record<keyof Seen, boolean>>>({});
+  const answered = !askSeen || (seen.company !== undefined && seen.tin !== undefined && seen.address !== undefined);
+  const anyNo = askSeen && (seen.company === false || seen.tin === false || seen.address === false);
+  const required = baseRequired || anyNo;
+  const ok = answered && (!required || text.trim().length >= 4);
   return (
     <Modal title={cfg.title} onClose={onClose}>
       <div className="callout" style={{ margin: '0 0 14px', display: 'block' }}>
@@ -198,13 +244,28 @@ function NoteModal({ receipt, action, cfg, required, busy, onClose, onSubmit }: 
         )}
       </div>
       <p>{cfg.desc}</p>
+      {askSeen && (
+        <div style={{ display: 'grid', gap: 10, margin: '0 0 14px' }}>
+          <b style={{ fontSize: '.9rem' }}>Looking at the invoice, can these be seen completely?</b>
+          {([['company', 'Company name', receipt.form.seenCompany], ['tin', 'Company TIN', receipt.form.seenTin], ['address', 'Company address', receipt.form.seenAddress]] as const).map(([k, label, ticked]) => (
+            <div key={k} style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <span>{label} <small className="muted">(Med Ref ticked: {yn(ticked)})</small></span>
+              <span className="seg" role="radiogroup" aria-label={label}>
+                <button type="button" role="radio" aria-checked={seen[k] === true} className={seen[k] === true ? 'on' : ''} onClick={() => setSeen((s) => ({ ...s, [k]: true }))}>Seen</button>
+                <button type="button" role="radio" aria-checked={seen[k] === false} className={seen[k] === false ? 'on' : ''} onClick={() => setSeen((s) => ({ ...s, [k]: false }))}>Not seen</button>
+              </span>
+            </div>
+          ))}
+          {anyNo && <small style={{ color: 'var(--warn)' }}>Say what could not be seen. The Approver will read it.</small>}
+        </div>
+      )}
       <label className="f">
         <span>{cfg.field}{!required && <span className="hint"> Optional</span>}</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={required ? 'Required' : 'Add a remark'} autoFocus maxLength={1000} />
       </label>
       <div className="btns">
         <button className="btn" onClick={onClose}>Cancel</button>
-        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(text.trim())}>{action === 'return' ? 'Return record' : cfg.label}</button>
+        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(text.trim(), askSeen ? (seen as Seen) : undefined)}>{action === 'return' ? 'Return record' : cfg.label}</button>
       </div>
     </Modal>
   );

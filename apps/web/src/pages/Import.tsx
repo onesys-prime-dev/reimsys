@@ -7,7 +7,7 @@ import { Icon, useToast } from '../ui';
 interface Preview {
   id: number; fileName: string; totalRows: number; validRows: number; errorCount: number;
   errors: { row: number; message: string }[];
-  preview: { payee: string; receiptDate: string; amount: number; description: string | null }[];
+  preview: { payee: string; receiptDate: string; amount: number; description: string | null; form: { birInvoice: boolean | null; invoiceNo: string | null } | null }[];
 }
 
 export function ImportPage() {
@@ -43,7 +43,7 @@ export function ImportPage() {
             <div className="btns"><button className="btn" onClick={() => pick.current?.click()} disabled={up.isPending}><Icon name="upload" size={18} />{up.isPending ? 'Reading…' : 'Choose file'}</button></div>
             <input ref={pick} type="file" accept=".csv,.xlsx,text/csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) up.mutate(f); e.target.value = ''; }} />
           </div>
-          <p className="muted" style={{ fontSize: '.86rem', marginBottom: 0 }}>Columns: <code>payee</code>, <code>receipt_date</code> (YYYY-MM-DD), <code>amount</code>, <code>category</code>, <code>description</code>. Imported receipts start as drafts. Photos or PDFs are added afterwards, before submitting.</p>
+          <p className="muted" style={{ fontSize: '.86rem', marginBottom: 0 }}>Download the template to see every column: <code>vendor</code>, <code>invoice_date</code> (YYYY-MM-DD), <code>invoice_no</code>, <code>vendor_tin</code>, <code>vendor_address</code>, <code>gross_amount</code>, <code>type</code> (product or service), <code>bir_invoice</code> (yes or no), <code>company_check</code>, <code>no_bir_reason</code>, <code>vat_type</code>, <code>vatable_amount</code>, <code>vat_amount</code>, <code>withheld</code>, <code>wht_rate</code>, <code>wht_amount</code>. A file with only the old columns (<code>payee</code>, <code>receipt_date</code>, <code>amount</code>) still works, but its receipts need the invoice details filled in before they can be submitted. Imported receipts start as drafts. Photos or PDFs are added afterwards.</p>
         </div></section>
       ) : (
         <>
@@ -58,7 +58,7 @@ export function ImportPage() {
           {pv.preview.length > 0 && (
             <section className="card">
               <div className="card-h"><h3>First {pv.preview.length} valid rows</h3></div>
-              {pv.preview.map((r, i) => <div className="pref" style={{ padding: '10px 18px' }} key={i}><div><b>{r.payee}</b><br /><small className="muted">{fmtDate(r.receiptDate)}{r.description ? ` · ${r.description}` : ''}</small></div><b>{money(r.amount)}</b></div>)}
+              {pv.preview.map((r, i) => <div className="pref" style={{ padding: '10px 18px' }} key={i}><div><b>{r.payee}</b><br /><small className="muted">{fmtDate(r.receiptDate)}{r.form?.invoiceNo ? ` · ${r.form.invoiceNo}` : ''}{r.form === null ? ' · invoice details to fill in' : ''}{r.description ? ` · ${r.description}` : ''}</small></div><b>{money(r.amount)}</b></div>)}
             </section>
           )}
           <div className="formbar">

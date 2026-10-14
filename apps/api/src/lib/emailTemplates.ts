@@ -131,7 +131,7 @@ export async function renderEmail(input: RenderInput): Promise<Rendered> {
   const meta = TEMPLATE_META[input.key];
   const details: [string, string][] = [];
   if (t.showDetails && meta.hasReceipt) {
-    for (const [label, key] of [['Receipt', 'refNo'], ['Paid to', 'payee'], ['Amount', 'amount'], ['Category', 'category'], ['Receipt date', 'date'], ['Status', 'status'], ['Document', 'docNo']] as const) {
+    for (const [label, key] of [['Receipt', 'refNo'], ['Paid to', 'payee'], ['Amount', 'amount'], ['Type', 'category'], ['Receipt date', 'date'], ['Status', 'status'], ['Document', 'docNo']] as const) {
       if (data[key]) details.push([label, data[key]!]);
     }
   }

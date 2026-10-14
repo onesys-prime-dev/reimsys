@@ -373,3 +373,32 @@ a.btn.ghost{color:var(--muted)}
 @keyframes livepulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 50%,transparent)}70%,100%{box-shadow:0 0 0 7px transparent}}
 @media(max-width:520px){.live-t{display:none}.live{padding:6px}}
 @media(prefers-reduced-motion:reduce){.live.live i{animation:none}}
+
+/* ---------- reimbursement form wizard ---------- */
+.steps{list-style:none;display:flex;gap:6px;margin:0 0 14px;padding:0;overflow-x:auto}
+.steps li{display:flex;align-items:center;gap:8px;flex:1 1 0;min-width:0;padding:8px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line);color:var(--muted);font-size:.8rem}
+.steps li span{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--line);font-weight:700;font-size:.75rem;color:var(--ink)}
+.steps li em{font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps li.on{border-color:var(--accent);color:var(--ink);background:var(--accent-soft)}
+.steps li.on span{background:var(--accent);color:#fff}
+.steps li.done span{background:var(--ok);color:#fff}
+@media (max-width:640px){.steps li em{display:none}.steps li.on em{display:block}.steps li{flex:0 0 auto}}
+.steph{margin:0 0 14px;font-size:1.05rem}
+.q{font-weight:600;margin-bottom:8px}.q i{color:var(--bad);font-style:normal}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.choice{display:flex;align-items:flex-start;gap:10px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;min-height:52px;cursor:pointer}
+.choice .dot{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--muted);margin-top:2px}
+.choice b{display:block}.choice small{display:block;color:var(--muted);font-weight:400;margin-top:2px}
+.choice.on{border-color:var(--accent);background:var(--accent-soft)}
+.choice.on .dot{border-color:var(--accent);background:radial-gradient(circle,var(--accent) 0 45%,transparent 50%)}
+.tick{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.tick.bad{border-color:var(--bad)}
+.tick label{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.tick input{flex:none;width:20px;height:20px;margin-top:2px;accent-color:var(--accent)}
+.tick b{display:block;font-weight:600}.tick em{display:block;font-style:normal;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.review{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.review .rv{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:10px;padding:9px 14px;border-top:1px solid var(--line)}
+.review .rv:first-child{border-top:0}
+.review .rv span{color:var(--muted)}.review .rv b{font-weight:600;overflow-wrap:anywhere}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.formgrid{grid-template-columns:minmax(0,1fr)}.review .rv{grid-template-columns:1fr;gap:2px}}

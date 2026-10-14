@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
-import type { Category } from '../types';
 import { Empty, Field, Icon, useToast } from '../ui';
 
 interface Report { id: number; person: string | null; category: string | null; format: string; status: string; from: string; to: string; rowCount: number | null; total: number | null; error: string | null; createdAt: string; requestedBy: string }
@@ -17,20 +16,19 @@ export function ReportsPage() {
   const toast = useToast();
   const [from, setFrom] = useState(firstOfMonth());
   const [to, setTo] = useState(endOfMonth());
-  const [categoryId, setCategoryId] = useState('');
+  const [type, setType] = useState('');
   const [personId, setPersonId] = useState('');
   const [format, setFormat] = useState<'pdf' | 'xlsx' | 'csv'>('pdf');
 
   const people = useQuery({ queryKey: ['encoders'], queryFn: () => api<{ people: { id: number; name: string }[] }>('/receipts/encoders') });
-  const cats = useQuery({ queryKey: ['categories'], queryFn: () => api<{ categories: Category[] }>('/categories') });
-  const qs = new URLSearchParams({ from, to, ...(categoryId ? { categoryId } : {}), ...(personId ? { encoderId: personId } : {}) }).toString();
+  const qs = new URLSearchParams({ from, to, ...(type ? { transactionType: type } : {}), ...(personId ? { encoderId: personId } : {}) }).toString();
   const preview = useQuery({ queryKey: ['report-preview', qs], enabled: !!from && !!to && from <= to, queryFn: () => api<{ count: number; total: number }>(`/reports/preview?${qs}`) });
   const list = useQuery({
     queryKey: ['reports'], queryFn: () => api<{ reports: Report[] }>('/reports'),
     refetchInterval: (q) => (q.state.data?.reports.some((r) => r.status === 'pending') ? 1500 : false),
   });
   const gen = useMutation({
-    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, categoryId: categoryId ? Number(categoryId) : null, encoderId: personId ? Number(personId) : null } }),
+    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, transactionType: type || null, encoderId: personId ? Number(personId) : null } }),
     onSuccess: (d) => { toast('Report created.'); qc.invalidateQueries({ queryKey: ['reports'] }); nav(`/reports/${d.report.id}`); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
@@ -52,7 +50,7 @@ export function ReportsPage() {
               {(people.data?.people.length ?? 0) > 1 && (
                 <Field label="Person" className="full"><select value={personId} onChange={(e) => setPersonId(e.target.value)}><option value="">Everyone</option>{people.data!.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
               )}
-              <Field label="Category"><select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}><option value="">All categories</option>{cats.data?.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label="Product or service"><select value={type} onChange={(e) => setType(e.target.value)}><option value="">Product and service</option><option value="product">Product</option><option value="service">Service</option></select></Field>
               <div className="f"><span>Format</span><div className="seg">{(['pdf', 'xlsx', 'csv'] as const).map((k) => <button key={k} type="button" className={format === k ? 'on' : ''} onClick={() => setFormat(k)}>{k.toUpperCase()}</button>)}</div></div>
             </div>
             <div className="callout ok" style={{ margin: '18px 0 0' }}>

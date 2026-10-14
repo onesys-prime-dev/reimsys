@@ -5,8 +5,9 @@ import { Empty, Icon } from '../ui';
 
 interface Data {
   report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; createdAt: string; requestedBy: string };
-  rows: { docNo: string; refNo: string; date: string; payee: string; category: string; encoder: string; approvedAt: string; amount: number }[];
+  rows: { docNo: string; refNo: string; date: string; invoiceNo: string; payee: string; category: string; vatType: string; vat: number; wht: number; encoder: string; approvedAt: string; amount: number }[];
   total: number;
+  totals: { gross: number; vatable: number; vat: number; wht: number };
   byCategory: { category: string; count: number; total: number }[];
   byPerson: { person: string; count: number; total: number }[];
 }
@@ -16,7 +17,7 @@ export function ReportViewPage() {
   const q = useQuery({ queryKey: ['report-data', id], queryFn: () => api<Data>(`/reports/${id}/data`), refetchInterval: (x) => (x.state.data?.report.status === 'pending' ? 1500 : false) });
   if (q.isError) return <Empty title="Report not found">It may belong to someone else. <Link to="/reports" style={{ color: 'var(--accent)' }}>Back to reports</Link></Empty>;
   if (!q.data) return <div className="empty">Loading…</div>;
-  const { report: r, rows, total, byCategory, byPerson } = q.data;
+  const { report: r, rows, total, totals, byCategory, byPerson } = q.data;
   const ready = r.status === 'ready';
 
   return (
@@ -56,7 +57,7 @@ export function ReportViewPage() {
 
       {byCategory.length > 0 && (
         <section className="card" style={{ marginBottom: 16 }}>
-          <div className="card-h"><h3>By category</h3></div>
+          <div className="card-h"><h3>By type</h3></div>
           <div className="card-b">
             {byCategory.map((c) => (
               <div key={c.category} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px,150px) 1fr auto', gap: 12, alignItems: 'center', padding: '5px 0' }}>
@@ -71,11 +72,11 @@ export function ReportViewPage() {
 
       <section className="card">
         <div className="matrix">
-          <table style={{ minWidth: 760 }}>
+          <table style={{ minWidth: 980 }}>
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Document</th><th style={{ textAlign: 'left' }}>Receipt</th><th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Paid to</th><th style={{ textAlign: 'left' }}>Category</th><th style={{ textAlign: 'left' }}>Encoded by</th><th style={{ textAlign: 'right' }}>Amount</th>
+                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'left' }}>Encoded by</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Gross</th>
               </tr>
             </thead>
             <tbody>
@@ -84,15 +85,18 @@ export function ReportViewPage() {
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}><b>{x.docNo}</b></td>
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{x.refNo}</td>
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{fmtDate(x.date)}</td>
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>{x.invoiceNo || '-'}</td>
                   <td style={{ textAlign: 'left' }}>{x.payee}</td>
                   <td style={{ textAlign: 'left' }}>{x.category}</td>
                   <td style={{ textAlign: 'left' }}>{x.encoder}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.vat)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.wht)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{money(x.amount)}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={7}><Empty title="No approved records in this range" /></td></tr>}
+              {!rows.length && <tr><td colSpan={10}><Empty title="No approved records in this range" /></td></tr>}
             </tbody>
-            {rows.length > 0 && <tfoot><tr><td colSpan={6} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
+            {rows.length > 0 && <tfoot><tr><td colSpan={7} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.vat)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.wht)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
           </table>
         </div>
       </section>

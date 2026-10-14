@@ -209,3 +209,14 @@ export function cleanFormData(d: ReceiptInput) {
     whtAmount: wht ? d.whtAmount ?? null : null,
   };
 }
+
+/** The company the invoices must be addressed to. The Med Ref confirms these can be seen completely on the invoice. */
+export const companySchema = z.object({
+  name: z.string().trim().min(2, 'Enter the company name.').max(160),
+  tin: z.string().trim().min(5, 'Enter the company TIN.').max(30),
+  address: z.string().trim().min(5, 'Enter the company address.').max(300),
+});
+export type Company = z.infer<typeof companySchema>;
+export const DEFAULT_COMPANY: Company = {
+  name: 'SOLARA PHARMA CORP.', tin: '801-590-238-00000', address: 'U-1704 Empire Tower AIC Burgandy Bldg. ADB Ave. Ortigas Center, San Antonio, Pasig City',
+};
