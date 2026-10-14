@@ -151,7 +151,7 @@ Source: the client's current "REIMBURSEMENT FORM" (11 screenshots in `REIMSIS SY
 1. Database fields and shared validation (with unit tests). 2. Wizard form. 3. Checker view. 4. PDF, reports, import/export, emails. 5. Browser tests and docs.
 
 ### Decisions (from the client)
-- **Reimbursement code** is a lookup code for past reimbursements. Plan: a new claim gets a generated code; filing "No, existing code" adds the invoice to that claim; entering a code shows its past reimbursements. (Still to confirm: who may look a code up, i.e. only its owner, or any Med Ref.)
+- **Reimbursement code:** not needed. The client uses it only because Google Forms cannot show past reimbursements. REIMSYS already has history, search and a reference number (the "code") on every receipt, so the question is dropped and no claim grouping is built. One receipt = one reference number.
 - **No BIR invoice:** allowed. The company check is skipped and a written reason is required; the Checker decides.
 - **VAT / withholding maths:** warn only.
 - **Categories:** replaced by Product / Service.
