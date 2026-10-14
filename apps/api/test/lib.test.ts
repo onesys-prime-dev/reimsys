@@ -51,3 +51,19 @@ describe('temporary passwords', () => {
     expect(seen.size).toBe(200);
   });
 });
+
+import { isSameOrigin } from '../src/middleware/security';
+describe('cross-site protection', () => {
+  it('accepts a page that talks to the address it was loaded from', () => {
+    expect(isSameOrigin('http://127.0.0.1:4000', '127.0.0.1:4000')).toBe(true);
+    expect(isSameOrigin('http://192.168.1.77:4000', '192.168.1.77:4000')).toBe(true);
+    expect(isSameOrigin('https://reimsys.example.com', 'reimsys.example.com')).toBe(true);
+  });
+  it('refuses another website pretending to be a page of ours', () => {
+    expect(isSameOrigin('https://evil.example.org', 'localhost:4000')).toBe(false);
+    expect(isSameOrigin('http://localhost:4001', 'localhost:4000')).toBe(false);
+    expect(isSameOrigin('http://localhost:4000.evil.org', 'localhost:4000')).toBe(false);
+    expect(isSameOrigin('not a url', 'localhost:4000')).toBe(false);
+    expect(isSameOrigin('http://localhost:4000', undefined)).toBe(false);
+  });
+});
