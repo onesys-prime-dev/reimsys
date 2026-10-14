@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { dateOnly } from './receipts.js';
 import { registerJob } from './jobs.js';
+import { drawLogo } from './logo.js';
 import { saveFile } from './storage.js';
 
 export interface ReportFilters { from: string; to: string; categoryId?: number | null; encoderId?: number | null; scope: Prisma.ReceiptWhereInput }
@@ -85,9 +86,10 @@ export function buildPdf(rows: Row[], total: number, f: { from: string; to: stri
     const cols = [{ h: 'Document no.', w: 92 }, { h: 'Receipt ref.', w: 92 }, { h: 'Date', w: 66 }, { h: 'Paid to', w: 170 }, { h: 'Category', w: 80 }, { h: 'Encoded by', w: 100 }, { h: 'Amount', w: 0 }];
     cols[6]!.w = W - cols.slice(0, 6).reduce((s, c) => s + c.w, 0);
     const header = () => {
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0c7480').text(config.orgName.toUpperCase(), L, 36);
-      doc.font('Helvetica-Bold').fontSize(16).fillColor('#12232b').text('Liquidation Report', L, 50);
-      doc.font('Helvetica').fontSize(9).fillColor('#546770').text(`Approved records · ${f.from} to ${f.to}${f.label ? ' · ' + f.label : ''} · ${rows.length} record${rows.length === 1 ? '' : 's'}`, L, 72);
+      drawLogo(doc, L, 32, 38);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0c7480').text(config.orgName.toUpperCase(), L + 48, 34);
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#12232b').text('Liquidation Report', L + 48, 48);
+      doc.font('Helvetica').fontSize(9).fillColor('#546770').text(`Approved records · ${f.from} to ${f.to}${f.label ? ' · ' + f.label : ''} · ${rows.length} record${rows.length === 1 ? '' : 's'}`, L + 48, 70);
       let x = L;
       const y = 94;
       doc.rect(L, y, W, 20).fill('#0c7480');
@@ -115,6 +117,7 @@ export function buildPdf(rows: Row[], total: number, f: { from: string; to: stri
     const n = doc.bufferedPageRange().count;
     for (let i = 0; i < n; i++) {
       doc.switchToPage(i);
+      doc.page.margins.bottom = 0; // otherwise the footer is treated as overflow and spills onto a blank extra page
       doc.font('Helvetica').fontSize(8).fillColor('#8a9aa1').text(`Generated ${new Date().toLocaleString('en-PH')}  ·  Page ${i + 1} of ${n}`, L, doc.page.height - 30, { width: W, align: 'center', lineBreak: false });
     }
     doc.end();

@@ -13,6 +13,7 @@ import { ReceiptFormPage } from './pages/ReceiptForm';
 import { ReceiptsPage } from './pages/Receipts';
 import { ReportsPage } from './pages/Reports';
 import { ReportViewPage } from './pages/ReportView';
+import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
 
 function titleFor(path: string) {
@@ -49,7 +50,7 @@ function Shell() {
   return (
     <div className="shell">
       <aside className="side">
-        <div className="brand"><span className="logo">R</span><b>REIMSIS</b></div>
+        <div className="brand"><Logo size={34} /></div>
         <nav className="nav" aria-label="Main">{items.map(link)}</nav>
         <button className="who" onClick={() => nav('/profile')}>
           <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} />

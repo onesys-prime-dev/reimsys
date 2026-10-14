@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { registerJob } from './jobs.js';
+import { drawLogo } from './logo.js';
 import { saveFile } from './storage.js';
 
 const php = (n: number | string) => 'PHP ' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -32,9 +33,11 @@ export async function buildReimbursementPdf(receiptId: number) {
   const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: `Reimbursement ${r.document?.docNo ?? ''}`, Author: config.orgName } });
   const L = 50, W = doc.page.width - 100;
 
-  doc.font('Helvetica-Bold').fontSize(11).fillColor('#0c7480').text(config.orgName.toUpperCase(), L, 50);
-  doc.font('Helvetica-Bold').fontSize(20).fillColor('#12232b').text('Reimbursement Document', L, 68);
-  doc.font('Helvetica').fontSize(10).fillColor('#546770').text(`Document no. ${r.document?.docNo ?? '-'}`, L, 96);
+  drawLogo(doc, L, 46, 46);
+  const TX = L + 60;
+  doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#0c7480').text(config.orgName.toUpperCase(), TX, 48);
+  doc.font('Helvetica-Bold').fontSize(20).fillColor('#12232b').text('Reimbursement Document', TX, 62);
+  doc.font('Helvetica').fontSize(10).fillColor('#546770').text(`Document no. ${r.document?.docNo ?? '-'}`, TX, 88);
   doc.moveTo(L, 118).lineTo(L + W, 118).strokeColor('#d6dfe2').stroke();
 
   let y = 136;

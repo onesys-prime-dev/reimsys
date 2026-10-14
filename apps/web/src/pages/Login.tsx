@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { errMsg } from '../api';
 import { useAuth } from '../auth';
+import { Logo } from '../components/Logo';
 import { Field } from '../ui';
 
 export function LoginPage() {
@@ -26,7 +27,7 @@ export function LoginPage() {
   return (
     <div className="login">
       <div className="card lcard">
-        <div className="brand"><span className="logo">R</span><b>REIMSIS</b></div>
+        <div className="brand" style={{ paddingBottom: 22 }}><Logo size={44} /></div>
         <h1>Sign in</h1>
         <p className="muted" style={{ margin: '6px 0 0' }}>Reimbursement management</p>
         <form onSubmit={submit}>
