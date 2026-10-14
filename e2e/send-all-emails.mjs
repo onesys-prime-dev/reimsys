@@ -4,10 +4,10 @@ const TO = process.argv[2];
 if (!TO) { console.error('Usage: node e2e/send-all-emails.mjs <address that should receive everything>'); process.exit(1); }
 const B = process.env.API ?? 'http://localhost:4000/api';
 const ORIGIN = new URL(B).origin;
-const PW = 'Reimsis#2026';
+const PW = 'Reimsys#2026';
 const tag = 'Email test ' + Date.now().toString().slice(-6);
 
-const H = (c, json = true) => ({ cookie: c, 'x-requested-with': 'reimsis', origin: ORIGIN, ...(json ? { 'content-type': 'application/json' } : {}) });
+const H = (c, json = true) => ({ cookie: c, 'x-requested-with': 'reimsys', origin: ORIGIN, ...(json ? { 'content-type': 'application/json' } : {}) });
 const login = async (e) => {
   const r = await fetch(B + '/auth/login', { method: 'POST', headers: H('', true), body: JSON.stringify({ email: e, password: PW }) });
   if (!r.ok) throw new Error('login failed for ' + e);

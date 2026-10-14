@@ -1,19 +1,19 @@
 {
-  "name": "reimsis",
+  "name": "reimsys",
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@12.11.2",
   "scripts": {
-    "dev": "pnpm -r --parallel --filter @reimsis/api --filter @reimsis/web dev",
-    "dev:api": "pnpm --filter @reimsis/api dev",
-    "dev:web": "pnpm --filter @reimsis/web dev",
-    "db:migrate": "pnpm --filter @reimsis/api db:migrate",
-    "db:seed": "pnpm --filter @reimsis/api db:seed",
+    "dev": "pnpm -r --parallel --filter @reimsys/api --filter @reimsys/web dev",
+    "dev:api": "pnpm --filter @reimsys/api dev",
+    "dev:web": "pnpm --filter @reimsys/web dev",
+    "db:migrate": "pnpm --filter @reimsys/api db:migrate",
+    "db:seed": "pnpm --filter @reimsys/api db:seed",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:api": "node e2e/api-flow.mjs",
     "test:ui": "node e2e/ui-flow.mjs",
-    "build": "pnpm --filter @reimsis/web build && pnpm --filter @reimsis/api build"
+    "build": "pnpm --filter @reimsys/web build && pnpm --filter @reimsys/api build"
   },
   "devDependencies": {
     "@types/mailparser": "^3.9.0",

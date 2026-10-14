@@ -1,6 +1,6 @@
 const B = 'http://localhost:4000/api';
-const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsis', 'content-type': 'application/json', origin: 'http://localhost:4000' });
-const login = async (e) => (await fetch(B + '/auth/login', { method: 'POST', headers: H(''), body: JSON.stringify({ email: e, password: 'Reimsis#2026' }) })).headers.get('set-cookie').split(';')[0];
+const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsys', 'content-type': 'application/json', origin: 'http://localhost:4000' });
+const login = async (e) => (await fetch(B + '/auth/login', { method: 'POST', headers: H(''), body: JSON.stringify({ email: e, password: 'Reimsys#2026' }) })).headers.get('set-cookie').split(';')[0];
 const get = async (c, p) => (await fetch(B + p, { headers: H(c) })).json();
 const post = async (c, p, b) => (await fetch(B + p, { method: 'POST', headers: H(c), body: JSON.stringify(b) })).json();
 let bad = 0; const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, x); if (!c) bad++; };

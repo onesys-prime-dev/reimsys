@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import {
   PLACEHOLDERS, TEMPLATE_KEYS, sampleFor, TEMPLATE_META, emailBrandingSchema, emailTemplateSchema, mailSettingsSchema, unknownPlaceholders,
   type EmailTemplate, type TemplateKey,
-} from '@reimsis/shared';
+} from '@reimsys/shared';
 import { audit } from '../lib/audit.js';
 import { config } from '../config.js';
 import { explainMailError, isPublicLink, queueEmail } from '../lib/email.js';

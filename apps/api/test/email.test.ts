@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import { simpleParser } from 'mailparser';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TEMPLATES, SAMPLE_DATA, TEMPLATE_KEYS, sampleFor, type EmailBranding } from '@reimsis/shared';
+import { DEFAULT_TEMPLATES, SAMPLE_DATA, TEMPLATE_KEYS, sampleFor, type EmailBranding } from '@reimsys/shared';
 import { buildMessage, htmlToText, isPublicLink, isReservedAddress } from '../src/lib/email';
 import { renderEmail } from '../src/lib/emailTemplates';
 
@@ -17,7 +17,7 @@ describe('links in emails', () => {
     expect(isPublicLink('http://192.168.1.39:4000/receipts/4')).toBe(false);
     expect(isPublicLink('https://192.168.1.39')).toBe(false);
     expect(isPublicLink('http://localhost:4000')).toBe(false);
-    expect(isPublicLink('https://reimsis.local')).toBe(false);
+    expect(isPublicLink('https://reimsys.local')).toBe(false);
     expect(isPublicLink('not a url')).toBe(false);
   });
 

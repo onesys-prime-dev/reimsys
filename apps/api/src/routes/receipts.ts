@@ -6,7 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, receiptInputSchema,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, UNDO_WINDOW_MINUTES, bulkSchema, commentSchema,
-} from '@reimsis/shared';
+} from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/errors.js';

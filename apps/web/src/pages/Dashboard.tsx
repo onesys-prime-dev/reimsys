@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+import { RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { ago, api, money } from '../api';
 import { useAuth } from '../auth';
 import type { ReceiptBrief } from '../types';

@@ -18,7 +18,7 @@ export function isSameOrigin(origin: string, host: string | undefined) {
  */
 export function csrfGuard(req: Request, _res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.get('x-requested-with') !== 'reimsis') return next(forbidden('Missing request header.', 'CSRF'));
+  if (req.get('x-requested-with') !== 'reimsys') return next(forbidden('Missing request header.', 'CSRF'));
   const origin = req.get('origin');
   if (origin && !config.webOrigins.includes(origin) && !isSameOrigin(origin, req.get('host'))) {
     return next(forbidden('This page was opened from an address the server does not recognise. Open REIMSYS from the address your administrator gave you.', 'CSRF'));

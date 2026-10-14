@@ -18,7 +18,7 @@ const errs = [];
 async function as(email, size = { width: 1280, height: 860 }) {
   const p = await (await b.newContext({ viewport: size, baseURL: WEB })).newPage();
   p.on('pageerror', (e) => errs.push(String(e))); p.on('console', (m) => m.type() === 'error' && !/40[0-9]/.test(m.text()) && errs.push(m.text()));
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
   return p;
 }
 
@@ -74,7 +74,7 @@ try {
   ok('no browser errors', errs.length === 0, JSON.stringify(errs));
 } finally {
   await b.close();
-  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-e', `DELETE FROM Receipt WHERE payee='${tag}'`]);
+  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM Receipt WHERE payee='${tag}'`]);
 }
 console.log(bad ? `\n${bad} FAILED` : '\nAll more-proof checks passed');
 process.exit(bad ? 1 : 0);

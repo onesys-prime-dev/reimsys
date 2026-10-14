@@ -1,9 +1,9 @@
-import { DEFAULT_GRANTS, DEFAULT_ROLES, PERMISSIONS } from '@reimsis/shared';
+import { DEFAULT_GRANTS, DEFAULT_ROLES, PERMISSIONS } from '@reimsys/shared';
 import { prisma } from '../src/db.js';
 import { hashPassword } from '../src/lib/password.js';
 
 /** Development password for the seeded accounts. Change or remove before any real deployment. */
-const DEV_PASSWORD = 'Reimsis#2026';
+const DEV_PASSWORD = 'Reimsys#2026';
 const CATEGORIES = ['Medicine', 'Transport', 'Meals', 'Supplies', 'Lodging'];
 
 async function main() {

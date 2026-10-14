@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Prisma } from '@prisma/client';
-import { createUserSchema, updateUserSchema } from '@reimsis/shared';
+import { createUserSchema, updateUserSchema } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';

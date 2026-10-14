@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { ago, api, errMsg, fmtDate, money } from '../api';
 import { useAuth } from '../auth';
 import type { Category, ReceiptBrief } from '../types';

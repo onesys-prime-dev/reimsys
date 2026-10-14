@@ -21,7 +21,7 @@ const ctx = await b.newContext({ baseURL: 'http://localhost:4000', viewport: { w
 const p = await ctx.newPage();
 await p.goto('/'); await p.waitForSelector('.lcard');
 await p.screenshot({ path: path.join(out, 'login.png') });
-await p.fill('input[type=email]', 'admin@example.com'); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+await p.fill('input[type=email]', 'admin@example.com'); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
 await p.waitForSelector('.shell');
 await p.screenshot({ path: path.join(out, 'app.png'), clip: { x: 0, y: 0, width: 640, height: 300 } });
 await p.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));

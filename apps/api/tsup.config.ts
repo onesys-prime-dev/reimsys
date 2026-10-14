@@ -9,5 +9,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   // The shared package ships TypeScript source, so it must be bundled in.
-  noExternal: ['@reimsis/shared'],
+  noExternal: ['@reimsys/shared'],
 });

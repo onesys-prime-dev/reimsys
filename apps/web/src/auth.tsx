@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import type { MeResponse } from '@reimsis/shared';
+import type { MeResponse } from '@reimsys/shared';
 import { ApiError, api } from './api';
 
 interface AuthValue {

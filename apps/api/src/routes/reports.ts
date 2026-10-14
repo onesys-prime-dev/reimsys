@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { reportRequestSchema } from '@reimsis/shared';
+import { reportRequestSchema } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { changePasswordSchema, type MeResponse } from '@reimsis/shared';
+import { changePasswordSchema, type MeResponse } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { useAuth } from '../auth';
 import { Field, useToast } from '../ui';

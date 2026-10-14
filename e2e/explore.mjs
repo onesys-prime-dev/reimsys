@@ -6,10 +6,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const OUT = process.argv[2] ?? path.join(os.tmpdir(), 'reimsis-explore');
+const OUT = process.argv[2] ?? path.join(os.tmpdir(), 'reimsys-explore');
 fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.WEB ?? 'http://localhost:5173';
-const PW = 'Reimsis#2026';
+const PW = 'Reimsys#2026';
 const browser = await chromium.launch({ channel: 'chrome' });
 const findings = [];
 const flag = (who, where, what) => { findings.push(`[${who}] ${where}: ${what}`); console.log('  FLAG', `[${who}]`, where, '-', what); };
@@ -75,7 +75,7 @@ await step(ana, 'receipt of someone else', async (p) => {
   const t = await text(p);
   // Receipt 1 may be hers; find one of Mark's through the API instead
   // A receipt that really belongs to someone else, straight from the database.
-  const other = Number(execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', "SELECT id FROM Receipt WHERE encoderId <> (SELECT id FROM User WHERE email='ana.reyes@example.com') ORDER BY id DESC LIMIT 1"], { encoding: 'utf8' }).trim());
+  const other = Number(execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', "SELECT id FROM Receipt WHERE encoderId <> (SELECT id FROM User WHERE email='ana.reyes@example.com') ORDER BY id DESC LIMIT 1"], { encoding: 'utf8' }).trim());
   await p.goto('/receipts/' + other); await p.waitForTimeout(800);
   if (!/not found/i.test(await text(p))) flag('medref', '/receipts/' + other, 'another user\'s receipt did not show "not found"');
 }, [404]);

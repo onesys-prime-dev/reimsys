@@ -1,4 +1,4 @@
-import type { MailSettingsInput, MailSettingsView } from '@reimsis/shared';
+import type { MailSettingsInput, MailSettingsView } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { decrypt, encrypt } from './secrets.js';

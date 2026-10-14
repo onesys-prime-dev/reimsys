@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, receiptInputSchema } from '@reimsis/shared';
+import { EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, receiptInputSchema } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { Category, ReceiptDetail } from '../types';
 import { Field, Icon, useToast } from '../ui';

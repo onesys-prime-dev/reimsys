@@ -9,7 +9,7 @@ async function session(email, size, shots) {
   p.on('pageerror', e => errs.push(String(e)));
   await p.goto('/');
   await p.fill('input[type=email]', email);
-  await p.fill('input[type=password]', 'Reimsis#2026');
+  await p.fill('input[type=password]', 'Reimsys#2026');
   await p.click('button[type=submit]');
   await p.waitForSelector('.shell');
   for (const [path, name, action] of shots) {

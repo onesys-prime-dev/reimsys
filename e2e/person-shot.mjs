@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 const out = process.argv[2];
 const b = await chromium.launch({ channel: 'chrome' });
 const p = await b.newPage({ viewport: { width: 1280, height: 900 }, baseURL: 'http://localhost:4000' });
-await p.goto('/'); await p.fill('input[type=email]', 'paolo.v@example.com'); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+await p.goto('/'); await p.fill('input[type=email]', 'paolo.v@example.com'); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
 await p.waitForSelector('.shell'); await p.goto('/reports'); await p.waitForSelector('select >> nth=0');
 await p.selectOption('select:has(option:text("Everyone"))', { label: 'Mark Dela Cruz' }); await p.waitForTimeout(900);
 await p.screenshot({ path: out + '/reports-person.png' });

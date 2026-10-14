@@ -1,6 +1,6 @@
 /**
  * Switches off the demo accounts that share the public development password.
- * Run it once real users exist:  pnpm --filter @reimsis/api demo:off
+ * Run it once real users exist:  pnpm --filter @reimsys/api demo:off
  *
  * It refuses to run unless at least one OTHER active Super Admin exists, so it can never lock everyone out.
  * Nothing is deleted: the accounts are deactivated and signed out, so the audit trail keeps their names.

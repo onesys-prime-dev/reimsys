@@ -104,4 +104,4 @@ Required on the dev machine: Node.js LTS (20+), npm or pnpm, XAMPP MySQL/MariaDB
 - **Forgot password and invitations.** The sign-in page has "Forgot your password?". It emails a one-hour link, always answers the same way (so it cannot be used to find out who has an account), and ends every older sign-in once the new password is saved. A new user also receives an invitation email with a 72-hour link, in addition to the temporary password shown to the administrator.
 - **Zoom fixed.** Zooming a large photo no longer hides its top and left edges.
 - **Clear upload errors.** A file over the limit now says so, instead of a generic failure.
-- **Retiring the demo accounts.** `pnpm --filter @reimsis/api demo:off` switches off the five shared-password demo accounts. It refuses to run until a real Super Admin exists.
+- **Retiring the demo accounts.** `pnpm --filter @reimsys/api demo:off` switches off the five shared-password demo accounts. It refuses to run until a real Super Admin exists.

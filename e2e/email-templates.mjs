@@ -9,7 +9,7 @@ const OUT = process.argv[2];
 fs.mkdirSync(OUT, { recursive: true });
 let failed = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) failed++; };
-const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' });
+const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 
 // start clean so the test is repeatable
 sql("DELETE FROM Setting WHERE `key` IN ('email.templates','email.branding')");
@@ -20,11 +20,11 @@ async function login(email, size = { width: 1280, height: 1000 }) {
   p.errors = [];
   p.on('pageerror', (e) => p.errors.push(String(e)));
   p.on('console', (m) => m.type() === 'error' && !/40[0-9]/.test(m.text()) && p.errors.push(m.text()));
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
   await p.waitForSelector('.shell');
   return p;
 }
-const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsis', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
+const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsys', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
 const frame = (p) => p.frameLocator('iframe[title="Email preview"]');
 
 const p = await login('admin@example.com');

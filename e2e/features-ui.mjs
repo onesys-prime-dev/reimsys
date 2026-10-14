@@ -9,14 +9,14 @@ let bad = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) bad++; };
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsis', origin: WEB, 'content-type': 'application/json' });
-const login = async (e) => (await fetch(WEB + '/api/auth/login', { method: 'POST', headers: H(''), body: JSON.stringify({ email: e, password: 'Reimsis#2026' }) })).headers.get('set-cookie').split(';')[0];
+const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' });
+const login = async (e) => (await fetch(WEB + '/api/auth/login', { method: 'POST', headers: H(''), body: JSON.stringify({ email: e, password: 'Reimsys#2026' }) })).headers.get('set-cookie').split(';')[0];
 async function seed(tag) {
   const c = await login('ana.reyes@example.com');
   const cat = (await (await fetch(WEB + '/api/categories', { headers: H(c) })).json()).categories[0].id;
   let r = (await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: H(c), body: JSON.stringify({ payee: tag, receiptDate: '2026-10-11', amount: 321.5, categoryId: cat }) })).json()).receipt;
   const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from(tag + Math.random())])], { type: 'image/png' }), 'r.png');
-  r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsis', origin: WEB }, body: f })).json()).receipt;
+  r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsys', origin: WEB }, body: f })).json()).receipt;
   await fetch(`${WEB}/api/receipts/${r.id}/submit`, { method: 'POST', headers: H(c), body: JSON.stringify({ version: r.version }) });
   return r.id;
 }
@@ -29,7 +29,7 @@ async function as(email, size = { width: 1280, height: 860 }) {
   const ctx = await b.newContext({ viewport: size, baseURL: WEB });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', (e) => errs.push(String(e))); p.on('console', (m) => m.type() === 'error' && !/401/.test(m.text()) && errs.push(m.text()));
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
   return { p, errs };
 }
 const allErrs = [];

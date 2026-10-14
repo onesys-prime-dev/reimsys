@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
-import { changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsis/shared';
+import { changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';

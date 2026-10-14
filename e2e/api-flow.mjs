@@ -2,7 +2,7 @@
 // Usage: node e2e/api-flow.mjs
 const BASE = process.env.API ?? 'http://localhost:4000/api';
 import { execFileSync } from 'node:child_process';
-const PASSWORD = 'Reimsis#2026';
+const PASSWORD = 'Reimsys#2026';
 let failed = 0, passed = 0;
 
 function check(name, cond, extra = '') {
@@ -12,7 +12,7 @@ function check(name, cond, extra = '') {
 class Client {
   constructor(email) { this.email = email; this.cookie = ''; }
   async req(method, path, body, { raw = false } = {}) {
-    const headers = { 'x-requested-with': 'reimsis', cookie: this.cookie };
+    const headers = { 'x-requested-with': 'reimsys', cookie: this.cookie };
     let payload;
     if (body instanceof FormData) payload = body;
     else if (body !== undefined) { headers['content-type'] = 'application/json'; payload = JSON.stringify(body); }
@@ -212,7 +212,7 @@ console.log('\nUndo a decision, comments, bulk actions');
     return (await who.post(`/receipts/${x.id}/submit`, { version: x.version })).data.receipt;
   };
   const view = (who, x) => who.req('GET', `/receipts/${x.id}/evidence/${x.evidence[0].id}/file?mode=view`, undefined, { raw: true });
-  const mysql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' });
+  const mysql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 
   /* ---- undo ---- */
   let u = await mk(ana, 'Undo Me');
