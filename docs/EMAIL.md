@@ -80,3 +80,7 @@ Sign in as the Super Admin and open **Access, Email templates**.
 - **Reset to default wording** brings the original text back. Every edit is recorded in the audit log.
 
 Links in emails: the button only appears when REIMSYS has a normal `https://` address. Until then the email says "Sign in to <name> to open it" instead, because mail with links to a bare IP address or plain http is far more likely to be marked as spam.
+
+## Demo and example addresses
+
+Addresses on `example.com`, `example.org`, `example.net`, `.test`, `.invalid` and `localhost` can never be real mailboxes, so REIMSYS does not try to send to them. They show as **logged** in Audit log, Emails ("Example address, not a real mailbox, so it was not sent"). This stops the seeded demo users from producing bounce messages in your inbox, for example from the morning summary. A local test mailbox (`localhost`) can still receive them, so testing is unaffected. Real users on real addresses are not affected.

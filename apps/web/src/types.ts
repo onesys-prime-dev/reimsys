@@ -27,6 +27,8 @@ export interface ReceiptDetail extends ReceiptBrief {
   isOwner: boolean;
   canEdit: boolean;
   canCopy: boolean;
+  canDelete: boolean;
+  possibleDuplicates: { id: number; refNo: string; status: ReceiptStatus; encoder: string }[];
   actions: { action: ReceiptAction; note: 'none' | 'optional' | 'required' }[];
   evidence: EvidenceFile[];
   document: { id: number; docNo: string; status: string } | null;

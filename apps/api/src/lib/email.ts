@@ -37,6 +37,14 @@ export function htmlToText(html: string) {
 }
 
 /**
+ * Addresses on example.com, .test and similar are reserved: they can never be real mailboxes. Sending to them only
+ * produces bounce messages, so they are recorded as "logged" instead. A local test mailbox is still allowed to receive them.
+ */
+const RESERVED_DOMAIN = /(^|\.)(example(\.(com|net|org))?|test|invalid|localhost)$/i;
+export const isReservedAddress = (addr: string) => RESERVED_DOMAIN.test((addr.split('@').pop() ?? '').trim());
+const isLocalTestServer = (host: string) => ['localhost', '127.0.0.1', '::1'].includes(host);
+
+/**
  * Everything about how a message looks to the receiving mail system, in one place so it can be tested without sending.
  * Spam filters like: a plain-text twin, a message id on the sender's own domain, and honest "automated mail" headers.
  */
@@ -101,6 +109,10 @@ registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
     // Test mode: deliver to the test address, and say who it was really for so nobody is confused.
     const redirected = mail.redirectTo && mail.redirectTo !== row.toEmail;
     const to = redirected ? mail.redirectTo! : row.toEmail;
+    if (isReservedAddress(to) && !isLocalTestServer(mail.smtp.host)) {
+      await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'logged', error: 'Example address, not a real mailbox, so it was not sent' } });
+      return;
+    }
     const subject = redirected ? `[TEST for ${row.toEmail}] ${row.subject}` : row.subject;
     const html = redirected ? row.body.replace('<td style="padding:24px">', `<td style="padding:24px"><p style="margin:0 0 14px;padding:8px 10px;background:#fbf0d3;color:#8a5a00;border-radius:6px;font-size:13px">Test mode: this email was meant for ${esc(row.toEmail)}.</p>`) : row.body;
     const info = await transportFor(mail.smtp).sendMail(buildMessage({ id: row.id, from: mail.from, to, subject, html }));

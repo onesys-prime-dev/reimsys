@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import { simpleParser } from 'mailparser';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEMPLATES, SAMPLE_DATA, TEMPLATE_KEYS, sampleFor, type EmailBranding } from '@reimsis/shared';
-import { buildMessage, htmlToText, isPublicLink } from '../src/lib/email';
+import { buildMessage, htmlToText, isPublicLink, isReservedAddress } from '../src/lib/email';
 import { renderEmail } from '../src/lib/emailTemplates';
 
 const branding: EmailBranding = { orgName: 'Test Pharmacy', footer: 'Cebu City', accent: '#0c7480' };
@@ -34,6 +34,15 @@ describe('links in emails', () => {
     expect(m.html).not.toContain('<a ');
     expect(m.html).toContain('Sign in to Test Pharmacy to open it.');
     expect(m.text).not.toContain('192.168');
+  });
+});
+
+describe('example addresses', () => {
+  it('are recognised as never deliverable', () => {
+    for (const a of ['ana.reyes@example.com', 'x@example.org', 'x@EXAMPLE.NET', 'x@reimsys.test', 'x@foo.invalid', 'x@localhost', 'x@mail.example.com']) expect(isReservedAddress(a), a).toBe(true);
+  });
+  it('do not catch real addresses', () => {
+    for (const a of ['someone@gmail.com', 'ana@mypharmacy.ph', 'x@examples.com', 'x@counterexample.com', 'x@testing.com']) expect(isReservedAddress(a), a).toBe(false);
   });
 });
 

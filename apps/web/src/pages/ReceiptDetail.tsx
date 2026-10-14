@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { ReceiptAction } from '@reimsis/shared';
+import { STATUS_LABEL, type ReceiptAction } from '@reimsis/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { EvidenceViewer } from '../components/EvidenceViewer';
@@ -9,6 +9,7 @@ import type { HistoryItem, ReceiptDetail } from '../types';
 import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
 
 const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; title: string; desc: string; field: string; ok: string }> = {
+  withdraw: { label: 'Withdraw', icon: 'undo', cls: '', title: 'Withdraw this receipt', desc: 'It goes back to Draft so you can change it. Checkers will no longer see it until you submit it again.', field: 'Why are you withdrawing it', ok: 'Withdrawn. It is a draft again.' },
   submit: { label: 'Submit for checking', icon: 'check', cls: 'pri', title: '', desc: '', field: '', ok: 'Submitted. Checkers have been notified.' },
   check: { label: 'Mark checked', icon: 'check', cls: 'pri', title: 'Mark as checked', desc: 'Add remarks for the Approver. Optional.', field: 'Remarks', ok: 'Marked as checked. Approvers have been notified.' },
   return: { label: 'Return', icon: 'undo', cls: '', title: 'Return to Med Ref', desc: 'Tell the Med Ref what to fix. They will get an email.', field: 'What needs to be corrected', ok: 'Returned. The Med Ref has been emailed.' },
@@ -17,7 +18,7 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   reserve: { label: 'Reserve', icon: 'pause', cls: 'hold', title: 'Put this record on hold', desc: 'A note is required. You can release it back to your queue later.', field: 'Why is it on hold', ok: 'Put on hold. The Med Ref has been emailed.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
-const ORDER: ReceiptAction[] = ['return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
+const ORDER: ReceiptAction[] = ['withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
 
 export function ReceiptDetailPage() {
   const id = Number(useParams().id);
@@ -26,6 +27,7 @@ export function ReceiptDetailPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [modal, setModal] = useState<ReceiptAction | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [allHistory, setAllHistory] = useState(false);
 
   const q = useQuery({
@@ -42,6 +44,11 @@ export function ReceiptDetailPage() {
     mutationFn: ({ action, note }: { action: ReceiptAction; note?: string }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, version: r!.version } }),
     onSuccess: (d, v) => { qc.setQueryData(['receipt', id], d); toast(COPY[v.action].ok); setModal(null); refresh(); },
     onError: (e) => { toast(errMsg(e), 'bad'); setModal(null); refresh(); },
+  });
+  const del = useMutation({
+    mutationFn: () => api(`/receipts/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { toast('Draft deleted.'); qc.removeQueries({ queryKey: ['receipt', id] }); qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); nav('/receipts'); },
+    onError: (e) => { toast(errMsg(e), 'bad'); setConfirmDelete(false); },
   });
   const copy = useMutation({
     mutationFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/copy`, { method: 'POST' }),
@@ -72,6 +79,7 @@ export function ReceiptDetailPage() {
         <div className="actionbar">
           {r.canEdit && <Link className="btn" to={`/receipts/${r.id}/edit`}><Icon name="edit" size={18} />Edit</Link>}
           {r.canCopy && <button className="btn" onClick={() => copy.mutate()} disabled={copy.isPending}>Copy to new draft</button>}
+          {r.canDelete && <button className="btn bad" onClick={() => setConfirmDelete(true)}><Icon name="x" size={18} />Delete draft</button>}
           {actions.map((a) => {
             const c = COPY[a.action];
             const click = () => (a.action === 'submit' ? act.mutate({ action: 'submit' }) : setModal(a.action));
@@ -82,6 +90,16 @@ export function ReceiptDetailPage() {
       </div>
 
       {note?.text && <div className={`callout ${note.cls}`}><Icon name={note.icon} /><div><b>{note.title}</b><span>{note.text}</span></div></div>}
+
+      {r.possibleDuplicates.length > 0 && r.status !== 'approved' && r.status !== 'disapproved' && (
+        <div className="callout warn">
+          <Icon name="info" />
+          <div>
+            <b>Possible duplicate</b>
+            <span>Same payee, amount and date as {r.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link> ({STATUS_LABEL[d.status].toLowerCase()}, {d.encoder})</span>)}. Check it is not the same expense twice.</span>
+          </div>
+        </div>
+      )}
 
       <div className="dgrid">
         <div className="stack">
@@ -136,6 +154,12 @@ export function ReceiptDetailPage() {
         </section>
       </div>
 
+      {confirmDelete && (
+        <Modal title="Delete this draft?" onClose={() => setConfirmDelete(false)}>
+          <p>{r.refNo} and its attached files will be removed for good. This cannot be undone.</p>
+          <div className="btns"><button className="btn" onClick={() => setConfirmDelete(false)}>Keep it</button><button className="btn bad" disabled={del.isPending} onClick={() => del.mutate()}>Delete draft</button></div>
+        </Modal>
+      )}
       {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note) => act.mutate({ action: modal, note })} />}
     </>
   );

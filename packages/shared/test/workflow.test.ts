@@ -14,6 +14,14 @@ describe('receipt state machine', () => {
     expect(names(availableActions('draft', perms('receipt.create'), false))).toEqual([]);
   });
 
+  it('lets only the owner withdraw a submitted receipt, back to draft', () => {
+    expect(names(availableActions('submitted', perms('receipt.create'), true))).toEqual(['withdraw']);
+    expect(availableActions('submitted', perms('receipt.create'), false)).toEqual([]);
+    expect(availableActions('checked', perms('receipt.create'), true)).toEqual([]);
+    expect(availableActions('approved', perms('receipt.create'), true)).toEqual([]);
+    expect(transitionFor('withdraw')!.to).toBe('draft');
+  });
+
   it('gives the checker check and return on submitted receipts only', () => {
     expect(names(availableActions('submitted', perms('review.check'), false))).toEqual(['check', 'return']);
     expect(names(availableActions('checked', perms('review.check'), false))).toEqual([]);

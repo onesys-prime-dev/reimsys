@@ -81,3 +81,10 @@ All transitions go through one state-machine module. Each writes an audit row an
 ## 7. Dev environment
 
 Required on the dev machine: Node.js LTS (20+), npm or pnpm, XAMPP MySQL/MariaDB (present), Git (present). Redis optional in dev.
+
+## 5b. Added after the first release
+
+- **Withdraw:** a Med Ref can pull a submitted receipt back to Draft (only while nobody has checked it). Checkers are told.
+- **Delete draft:** a draft can be deleted by its owner, files included. Anything submitted must be withdrawn first.
+- **Possible duplicate warning:** a receipt with the same payee, amount and date as another receipt the viewer can see gets a warning with a link.
+- **Per-person liquidation reports**, **editable email templates and look**, **email account set up in the app**, **test mode for email**, and the **REIMSYS** name and logo.

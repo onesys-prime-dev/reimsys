@@ -122,6 +122,18 @@ receiptsRouter.patch('/:id', requirePerm('receipt.create'), async (req, res) => 
   res.json({ receipt: await receiptDetail(req.auth!, updated) });
 });
 
+/** A draft that was started by mistake can be thrown away. Anything that was submitted must be withdrawn first. */
+receiptsRouter.delete('/:id', requirePerm('receipt.create'), async (req, res) => {
+  const r = await loadVisible(req.auth!, idParam(req.params.id));
+  assertOwner(req.auth!, r);
+  if (r.status !== 'draft') throw conflict('Only a draft can be deleted. If it was submitted, withdraw it first.', 'INVALID_STATE');
+  const files = await prisma.receiptEvidence.findMany({ where: { receiptId: r.id } });
+  await prisma.receipt.delete({ where: { id: r.id } });
+  for (const f of files) await removeFile(f.storedName);
+  await audit(req, { action: 'receipt.deleted', entityType: 'receipt', entityId: r.id, summary: `deleted the draft ${r.refNo}`, before: { payee: r.payee, amount: Number(r.amount), files: files.length } });
+  res.json({ ok: true });
+});
+
 receiptsRouter.post('/:id/copy', requirePerm('receipt.create'), async (req, res) => {
   const r = await loadVisible(req.auth!, idParam(req.params.id));
   assertOwner(req.auth!, r);
@@ -223,7 +235,7 @@ receiptsRouter.get('/:id/history', async (req, res) => {
 /* ---------- workflow actions ---------- */
 
 const SUMMARY: Record<ReceiptAction, string> = {
-  submit: 'submitted for checking', check: 'marked as checked', return: 'returned the record',
+  submit: 'submitted for checking', withdraw: 'withdrew the receipt', check: 'marked as checked', return: 'returned the record',
   approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
@@ -258,6 +270,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   }
 
   const data: Prisma.ReceiptUncheckedUpdateManyInput = { status: t.to, version: { increment: 1 } };
+  if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null });
   if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null });
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note });
   if (action === 'return' || action === 'reserve') data.lastNote = note;
@@ -285,6 +298,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   const ref = `${r.refNo} (${r.payee})`;
   const others = (ids: (number | null | undefined)[]) => ids.filter((x): x is number => !!x && x !== auth.user.id);
   const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: r.category.name }, { actorName: who, note, docNo });
+  if (action === 'withdraw') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.withdrawn', receiptId: r.id, text: `${ref} was withdrawn by ${who}.` });
   if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
   if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });
   if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${note}`, email: { template: 'returned', data: mail } });

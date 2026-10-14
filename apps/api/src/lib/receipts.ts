@@ -57,6 +57,11 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
   const name = (id: number | null) => people.find((p) => p.id === id)?.name ?? null;
   const isOwner = r.encoderId === auth.user.id;
   const status = r.status as ReceiptStatus;
+  // Same payee, amount and date as another receipt this person can see: worth a second look before paying twice.
+  const dupes = await prisma.receipt.findMany({
+    where: { AND: [visibleWhere(auth), { id: { not: r.id }, payee: r.payee, amount: r.amount, receiptDate: r.receiptDate, status: { not: 'disapproved' } }] },
+    select: { id: true, refNo: true, status: true, encoder: { select: { name: true } } }, orderBy: { id: 'desc' }, take: 3,
+  });
   return {
     ...receiptBrief(r),
     description: r.description,
@@ -70,6 +75,8 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     evidence: evidence.map((e) => ({ id: e.id, fileName: e.fileName, mime: e.mime, size: e.size, createdAt: e.createdAt })),
     document: r.document ? { id: r.document.id, docNo: r.document.docNo, status: r.document.status } : null,
     canCopy: isOwner && status === 'disapproved',
+    canDelete: isOwner && auth.permissions.has('receipt.create') && status === 'draft',
+    possibleDuplicates: dupes.map((d) => ({ id: d.id, refNo: d.refNo, status: d.status as ReceiptStatus, encoder: d.encoder.name })),
   };
 }
 

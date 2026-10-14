@@ -7,7 +7,7 @@ export const STATUS_LABEL: Record<ReceiptStatus, string> = {
   approved: 'Approved', disapproved: 'Disapproved', reserved: 'Reserved',
 };
 
-export type ReceiptAction = 'submit' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release';
+export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release';
 export type NoteRule = 'none' | 'optional' | 'required';
 
 export interface Transition {
@@ -25,6 +25,7 @@ export interface Transition {
 /** The single source of truth for status changes. The API enforces it, the UI reads it. */
 export const TRANSITIONS: Transition[] = [
   { action: 'submit', from: ['draft', 'returned'], to: 'submitted', permission: 'receipt.create', note: 'none', owner: true },
+  { action: 'withdraw', from: ['submitted'], to: 'draft', permission: 'receipt.create', note: 'optional', owner: true },
   { action: 'check', from: ['submitted'], to: 'checked', permission: 'review.check', note: 'optional', notOwner: true },
   { action: 'return', from: ['submitted'], to: 'returned', permission: 'review.check', note: 'required', notOwner: true },
   { action: 'approve', from: ['checked'], to: 'approved', permission: 'review.decide', note: 'optional', notOwner: true },
