@@ -23,7 +23,7 @@ export interface ReceiptBrief {
 export interface EvidenceFile { id: number; fileName: string; mime: string; size: number; createdAt: string }
 
 export interface ReceiptForm {
-  birInvoice: boolean | null; invoiceUnderCompany: boolean | null; reasonForSpending: string | null; classification: string | null; seenCompany: boolean | null; seenTin: boolean | null; seenAddress: boolean | null; noBirReason: string | null;
+  birInvoice: boolean | null; invoiceUnderCompany: boolean | null; reasonForSpending: string | null; classification: string | null; classificationOther: string | null; seenCompany: boolean | null; seenTin: boolean | null; seenAddress: boolean | null; noBirReason: string | null;
   invoiceNo: string | null; vendorAddress: string | null; vendorTin: string | null; transactionType: string | null;
   vatType: string | null; vatableAmount: number | null; vatAmount: number | null;
   withheld: boolean | null; whtRate: number | null; whtAmount: number | null;

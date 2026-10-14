@@ -62,11 +62,15 @@ const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'fa
 export const TRANSACTION_TYPES = ['product', 'service'] as const;
 export const VAT_TYPES = ['vatable', 'non_vatable'] as const;
 export const TRANSACTION_LABEL: Record<(typeof TRANSACTION_TYPES)[number], string> = { product: 'Product', service: 'Service' };
-export const CLASSIFICATIONS = ['fuel', 'representation', 'meal', 'meeting', 'transportation', 'parking', 'printing', 'other'] as const;
+/** In the same order and words as the client's form. "Other" comes with the person's own words. */
+export const CLASSIFICATIONS = ['fuel', 'meeting', 'representation', 'transportation', 'parking', 'printing', 'meal', 'other'] as const;
 export const CLASSIFICATION_LABEL: Record<(typeof CLASSIFICATIONS)[number], string> = {
-  fuel: 'Fuel', representation: 'Representation', meal: 'Meal', meeting: 'Meeting, seminar or convention', transportation: 'Transportation',
-  parking: 'Parking', printing: 'Printing or photocopying', other: 'Other',
+  fuel: 'Fuel', meeting: 'Meeting, Seminar, or Convention', representation: 'Representation', transportation: 'Transportation',
+  parking: 'Parking', printing: 'Printing or Photocopying', meal: 'Meal', other: 'Other',
 };
+/** The classification as people read it: the label, or "Other: what they wrote". */
+export const classificationText = (c: string | null | undefined, other?: string | null) =>
+  !c ? '' : c === 'other' && other ? `Other: ${other}` : CLASSIFICATION_LABEL[c as keyof typeof CLASSIFICATION_LABEL] ?? c;
 export const VAT_LABEL: Record<(typeof VAT_TYPES)[number], string> = { vatable: 'Vatable', non_vatable: 'Non-vatable' };
 
 /** The client's reimbursement form. What is required depends on the answers, so it is checked as a whole. */
@@ -75,6 +79,7 @@ const receiptShape = z.object({
   invoiceUnderCompany: optional(flag),
   reasonForSpending: optional(z.string().trim().max(300)),
   classification: optional(z.enum(CLASSIFICATIONS)),
+  classificationOther: optional(z.string().trim().max(100)),
   seenCompany: optional(z.boolean()),
   seenTin: optional(z.boolean()),
   seenAddress: optional(z.boolean()),
@@ -97,7 +102,7 @@ const receiptShape = z.object({
 
 /** What the "it depends on the answers" rules look at. Every field may be missing. */
 interface Answers {
-  birInvoice?: boolean | null; invoiceUnderCompany?: boolean | null; reasonForSpending?: string | null; classification?: string | null; transactionType?: string | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
+  birInvoice?: boolean | null; invoiceUnderCompany?: boolean | null; reasonForSpending?: string | null; classification?: string | null; classificationOther?: string | null; transactionType?: string | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
   invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
   vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
@@ -135,6 +140,7 @@ function conditionalIssues(d: Answers, rules: AppSettings): { path: string; mess
   if (needsReason(d, rules)) {
     need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
     need(d.classification, 'classification', 'Choose a classification.');
+    if (d.classification === 'other') need((d.classificationOther ?? '').length >= 2, 'classificationOther', 'Write what the other classification is.');
   }
   return out;
 }
@@ -158,7 +164,7 @@ export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings
   const b = (v: unknown) => (v === true || v === 'yes' || v === 'true' ? true : v === false || v === 'no' || v === 'false' ? false : null);
   const t = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   for (const i of conditionalIssues({
-    birInvoice: b(raw.birInvoice), invoiceUnderCompany: b(raw.invoiceUnderCompany), reasonForSpending: t(raw.reasonForSpending), classification: t(raw.classification), transactionType: t(raw.transactionType), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
+    birInvoice: b(raw.birInvoice), invoiceUnderCompany: b(raw.invoiceUnderCompany), reasonForSpending: t(raw.reasonForSpending), classification: t(raw.classification), classificationOther: t(raw.classificationOther), transactionType: t(raw.transactionType), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
     invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
     vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
   }, rules)) out[i.path] ||= i.message;
@@ -265,6 +271,7 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
     transactionType: bir ? d.transactionType ?? null : null,
     reasonForSpending: reason ? t(d.reasonForSpending) : null,
     classification: reason ? d.classification ?? null : null,
+    classificationOther: reason && d.classification === 'other' ? t(d.classificationOther) : null,
     vatType: bir ? d.vatType ?? null : null,
     vatableAmount: bir ? d.vatableAmount ?? null : null,
     vatAmount: bir ? d.vatAmount ?? null : null,

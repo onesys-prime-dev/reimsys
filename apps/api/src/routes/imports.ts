@@ -3,7 +3,7 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { parse } from 'csv-parse/sync';
 import { assertSafeZip } from '../lib/zipGuard.js';
-import { cleanFormData, makeReceiptSchema } from '@reimsys/shared';
+import { CLASSIFICATIONS, CLASSIFICATION_LABEL, cleanFormData, makeReceiptSchema } from '@reimsys/shared';
 import { getSettings } from '../lib/appSettings.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -31,6 +31,16 @@ const ALIAS: Record<string, string> = {
   no_bir_reason: 'reason_for_spending', reason: 'reason_for_spending', encoder: 'encoder_email', email: 'encoder_email', transaction_type: 'type', business_transaction: 'type', bir: 'bir_invoice', tin: 'vendor_tin',
 };
 const yesNo = (v: string | undefined) => (/^(yes|y|true|1)$/i.test((v ?? '').trim()) ? true : /^(no|n|false|0)$/i.test((v ?? '').trim()) ? false : undefined);
+/** "Meeting, Seminar, or Convention", "meal" or "Other: team building" -> the stored code and, for Other, the person's words. */
+function readClassification(v: string | undefined, other: string | undefined) {
+  const s = (v ?? '').trim();
+  if (!s) return {};
+  const m = /^other\s*[:\-]?\s*(.*)$/i.exec(s);
+  if (m) return { classification: 'other', classificationOther: (m[1] || other || '').trim() || undefined };
+  const lower = s.toLowerCase();
+  const code = CLASSIFICATIONS.find((c) => c === lower || CLASSIFICATION_LABEL[c].toLowerCase() === lower || lower.startsWith(c));
+  return { classification: code ?? lower };
+}
 const num = (v: string | undefined) => (v ?? '').replace(/[₱,%\s]|php/gi, '');
 
 function cellText(v: unknown): string {
@@ -72,7 +82,7 @@ async function readRows(file: Express.Multer.File): Promise<Record<string, strin
 
 importsRouter.get('/template', (_req, res) => {
   const sample = [
-    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'other', 'vatable', '1000.00', '120.00', 'no', '', '', 'Clinic supplies', ''],
+    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'Other: Clinic supplies', 'vatable', '1000.00', '120.00', 'no', '', '', 'Clinic supplies', ''],
     ['Corner Store', '2026-10-12', '', '', 'Mandaue City, Cebu', '350.00', '', 'no', '', '', 'Water refills for the clinic', 'meal', '', '', '', '', '', '', '', ''],
   ];
   res.type('text/csv').attachment('reimsys-import-template.csv').send(toCsv([TEMPLATE_HEAD, ...sample]));
@@ -107,15 +117,15 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
       payee: r.payee, receiptDate: r.receipt_date, amount: num(r.amount), description: r.description || null,
       ...(full ? {
         birInvoice: yesNo(r.bir_invoice), invoiceUnderCompany: yesNo(r.invoice_under_company) ?? (yesNo(r.bir_invoice) ? true : undefined), seenCompany: yesNo(r.company_check), seenTin: yesNo(r.company_check), seenAddress: yesNo(r.company_check),
-        reasonForSpending: r.reason_for_spending, classification: (r.classification ?? '').toLowerCase().split(/[\s,]/)[0] || undefined,
+        reasonForSpending: r.reason_for_spending, ...readClassification(r.classification, r.classification_other),
         invoiceNo: r.invoice_no, vendorAddress: r.vendor_address, vendorTin: r.vendor_tin, transactionType: (r.type ?? '').toLowerCase(),
         vatType: (r.vat_type ?? '').toLowerCase().replace(/[\s-]+/g, '_'), vatableAmount: num(r.vatable_amount), vatAmount: num(r.vat_amount),
         withheld: yesNo(r.withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
-      } : { birInvoice: false, vendorAddress: 'x', reasonForSpending: 'xxx', classification: 'other' }),
+      } : { birInvoice: false, vendorAddress: 'x', reasonForSpending: 'xxx', classification: 'fuel' }),
     };
     const parsed = makeReceiptSchema(getSettings()).safeParse(candidate);
     if (!parsed.success) {
-      const label: Record<string, string> = { receiptDate: 'invoice_date', payee: 'vendor', amount: 'gross_amount', birInvoice: 'bir_invoice', transactionType: 'type', reasonForSpending: 'reason_for_spending', classification: 'classification', invoiceUnderCompany: 'invoice_under_company', seenCompany: 'company_check', seenTin: 'company_check', seenAddress: 'company_check' };
+      const label: Record<string, string> = { receiptDate: 'invoice_date', payee: 'vendor', amount: 'gross_amount', birInvoice: 'bir_invoice', transactionType: 'type', reasonForSpending: 'reason_for_spending', classification: 'classification', classificationOther: 'classification', invoiceUnderCompany: 'invoice_under_company', seenCompany: 'company_check', seenTin: 'company_check', seenAddress: 'company_check' };
       return void errors.push({ row: rowNo, message: parsed.error.issues.map((x) => `${label[String(x.path[0])] ?? x.path[0]}: ${x.message}`).join(' ') });
     }
     valid.push({ payee: parsed.data.payee, receiptDate: parsed.data.receiptDate, amount: parsed.data.amount, description: parsed.data.description ?? null, form: full ? cleanFormData(parsed.data, getSettings()) : null, encoderId });

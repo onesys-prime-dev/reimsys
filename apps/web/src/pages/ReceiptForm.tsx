@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CLASSIFICATIONS, CLASSIFICATION_LABEL, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
+import { CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { Field, Icon, useToast } from '../ui';
@@ -14,14 +14,14 @@ interface FormState {
   bir: '' | 'yes' | 'no';
   underCo: '' | 'yes' | 'no';
   seenCompany: boolean; seenTin: boolean; seenAddress: boolean;
-  spendReason: string; classification: '' | (typeof CLASSIFICATIONS)[number];
+  spendReason: string; classification: '' | (typeof CLASSIFICATIONS)[number]; classificationOther: string;
   date: string; invoiceNo: string; payee: string; vendorAddress: string; vendorTin: string; amount: string; type: '' | 'product' | 'service';
   vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string;
   withheld: '' | 'yes' | 'no'; whtRate: string; whtAmount: string;
   description: string;
 }
 const EMPTY: FormState = {
-  bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
+  bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', classificationOther: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
   type: '', vatType: '', vatable: '', vat: '', withheld: '', whtRate: '', whtAmount: '', description: '',
 };
 
@@ -30,14 +30,14 @@ const STEP_TITLE: Record<StepId, string> = {
   bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Withholding tax', spend: 'Reason for spending', evidence: 'Proof and review',
 };
 const STEP_FIELDS: Record<StepId, string[]> = {
-  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification'],
+  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
   vat: ['vatType', 'vatableAmount', 'vatAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
   birInvoice: f.bir, invoiceUnderCompany: f.bir === 'yes' ? f.underCo : '', seenCompany: f.underCo === 'yes' ? f.seenCompany : null, seenTin: f.underCo === 'yes' ? f.seenTin : null, seenAddress: f.underCo === 'yes' ? f.seenAddress : null,
-  reasonForSpending: f.spendReason, classification: f.classification, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
+  reasonForSpending: f.spendReason, classification: f.classification, classificationOther: f.classificationOther, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
   transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
@@ -47,7 +47,7 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
   const n = (v: number | null) => (v === null ? '' : String(v));
   return {
     bir: yn(x.birInvoice), underCo: x.birInvoice ? (x.invoiceUnderCompany === null ? 'yes' : yn(x.invoiceUnderCompany)) : '', seenCompany: !!x.seenCompany, seenTin: !!x.seenTin, seenAddress: !!x.seenAddress,
-    spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '',
+    spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '', classificationOther: x.classificationOther ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
     type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount),
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
@@ -312,13 +312,18 @@ export function ReceiptFormPage() {
           {step === 'spend' && (
             <div className="form">
               <Field label="Specific reason for spending" className="full" error={e.reasonForSpending}>
-                <textarea rows={3} value={f.spendReason} maxLength={300} onChange={(ev) => set('spendReason', ev.target.value, 'reasonForSpending')} placeholder="What was the money spent on, and why?" autoFocus />
+                <input type="text" value={f.spendReason} maxLength={300} onChange={(ev) => set('spendReason', ev.target.value, 'reasonForSpending')} autoFocus />
               </Field>
               <div className="full">
-                <div className="q">Classification <i>*</i></div>
-                <Choice name="Classification" value={f.classification} onChange={(v) => set('classification', v, 'classification')} options={CLASSIFICATIONS.map((c) => ({ value: c, label: CLASSIFICATION_LABEL[c] }))} />
+                <div className="q">Choose the general classification of your reason <i>*</i></div>
+                <Choice name="Classification" value={f.classification} onChange={(v) => set('classification', v, 'classification', 'classificationOther')} options={CLASSIFICATIONS.map((c) => ({ value: c, label: c === 'other' ? 'Other:' : CLASSIFICATION_LABEL[c] }))} />
                 {e.classification && <span className="err">{e.classification}</span>}
               </div>
+              {f.classification === 'other' && (
+                <Field label="Other classification" className="full" error={e.classificationOther}>
+                  <input type="text" value={f.classificationOther} maxLength={100} onChange={(ev) => set('classificationOther', ev.target.value, 'classificationOther')} placeholder="Write what it is" autoFocus />
+                </Field>
+              )}
             </div>
           )}
 
@@ -360,7 +365,7 @@ export function ReceiptFormPage() {
                   {f.bir === 'yes' && inv('Invoice under the company', f.underCo === 'yes' ? 'Yes' : f.underCo === 'no' ? 'No' : '-')}
                   {f.bir === 'yes' && inv('Type', f.type ? TRANSACTION_LABEL[f.type] : '-')}
                   {steps.includes('spend') && inv('Reason for spending', f.spendReason || '-')}
-                  {steps.includes('spend') && inv('Classification', f.classification ? CLASSIFICATION_LABEL[f.classification] : '-')}
+                  {steps.includes('spend') && inv('Classification', f.classification ? classificationText(f.classification, f.classificationOther) : '-')}
                   {inv('Gross amount', money(f.amount))}
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
                   {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}

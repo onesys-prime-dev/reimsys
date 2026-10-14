@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GRANTS, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
-  DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
+  CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
 } from '../src/index';
 
 const perms = (...p: string[]) => new Set(p);
@@ -83,7 +83,7 @@ describe('permissions', () => {
 describe('validation', () => {
   // A complete "BIR invoice: yes" answer, as the form sends it.
   const base = {
-    birInvoice: 'yes', invoiceUnderCompany: 'yes', reasonForSpending: 'Clinic supplies', classification: 'other', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
+    birInvoice: 'yes', invoiceUnderCompany: 'yes', reasonForSpending: 'Clinic supplies', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
     vendorAddress: 'Mandaue City', vendorTin: '123-456-789-00000', amount: '1120', transactionType: 'product', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', withheld: 'no',
   };
   const field = (input: object) => { const r = receiptInputSchema.safeParse(input); return r.success ? [] : r.error.issues.map((i) => String(i.path[0])); };
@@ -157,6 +157,15 @@ describe('validation', () => {
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, sessionIdleMinutes: 1 }).success).toBe(false);
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxMb: 500 }).success).toBe(false);
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxFiles: 0 }).success).toBe(false);
+  });
+
+  it('matches the client form for the classification, with words for "Other"', () => {
+    expect(CLASSIFICATIONS.map((c) => CLASSIFICATION_LABEL[c])).toEqual(['Fuel', 'Meeting, Seminar, or Convention', 'Representation', 'Transportation', 'Parking', 'Printing or Photocopying', 'Meal', 'Other']);
+    expect(field({ ...base, classification: 'other' })).toContain('classificationOther');
+    expect(field({ ...base, classification: 'other', classificationOther: 'Team building' })).toEqual([]);
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, classification: 'meal', classificationOther: 'leftover' }))).toMatchObject({ classification: 'meal', classificationOther: null });
+    expect(classificationText('other', 'Team building')).toBe('Other: Team building');
+    expect(classificationText('meeting')).toBe('Meeting, Seminar, or Convention');
   });
 
   it('rejects zero, negative and future-dated receipts', () => {

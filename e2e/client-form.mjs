@@ -38,7 +38,7 @@ const stamp = Date.now();
 
 // A complete answer for "BIR invoice: yes", vatable, no withholding.
 const full = (over = {}) => ({
-  birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'other', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
+  birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
   vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, ...over,
 });
 const codes = (r) => (r.data?.error?.issues ?? []).map((i) => i.path[0]);
@@ -67,6 +67,11 @@ const noneOk = { ...none, vendorAddress: 'Mandaue City, Cebu', reasonForSpending
 const nb = await ana.post('/receipts', { ...noneOk, vatType: 'vatable', vatAmount: 9, seenCompany: true, transactionType: 'service' });
 check('the short no-BIR path is accepted', nb.status === 201 && nb.data.receipt.form.reasonForSpending === 'Water refills for the clinic' && nb.data.receipt.form.classification === 'meal');
 check('a classification outside the list is refused', codes(await ana.post('/receipts', { ...noneOk, classification: 'holiday' })).includes('classification'));
+check('"Other" needs the person to write what it is', codes(await ana.post('/receipts', { ...noneOk, classification: 'other' })).includes('classificationOther'));
+const oth = await ana.post('/receipts', { ...noneOk, classification: 'other', classificationOther: 'Team building' });
+check('"Other" with its words is saved', oth.status === 201 && oth.data.receipt.form.classification === 'other' && oth.data.receipt.form.classificationOther === 'Team building');
+const oth3 = await ana.post('/receipts', { ...noneOk, classification: 'meal', classificationOther: 'left over' });
+check('the "Other" words are dropped when another classification is chosen', oth3.status === 201 && oth3.data.receipt.form.classificationOther === null);
 const notCo = await ana.post('/receipts', full({ invoiceNo: 'NC-' + stamp, invoiceUnderCompany: false, seenCompany: false, seenTin: false, seenAddress: false }));
 check('an invoice not under the company skips the three ticks', notCo.status === 201 && notCo.data.receipt.form.invoiceUnderCompany === false && notCo.data.receipt.form.seenCompany === null, JSON.stringify(notCo.data?.error));
 const tax = await ana.post('/receipts', full({ invoiceNo: 'TX-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
@@ -104,9 +109,9 @@ check('and cannot be submitted until they are filled in', (await ana.post(`/rece
 console.log('\nThe full import template');
 const fullCsv = [
   'vendor,invoice_date,invoice_no,vendor_tin,vendor_address,gross_amount,type,bir_invoice,invoice_under_company,company_check,reason_for_spending,classification,vat_type,vatable_amount,vat_amount,withheld,wht_rate,wht_amount,description',
-  `Form Test Import A ${stamp},2026-10-10,IMP-1,111-222-333-00000,Cebu City,1120,product,yes,yes,yes,Clinic supplies,other,vatable,1000,120,no,,,ok`,
+  `Form Test Import A ${stamp},2026-10-10,IMP-1,111-222-333-00000,Cebu City,1120,product,yes,yes,yes,Clinic supplies,Other: Clinic supplies,vatable,1000,120,no,,,ok`,
   `Form Test Import B ${stamp},2026-10-10,,,Cebu City,350,,no,,,Water refills,meal,,,,,,,no invoice`,
-  `Form Test Import C ${stamp},2026-10-10,IMP-3,,,500,product,yes,yes,no,Supplies,other,vatable,400,48,no,,,missing TIN and unticked`,
+  `Form Test Import C ${stamp},2026-10-10,IMP-3,,,500,product,yes,yes,no,Supplies,fuel,vatable,400,48,no,,,missing TIN and unticked`,
 ].join('\n') + '\n';
 const ff = new FormData(); ff.append('file', new Blob([fullCsv], { type: 'text/csv' }), 'full.csv');
 const fpv = await ana.req('POST', '/imports', ff);
@@ -114,6 +119,8 @@ check('two rows are valid and the incomplete one is rejected with reasons', fpv.
 await ana.post(`/imports/${fpv.data.id}/confirm`);
 const imported = (await ana.get(`/receipts?q=${encodeURIComponent('Form Test Import A ' + stamp)}`)).data.items[0];
 check('imported rows keep their invoice answers', imported?.invoiceNo === 'IMP-1' && imported.birInvoice === true && imported.transactionType === 'product');
+const importedFull = imported ? (await ana.get('/receipts/' + imported.id)).data.receipt : null;
+check('an imported "Other: ..." classification keeps its words', importedFull?.form?.classification === 'other' && importedFull.form.classificationOther === 'Clinic supplies', JSON.stringify(importedFull?.form));
 
 console.log('\nThe Checker confirms the company details');
 r = edit.data.receipt;

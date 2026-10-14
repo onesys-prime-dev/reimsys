@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CLASSIFICATION_LABEL, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
+import { classificationText, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -172,7 +172,7 @@ export function ReceiptDetailPage() {
                 <dl className="dl">
                   <dt>BIR-registered invoice</dt><dd>{yn(r.form.birInvoice)}</dd>
                   {r.form.birInvoice && <><dt>Invoice under the company</dt><dd>{r.form.invoiceUnderCompany === null ? 'Yes' : yn(r.form.invoiceUnderCompany)}</dd></>}
-                  {r.form.classification && <><dt>Classification</dt><dd>{CLASSIFICATION_LABEL[r.form.classification as keyof typeof CLASSIFICATION_LABEL] ?? r.form.classification}</dd></>}
+                  {r.form.classification && <><dt>Classification</dt><dd>{classificationText(r.form.classification, r.form.classificationOther)}</dd></>}
                   {r.form.reasonForSpending && <><dt>Reason for spending</dt><dd>{r.form.reasonForSpending}</dd></>}
                   {r.form.birInvoice && r.form.invoiceUnderCompany !== false && (
                     <>

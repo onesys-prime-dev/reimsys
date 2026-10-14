@@ -137,6 +137,7 @@ model Receipt {
   invoiceUnderCompany Boolean?
   reasonForSpending   String?                  @db.VarChar(300)
   classification      String?                  @db.VarChar(30)
+  classificationOther String?                  @db.VarChar(100)
   seenCompany     Boolean?
   seenTin         Boolean?
   seenAddress     Boolean?

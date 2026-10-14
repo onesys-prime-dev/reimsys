@@ -11,7 +11,7 @@ export async function fillQuickForm(page, { payee, amount = '100', date, descrip
   await page.getByLabel(/Amount paid to vendor/).fill(String(amount));
   await page.click('button:has-text("Next")');
   await page.getByLabel('Specific reason for spending').fill('Test receipt');
-  await page.getByRole('radio', { name: /^Other/ }).first().click();
+  await page.getByRole('radio', { name: /^Fuel/ }).first().click();
   await page.click('button:has-text("Next")');
   await page.waitForSelector('.drop');
   if (description) await page.getByLabel(/Description/).fill(description);

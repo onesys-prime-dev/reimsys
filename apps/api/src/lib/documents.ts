@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { classificationText } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { registerJob } from './jobs.js';
@@ -57,7 +58,7 @@ export async function buildReimbursementPdf(receiptId: number) {
   if (r.transactionType) row('Type', typeLabel(r));
   row('BIR-registered invoice', r.birInvoice === null ? '-' : r.birInvoice ? 'Yes' : 'No');
   if (r.birInvoice && r.invoiceUnderCompany !== null) row('Invoice under the company', r.invoiceUnderCompany ? 'Yes' : 'No');
-  if (r.classification) row('Classification', typeLabel({ transactionType: null, classification: r.classification, category: null }));
+  if (r.classification) row('Classification', classificationText(r.classification, r.classificationOther));
   if (r.reasonForSpending) row('Reason for spending', r.reasonForSpending);
   if (r.birInvoice) {
     row('VAT', r.vatType === 'vatable' ? 'Vatable' : r.vatType === 'non_vatable' ? 'Non-vatable' : '-');

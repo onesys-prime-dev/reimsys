@@ -35,7 +35,7 @@ const dec = (v: { toString(): string } | null) => (v === null ? null : Number(v)
 /** The answers on the client's reimbursement form, in the shape the screens use. Old receipts have these empty. */
 export function receiptForm(r: ReceiptRow) {
   return {
-    birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
+    birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, classificationOther: r.classificationOther, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
     invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType,
     vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount),
     withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount),
