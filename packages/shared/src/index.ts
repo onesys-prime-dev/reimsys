@@ -63,12 +63,25 @@ export const isLockedGrant = (role: string, permission: string) =>
 
 
 /* ---------- validation ---------- */
+/** Passwords people pick first, which attackers try first. Matched ignoring case and ignoring a trailing number or symbol. */
+const COMMON = new Set([
+  'password', 'passw0rd', 'qwerty', 'qwertyuiop', 'letmein', 'welcome', 'iloveyou', 'admin', 'administrator', 'changeme', 'secret',
+  'abc', 'abcdef', 'monkey', 'dragon', 'football', 'baseball', 'sunshine', 'princess', 'login', 'master', 'shadow', 'superman',
+  'trustno', 'starwars', 'whatever', 'pharmacy', 'reimsys', 'reimsis', 'medref', 'checker', 'approver', 'filipino', 'manila', 'cebu',
+]);
+export const isCommonPassword = (p: string) => {
+  const base = p.toLowerCase().replace(/[^a-z]+$/g, '').replace(/^[^a-z]+/g, '');
+  const oneKey = (x: string) => x.length > 1 && /^(.)\1+$/.test(x); // "aaaaaaaaaa" and the like
+  return COMMON.has(base) || oneKey(p) || oneKey(base) || /^(0123456789|1234567890|12345678910|123456789|987654321)/.test(p);
+};
+
 export const passwordSchema = z
   .string()
-  .min(8, 'Use at least 8 characters.')
-  .max(128)
+  .min(10, 'Use at least 10 characters.')
+  .max(128, 'Use at most 128 characters.')
   .regex(/[A-Za-z]/, 'Include a letter.')
-  .regex(/\d/, 'Include a number.');
+  .regex(/\d/, 'Include a number.')
+  .refine((p) => !isCommonPassword(p), 'That password is too easy to guess. Choose something less common.');
 
 export const forgotSchema = z.object({ email: z.string().trim().toLowerCase().email() });
 export const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
@@ -132,6 +145,17 @@ export interface MeResponse {
     role: RoleSummary;
   };
   permissions: string[];
+  /** Present when the answer comes from a signed-in request. Times are ISO strings. */
+  session?: SessionInfo;
+}
+export interface SessionInfo {
+  /** When the session ends if nothing happens. */
+  expiresAt: string;
+  /** The latest it can ever last until, however busy the person is. */
+  maxAt: string;
+  idleMinutes: number;
+  /** The server's clock, so the screen can allow for a wrong clock on the device. */
+  serverNow: string;
 }
 export * from './receipts';
 

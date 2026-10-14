@@ -8,7 +8,10 @@ const env = z
     PORT: z.coerce.number().default(4000),
     DATABASE_URL: z.string().min(1),
     WEB_ORIGIN: z.string().default('http://localhost:5173'),
-    SESSION_DAYS: z.coerce.number().default(7),
+    // A session ends after this long with no real activity (clicks and typing, not background refreshes)...
+    SESSION_IDLE_MINUTES: z.coerce.number().min(5).max(1440).default(60),
+    // ...and never lasts longer than this, however busy the person is.
+    SESSION_MAX_HOURS: z.coerce.number().min(1).max(168).default(12),
     STORAGE_DIR: z.string().default('./storage'),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().default(587),
@@ -26,7 +29,8 @@ export const config = {
   port: env.PORT,
   webOrigin: env.WEB_ORIGIN.split(',')[0]!.trim(),
   webOrigins: env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
-  sessionMs: env.SESSION_DAYS * 24 * 60 * 60 * 1000,
+  sessionIdleMs: env.SESSION_IDLE_MINUTES * 60_000,
+  sessionMaxMs: env.SESSION_MAX_HOURS * 3_600_000,
   storageDir: path.resolve(env.STORAGE_DIR),
   cookieName: 'reimsys_sid',
   orgName: env.ORG_NAME,

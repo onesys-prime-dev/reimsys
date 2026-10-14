@@ -6,6 +6,12 @@ import { HttpError } from '../lib/errors.js';
 
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof HttpError) return void res.status(err.status).json({ error: { code: err.code, message: err.message } });
+  // Requests the body parser could not accept (too big, or not valid JSON).
+  const parsed = err as { type?: string; status?: number };
+  if (parsed?.type === 'entity.too.large') return void res.status(413).json({ error: { code: 'TOO_LARGE', message: 'That request is too large.' } });
+  if (parsed?.type === 'entity.parse.failed' || parsed?.type === 'encoding.unsupported' || parsed?.type === 'charset.unsupported') {
+    return void res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'The request could not be read.' } });
+  }
   // Upload limits: say what is wrong in plain words instead of a generic failure.
   if (err instanceof MulterError) {
     const tooBig = err.code === 'LIMIT_FILE_SIZE';

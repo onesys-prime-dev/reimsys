@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { neutraliseFormula } from '../lib/reports.js';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -52,7 +53,7 @@ auditRouter.get('/export', async (req, res) => {
     if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999');
   }
   const rows = await prisma.auditLog.findMany({ where, orderBy: { id: 'desc' }, take: 50000 });
-  const esc = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const esc = (v: unknown) => { const s = String(neutraliseFormula(v as string)); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const csv = '﻿' + [['Time', 'Person', 'Action', 'Summary', 'Record', 'IP'].join(','), ...rows.map((r) => [r.createdAt.toISOString(), r.actorName, r.action, r.summary, `${r.entityType}${r.entityId ? ' #' + r.entityId : ''}`, r.ip].map(esc).join(','))].join('\r\n');
   res.type('text/csv').attachment(`audit-log-${new Date().toISOString().slice(0, 10)}.csv`).send(csv);
 });

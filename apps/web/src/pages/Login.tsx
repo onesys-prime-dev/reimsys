@@ -3,6 +3,7 @@ import { errMsg } from '../api';
 import { useAuth } from '../auth';
 import { Link } from 'react-router-dom';
 import { Logo } from '../components/Logo';
+import { takeEndReason, type EndReason } from '../activity';
 import { Field } from '../ui';
 
 export function LoginPage() {
@@ -11,6 +12,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [why] = useState<EndReason | null>(() => takeEndReason());
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +33,11 @@ export function LoginPage() {
         <div className="brand" style={{ paddingBottom: 22 }}><Logo size={44} /></div>
         <h1>Sign in</h1>
         <p className="muted" style={{ margin: '6px 0 0' }}>Reimbursement management</p>
+        {why && (
+          <div className="callout warn" role="status" style={{ margin: '14px 0 0' }}>
+            <div><b>{why === 'idle' ? 'You were signed out' : why === 'max' ? 'Your session ended' : 'You were signed out'}</b><span>{why === 'idle' ? 'You were away for a while, and for security the app signs you out. Please sign in again.' : why === 'max' ? 'For security, a sign-in cannot last longer than its limit. Please sign in again.' : 'Your session has ended. This can happen when you sign in on another device, change your password, or an administrator ends it. Please sign in again.'}</span></div>
+          </div>
+        )}
         <form onSubmit={submit}>
           <Field label="Email">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus required />

@@ -319,5 +319,8 @@ const aud = (await admin.get(`/audit?q=${r.id}&pageSize=100`)).data;
 check('audit browser finds receipt activity', aud.total > 5);
 check('non-admin cannot read audit', (await ana.get('/audit')).status === 403);
 
-console.log(`\n${passed} passed, ${failed} failed`);
+// remove the receipts this run made, so repeated runs do not pile up in everyone's queues
+try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee LIKE '% ${stamp}%'`]); } catch { /* cleanup is best effort */ }
+console.log(`
+${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

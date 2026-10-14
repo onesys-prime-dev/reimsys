@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { protectSettings } from './protect-settings.mjs';
 
 const [OUT, BOX] = process.argv.slice(2);
 fs.mkdirSync(OUT, { recursive: true });
@@ -21,6 +22,7 @@ async function login(email, size = { width: 1280, height: 900 }) {
 }
 const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsys', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
 
+protectSettings(); // puts every saved setting back when this test ends, however it ends
 sql("DELETE FROM setting WHERE `key`='mail'");
 const p = await login('admin@example.com');
 await p.goto('/access'); await p.click('button[role=tab]:has-text("Email")');

@@ -56,7 +56,7 @@ try {
   await ana.waitForSelector('.callout:has-text("prescription")');
   ok('the Med Ref sees the approver\'s request, in plain words, at the top', /Returned for correction/.test(await ana.locator('.callout').first().innerText()));
   await ana.screenshot({ path: path.join(out, '3-medref.png') });
-  await ana.click('a:has-text("Edit")'); await ana.waitForSelector('form');
+  await ana.click('a:has-text("Edit")'); await ana.waitForSelector('h1:has-text("Edit receipt")');
   await ana.setInputFiles('input[type=file]', { name: 'prescription.png', mimeType: 'image/png', buffer: Buffer.concat([PNG, Buffer.from('rx' + stamp)]) });
   await ana.click('button:has-text("Resubmit for checking")'); await ana.waitForSelector('.pill:has-text("Submitted")');
   ok('the Med Ref adds the prescription and sends it again', (await ana.locator('.evtab').count()) === 2);

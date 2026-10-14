@@ -1,5 +1,6 @@
-import type { Role, User } from '@prisma/client';
+import type { Role, Session, User } from '@prisma/client';
 import type { MeResponse, RoleSummary } from '@reimsys/shared';
+import { config } from '../config.js';
 
 export const roleSummary = (r: Role, userCount?: number): RoleSummary => ({
   id: r.id,
@@ -10,7 +11,16 @@ export const roleSummary = (r: Role, userCount?: number): RoleSummary => ({
   ...(userCount === undefined ? {} : { userCount }),
 });
 
-export function meResponse(user: User & { role: Role }, permissions: Iterable<string>): MeResponse {
+export function sessionInfo(s: Pick<Session, 'expiresAt' | 'createdAt'>) {
+  return {
+    expiresAt: s.expiresAt.toISOString(),
+    maxAt: new Date(s.createdAt.getTime() + config.sessionMaxMs).toISOString(),
+    idleMinutes: Math.round(config.sessionIdleMs / 60_000),
+    serverNow: new Date().toISOString(),
+  };
+}
+
+export function meResponse(user: User & { role: Role }, permissions: Iterable<string>, session?: Pick<Session, 'expiresAt' | 'createdAt'>): MeResponse {
   return {
     user: {
       id: user.id,
@@ -25,6 +35,7 @@ export function meResponse(user: User & { role: Role }, permissions: Iterable<st
       role: roleSummary(user.role),
     },
     permissions: [...permissions].sort(),
+    ...(session ? { session: sessionInfo(session) } : {}),
   };
 }
 

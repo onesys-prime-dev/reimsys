@@ -20,7 +20,7 @@ export const MODEL_SCOPE: Record<string, Scope> = {
   Setting: 'settings',
 };
 
-interface Client { id: number; userId: number; res: Response }
+interface Client { id: number; userId: number; sessionId: string; res: Response }
 
 const BATCH_MS = 350;
 const HEARTBEAT_MS = 20_000;
@@ -37,7 +37,7 @@ class Hub {
   get size() { return this.clients.size; }
 
   /** Opens the stream for one browser tab. */
-  connect(userId: number, req: Request, res: Response) {
+  connect(userId: number, req: Request, res: Response, sessionId = '') {
     res.status(200).set({
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
@@ -51,7 +51,7 @@ class Hub {
     const mine = [...this.clients].filter((c) => c.userId === userId);
     while (mine.length >= MAX_PER_USER) this.drop(mine.shift()!);
 
-    const client: Client = { id: this.nextId++, userId, res };
+    const client: Client = { id: this.nextId++, userId, sessionId, res };
     this.clients.add(client);
     res.write(`event: hello\ndata: ${JSON.stringify({ at: Date.now() })}\n\n`);
     const gone = () => this.drop(client, false);
@@ -99,6 +99,21 @@ class Hub {
     for (const c of [...this.clients]) {
       const scopes = [...batch].filter(([, to]) => to === null || to.has(c.userId)).map(([s]) => s);
       if (scopes.length) this.safeWrite(c, `event: change\ndata: ${JSON.stringify({ scopes })}\n\n`);
+    }
+  }
+
+  /** The sessions that currently have a live connection open. */
+  sessionIds() { return [...new Set([...this.clients].map((c) => c.sessionId).filter(Boolean))]; }
+
+  /** Ends the live connections of sessions that no longer exist (signed out, timed out, switched off). Each is told to re-check first. */
+  closeSessions(dead: Set<string>) {
+    for (const c of [...this.clients]) {
+      if (!dead.has(c.sessionId)) continue;
+      this.safeWrite(c, `event: change
+data: ${JSON.stringify({ scopes: ['me'] })}
+
+`);
+      setTimeout(() => this.drop(c), 250).unref();
     }
   }
 

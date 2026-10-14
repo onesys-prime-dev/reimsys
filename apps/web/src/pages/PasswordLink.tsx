@@ -94,7 +94,7 @@ export function ResetPasswordPage() {
   return (
     <Shell>
       <h1>{check.data.invite ? `Welcome, ${check.data.name?.split(' ')[0]}` : 'Choose a new password'}</h1>
-      <p className="muted" style={{ margin: '6px 0 0' }}>{check.data.invite ? 'Choose a password to finish setting up your account.' : `For ${check.data.name}.`} Use at least 8 characters with a letter and a number.</p>
+      <p className="muted" style={{ margin: '6px 0 0' }}>{check.data.invite ? 'Choose a password to finish setting up your account.' : `For ${check.data.name}.`} Use at least 10 characters with a letter and a number.</p>
       <form onSubmit={submit}>
         <Field label="New password"><input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" autoFocus required /></Field>
         <Field label="Type it again" error={error}><input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" required /></Field>

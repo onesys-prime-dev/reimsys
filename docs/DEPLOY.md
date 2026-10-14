@@ -152,3 +152,9 @@ Screens update by themselves: when someone approves a receipt, the person watchi
 - If the connection drops (Wi-Fi blip, sleeping phone), the screen shows **Offline**, reconnects on its own, and refreshes everything once.
 - Behind nginx, keep the `/api/events` block above (`proxy_buffering off`), or updates arrive late in lumps.
 - The signals are kept in the API process. That is right for one API process. If you ever run several API processes behind a load balancer, add Redis publish/subscribe so a change made on one reaches people connected to another (the hub in `apps/api/src/lib/realtime.ts` is the only place to change).
+
+## Database table names
+
+Every table has a lower-case name (`user`, `receipt`, `comment` ...). The indexes and foreign keys are lower-case too; the migrations create them that way. This matters on **Linux**, where MySQL treats `User` and `user` as different tables. On Windows it changes nothing.
+
+A new database is built with `pnpm db:migrate` and ends up identical to the schema. This was checked on a fresh database (migrations and database both match the schema exactly).

@@ -4,7 +4,14 @@ import { prisma } from '../db.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
 import { sha256 } from '../lib/password.js';
 
-const TOUCH_MS = 60_000;
+const TOUCH_MS = 30_000;
+
+/** Only things a person does extend a session. Background refreshes (the page quietly asking for news) must not, or an abandoned tab would stay signed in forever. */
+const isRealActivity = (req: Request) => !['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.get('x-user-activity') === '1';
+
+/** A session is valid until it has been idle too long or has lived too long. */
+export const sessionAlive = (s: { revokedAt: Date | null; expiresAt: Date; createdAt: Date }, now = new Date()) =>
+  !s.revokedAt && s.expiresAt > now && now.getTime() < s.createdAt.getTime() + config.sessionMaxMs;
 
 /** Loads the session, user, role and permissions on every request so changes apply immediately. */
 export async function loadAuth(req: Request, _res: Response, next: NextFunction) {
@@ -12,22 +19,22 @@ export async function loadAuth(req: Request, _res: Response, next: NextFunction)
   if (!token) return next();
   const session = await prisma.session.findUnique({ where: { tokenHash: sha256(token) } });
   const now = new Date();
-  if (!session || session.revokedAt || session.expiresAt < now) return next();
+  if (!session || !sessionAlive(session, now)) return next();
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
     include: { role: { include: { permissions: { include: { permission: true } } } } },
   });
   if (!user || !user.isActive) return next();
-  if (now.getTime() - session.lastSeenAt.getTime() > TOUCH_MS) {
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { lastSeenAt: now, expiresAt: new Date(now.getTime() + config.sessionMs) },
-    });
+  let current = session;
+  if (isRealActivity(req) && now.getTime() - session.lastSeenAt.getTime() > TOUCH_MS) {
+    // Pushed forward by the idle allowance, but never past the overall limit.
+    const ends = Math.min(now.getTime() + config.sessionIdleMs, session.createdAt.getTime() + config.sessionMaxMs);
+    current = await prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: now, expiresAt: new Date(ends) } });
   }
   const { permissions, ...role } = user.role;
   req.auth = {
     user: { ...user, role } as never,
-    session,
+    session: current,
     permissions: new Set(permissions.map((p) => p.permission.code)),
   };
   next();

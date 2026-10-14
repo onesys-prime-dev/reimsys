@@ -67,3 +67,59 @@ describe('cross-site protection', () => {
     expect(isSameOrigin('http://localhost:4000', undefined)).toBe(false);
   });
 });
+
+import { assertSafeZip } from '../src/lib/zipGuard';
+import { neutraliseFormula, toCsv as csvOf } from '../src/lib/reports';
+import zlib from 'node:zlib';
+
+/** Builds a minimal zip with one entry that claims a given uncompressed size. Only the table of contents matters to the guard. */
+function fakeZip(entries: { name: string; compressed: number; uncompressed: number }[]) {
+  const dir: Buffer[] = [];
+  for (const e of entries) {
+    const h = Buffer.alloc(46 + e.name.length);
+    h.writeUInt32LE(0x02014b50, 0); h.writeUInt32LE(e.compressed, 20); h.writeUInt32LE(e.uncompressed, 24); h.writeUInt16LE(e.name.length, 28);
+    h.write(e.name, 46); dir.push(h);
+  }
+  const cd = Buffer.concat(dir);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(0, 16);
+  return Buffer.concat([cd, end]);
+}
+
+describe('spreadsheet upload guard', () => {
+  it('accepts an ordinary small spreadsheet', () => {
+    expect(() => assertSafeZip(fakeZip([{ name: 'xl/worksheets/sheet1.xml', compressed: 20_000, uncompressed: 90_000 }, { name: '[Content_Types].xml', compressed: 400, uncompressed: 1200 }]))).not.toThrow();
+  });
+  it('refuses a zip bomb: a tiny file that claims to expand to gigabytes', () => {
+    expect(() => assertSafeZip(fakeZip([{ name: 'xl/worksheets/sheet1.xml', compressed: 4_000, uncompressed: 2_000_000_000 }]))).toThrow(/safely/);
+  });
+  it('refuses a high squeeze ratio even when the total is smaller', () => {
+    expect(() => assertSafeZip(fakeZip([{ name: 'a.xml', compressed: 1_000, uncompressed: 50_000_000 }]))).toThrow(/safely/);
+  });
+  it('refuses a zip with a huge number of parts', () => {
+    expect(() => assertSafeZip(fakeZip(Array.from({ length: 400 }, (_, i) => ({ name: `p${i}`, compressed: 10, uncompressed: 20 }))))).toThrow(/safely/);
+  });
+  it('refuses something that is not a zip at all', () => {
+    expect(() => assertSafeZip(Buffer.from('this is not a spreadsheet, just some text that is long enough'))).toThrow(/safely/);
+    expect(() => assertSafeZip(Buffer.alloc(5))).toThrow(/safely/);
+  });
+  it('the squeeze really is possible, which is why the check exists', () => {
+    expect(zlib.deflateRawSync(Buffer.alloc(20_000_000)).length).toBeLessThan(40_000);
+  });
+});
+
+describe('spreadsheet formulas in exports', () => {
+  it('turns anything that looks like a formula into plain text', () => {
+    for (const s of ['=HYPERLINK("http://evil","x")', '+cmd|\' /C calc\'!A0', '-2+3', '@SUM(1,1)', '\t=1+1', '\r=1']) expect(neutraliseFormula(s), s).toBe("'" + s);
+  });
+  it('leaves ordinary text and real numbers alone', () => {
+    expect(neutraliseFormula('Mercury Drug - Mandaue')).toBe('Mercury Drug - Mandaue');
+    expect(neutraliseFormula('2026-10-12')).toBe('2026-10-12');
+    expect(neutraliseFormula(-12.5)).toBe(-12.5);
+    expect(neutraliseFormula(null)).toBe('');
+  });
+  it('applies to every cell of a CSV, and still quotes properly', () => {
+    const out = csvOf([['=1+1', 'a,b', 'ok', 5]]);
+    expect(out).toContain("'=1+1,\"a,b\",ok,5");
+  });
+});
