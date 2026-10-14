@@ -363,3 +363,13 @@ a.btn.ghost{color:var(--muted)}
 .stage .evimg{margin:auto;flex:none;height:auto;transition:none;cursor:zoom-in}
 
 .showoff{display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--muted);font-weight:600}
+
+/* live-update light */
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;color:var(--muted);padding:4px 9px;border:1px solid var(--line);border-radius:99px;background:var(--surface);white-space:nowrap}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.live.live i{background:var(--ok);box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent);animation:livepulse 2.4s ease-out infinite}
+.live.offline{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.live.offline i{background:var(--warn)}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 50%,transparent)}70%,100%{box-shadow:0 0 0 7px transparent}}
+@media(max-width:520px){.live-t{display:none}.live{padding:6px}}
+@media(prefers-reduced-motion:reduce){.live.live i{animation:none}}
