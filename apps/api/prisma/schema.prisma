@@ -17,6 +17,8 @@ model Role {
   permissions RolePermission[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+
+  @@map("role")
 }
 
 model Permission {
@@ -25,6 +27,8 @@ model Permission {
   label     String           @db.VarChar(120)
   groupName String           @db.VarChar(60)
   roles     RolePermission[]
+
+  @@map("permission")
 }
 
 model RolePermission {
@@ -34,6 +38,7 @@ model RolePermission {
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
+  @@map("rolepermission")
 }
 
 model User {
@@ -64,6 +69,7 @@ model User {
   updatedAt          DateTime  @updatedAt
 
   @@index([roleId])
+  @@map("user")
 }
 
 model Session {
@@ -79,6 +85,7 @@ model Session {
   revokedAt  DateTime?
 
   @@index([userId])
+  @@map("session")
 }
 
 /// Append-only. The application never updates or deletes rows here.
@@ -100,6 +107,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId])
   @@index([createdAt])
+  @@map("auditlog")
 }
 
 model Category {
@@ -109,6 +117,8 @@ model Category {
   sortOrder Int       @default(0)
   receipts  Receipt[]
   createdAt DateTime  @default(now())
+
+  @@map("category")
 }
 
 model Receipt {
@@ -142,6 +152,7 @@ model Receipt {
   @@index([encoderId])
   @@index([receiptDate])
   @@index([categoryId])
+  @@map("receipt")
 }
 
 model ReceiptEvidence {
@@ -158,6 +169,7 @@ model ReceiptEvidence {
   deletedAt    DateTime?
 
   @@index([receiptId])
+  @@map("receiptevidence")
 }
 
 model ReimbursementDocument {
@@ -170,6 +182,8 @@ model ReimbursementDocument {
   generatedAt DateTime?
   error       String?   @db.VarChar(300)
   createdAt   DateTime  @default(now())
+
+  @@map("reimbursementdocument")
 }
 
 model Notification {
@@ -183,6 +197,7 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
+  @@map("notification")
 }
 
 model EmailLog {
@@ -201,6 +216,7 @@ model EmailLog {
   sentAt    DateTime?
 
   @@index([status])
+  @@map("emaillog")
 }
 
 model Job {
@@ -215,6 +231,7 @@ model Job {
   finishedAt DateTime?
 
   @@index([status, runAt])
+  @@map("job")
 }
 
 model LiquidationReport {
@@ -231,6 +248,7 @@ model LiquidationReport {
   finishedAt    DateTime?
 
   @@index([requestedById])
+  @@map("liquidationreport")
 }
 
 model ImportJob {
@@ -244,11 +262,15 @@ model ImportJob {
   validRows   Int
   createdAt   DateTime  @default(now())
   confirmedAt DateTime?
+
+  @@map("importjob")
 }
 
 model Sequence {
   key   String @id @db.VarChar(40)
   value Int
+
+  @@map("sequence")
 }
 
 /// Settings an administrator edits in the app (for example the mail account). Secrets inside are encrypted.
@@ -257,6 +279,8 @@ model Setting {
   value       String   @db.Text
   updatedAt   DateTime @updatedAt
   updatedById Int?
+
+  @@map("setting")
 }
 
 model Comment {
@@ -269,6 +293,7 @@ model Comment {
   createdAt DateTime @default(now())
 
   @@index([receiptId, id])
+  @@map("comment")
 }
 
 /// One-time links for choosing a password: "forgot password" (short life) and the invitation for a new user (longer).
@@ -283,4 +308,5 @@ model PasswordToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+  @@map("passwordtoken")
 }
