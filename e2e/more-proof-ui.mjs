@@ -74,7 +74,7 @@ try {
   ok('no browser errors', errs.length === 0, JSON.stringify(errs));
 } finally {
   await b.close();
-  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM Receipt WHERE payee='${tag}'`]);
+  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee='${tag}'`]);
 }
 console.log(bad ? `\n${bad} FAILED` : '\nAll more-proof checks passed');
 process.exit(bad ? 1 : 0);

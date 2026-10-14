@@ -4,9 +4,9 @@ const ORIGIN = new URL(BASE).origin;
 let bad = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) bad++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsis', origin: ORIGIN, 'content-type': 'application/json' });
+const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsys', origin: ORIGIN, 'content-type': 'application/json' });
 const api = async (c, m, p, b) => { const r = await fetch(BASE + p, { method: m, headers: H(c), body: b ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json().catch(() => null), cookie: r.headers.get('set-cookie')?.split(';')[0] }; };
-const login = async (e, pw = 'Reimsis#2026') => (await api('', 'POST', '/auth/login', { email: e, password: pw })).cookie;
+const login = async (e, pw = 'Reimsys#2026') => (await api('', 'POST', '/auth/login', { email: e, password: pw })).cookie;
 
 /** Opens the stream and collects what arrives. */
 async function listen(cookie) {
@@ -58,7 +58,7 @@ ok('the signal names an area and carries no receipt details', !!first && Object.
 const before = sLiza.live.events.filter((e) => e.ev === 'change').length;
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from('l' + stamp)])], { type: 'image/png' }), 'a.png');
-await fetch(`${BASE}/receipts/${made.id}/evidence`, { method: 'POST', headers: { cookie: ana, 'x-requested-with': 'reimsis', origin: ORIGIN }, body: f });
+await fetch(`${BASE}/receipts/${made.id}/evidence`, { method: 'POST', headers: { cookie: ana, 'x-requested-with': 'reimsys', origin: ORIGIN }, body: f });
 await api(ana, 'POST', `/receipts/${made.id}/submit`, { version: (await api(ana, 'GET', `/receipts/${made.id}`)).data.receipt.version });
 await sleep(1200);
 const after = sLiza.live.events.filter((e) => e.ev === 'change').length;

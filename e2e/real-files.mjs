@@ -137,5 +137,5 @@ process.exit(bad ? 1 : 0);
 
 function sql_cleanup() {
   // remove only what this run created
-  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM Receipt WHERE payee IN ('Real Files ${stamp}','Too Big ${stamp}')`]);
+  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee IN ('Real Files ${stamp}','Too Big ${stamp}')`]);
 }

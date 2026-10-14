@@ -21,7 +21,7 @@ async function login(email, size = { width: 1280, height: 900 }) {
 }
 const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsys', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
 
-sql("DELETE FROM Setting WHERE `key`='mail'");
+sql("DELETE FROM setting WHERE `key`='mail'");
 const p = await login('admin@example.com');
 await p.goto('/access'); await p.click('button[role=tab]:has-text("Email")');
 await p.waitForSelector('text=Email account');
@@ -67,10 +67,10 @@ const got = await api(p, '/api/settings/mail');
 ok('the API never returns the password', !got.t.includes(SECRET) && JSON.parse(got.t).mail.hasPassword === true, got.t);
 
 // stored encrypted
-const stored = sql("SELECT value FROM Setting WHERE `key`='mail'");
+const stored = sql("SELECT value FROM setting WHERE `key`='mail'");
 ok('the password is encrypted in the database', stored.includes('"passEnc":"v1:') && !stored.includes(SECRET));
-ok('the audit log never contains the password', !sql("SELECT CONCAT_WS(' ', summary, `before`, `after`) FROM AuditLog WHERE action LIKE 'settings.%'").includes(SECRET));
-ok('the audit log recorded the change', sql("SELECT COUNT(*) FROM AuditLog WHERE action='settings.mail_saved'").trim() !== '0');
+ok('the audit log never contains the password', !sql("SELECT CONCAT_WS(' ', summary, `before`, `after`) FROM auditlog WHERE action LIKE 'settings.%'").includes(SECRET));
+ok('the audit log recorded the change', sql("SELECT COUNT(*) FROM auditlog WHERE action='settings.mail_saved'").trim() !== '0');
 
 // real send, using the saved account
 await p.fill('input[aria-label="Test email address"]', 'onesysprimedev@gmail.com');
@@ -87,7 +87,7 @@ ok('it was sent from the address you set', !!delivered && /REIMSYS/.test(deliver
 // leaving the password blank keeps it
 await p.fill('input[placeholder="Your Organisation"]', 'REIMSYS Cebu');
 await p.click('button[type=submit]:has-text("Save")'); await p.waitForSelector('.toast:has-text("Email account saved")');
-const again = sql("SELECT value FROM Setting WHERE `key`='mail'");
+const again = sql("SELECT value FROM setting WHERE `key`='mail'");
 ok('saving with a blank password keeps the saved one', again.includes('"passEnc":"v1:') && again.includes('REIMSYS Cebu'));
 
 // Emails tab shows it

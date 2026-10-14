@@ -15,21 +15,21 @@ const stamp = Date.now();
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 /* ---- quick API helpers for the person who ACTS (the watchers are real browsers) ---- */
-const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsis', origin: WEB, 'content-type': 'application/json' });
+const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' });
 const api = async (c, m, p, b) => { const r = await fetch(WEB + '/api' + p, { method: m, headers: H(c), body: b ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json().catch(() => null), cookie: r.headers.get('set-cookie')?.split(';')[0] }; };
-const login = async (e, pw = 'Reimsis#2026') => (await api('', 'POST', '/auth/login', { email: e, password: pw })).cookie;
+const login = async (e, pw = 'Reimsys#2026') => (await api('', 'POST', '/auth/login', { email: e, password: pw })).cookie;
 async function makeReceipt(c, tag) {
   const cat = (await api(c, 'GET', '/categories')).data.categories[0].id;
   let r = (await api(c, 'POST', '/receipts', { payee: tag, receiptDate: '2026-10-11', amount: 88, categoryId: cat })).data.receipt;
   const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from(tag + Math.random())])], { type: 'image/png' }), 'r.png');
-  r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsis', origin: WEB }, body: f })).json()).receipt;
+  r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsys', origin: WEB }, body: f })).json()).receipt;
   return r;
 }
 const view = (c, r) => fetch(`${WEB}/api/receipts/${r.id}/evidence/${r.evidence[0].id}/file?mode=view`, { headers: { cookie: c } });
 
 const b = await chromium.launch({ channel: 'chrome' });
 const errs = [];
-async function watcher(email, startPath, size = { width: 1280, height: 860 }, pw = 'Reimsis#2026') {
+async function watcher(email, startPath, size = { width: 1280, height: 860 }, pw = 'Reimsys#2026') {
   const ctx = await b.newContext({ viewport: size, baseURL: WEB });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errs.push(String(e)));
@@ -152,7 +152,7 @@ try {
     const a = await login('admin@example.com').catch(() => null);
     if (a) await api(a, 'PUT', `/roles/${permsToRestore.id}/permissions`, { codes: permsToRestore.codes }).catch(() => null);
   }
-  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-e', `DELETE FROM Receipt WHERE payee LIKE 'Live % ${stamp}'`]);
+  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee LIKE 'Live % ${stamp}'`]);
 }
 console.log(bad ? `\n${bad} FAILED` : '\nAll live-update checks passed');
 process.exit(bad ? 1 : 0);

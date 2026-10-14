@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE `Role` (
+CREATE TABLE `role` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `code` VARCHAR(30) NOT NULL,
     `name` VARCHAR(60) NOT NULL,
@@ -8,23 +8,23 @@ CREATE TABLE `Role` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `Role_code_key`(`code`),
+    UNIQUE INDEX `role_code_key`(`code`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Permission` (
+CREATE TABLE `permission` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `code` VARCHAR(60) NOT NULL,
     `label` VARCHAR(120) NOT NULL,
     `groupName` VARCHAR(60) NOT NULL,
 
-    UNIQUE INDEX `Permission_code_key`(`code`),
+    UNIQUE INDEX `permission_code_key`(`code`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `RolePermission` (
+CREATE TABLE `rolepermission` (
     `roleId` INTEGER NOT NULL,
     `permissionId` INTEGER NOT NULL,
 
@@ -32,7 +32,7 @@ CREATE TABLE `RolePermission` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `User` (
+CREATE TABLE `user` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `email` VARCHAR(160) NOT NULL,
     `name` VARCHAR(100) NOT NULL,
@@ -52,13 +52,13 @@ CREATE TABLE `User` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `User_email_key`(`email`),
-    INDEX `User_roleId_idx`(`roleId`),
+    UNIQUE INDEX `user_email_key`(`email`),
+    INDEX `user_roleId_idx`(`roleId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Session` (
+CREATE TABLE `session` (
     `id` VARCHAR(36) NOT NULL,
     `tokenHash` VARCHAR(64) NOT NULL,
     `userId` INTEGER NOT NULL,
@@ -69,13 +69,13 @@ CREATE TABLE `Session` (
     `expiresAt` DATETIME(3) NOT NULL,
     `revokedAt` DATETIME(3) NULL,
 
-    UNIQUE INDEX `Session_tokenHash_key`(`tokenHash`),
-    INDEX `Session_userId_idx`(`userId`),
+    UNIQUE INDEX `session_tokenHash_key`(`tokenHash`),
+    INDEX `session_userId_idx`(`userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `AuditLog` (
+CREATE TABLE `auditlog` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `actorId` INTEGER NULL,
     `actorName` VARCHAR(160) NOT NULL,
@@ -89,23 +89,23 @@ CREATE TABLE `AuditLog` (
     `userAgent` VARCHAR(255) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `AuditLog_entityType_entityId_idx`(`entityType`, `entityId`),
-    INDEX `AuditLog_actorId_idx`(`actorId`),
-    INDEX `AuditLog_createdAt_idx`(`createdAt`),
+    INDEX `auditlog_entityType_entityId_idx`(`entityType`, `entityId`),
+    INDEX `auditlog_actorId_idx`(`actorId`),
+    INDEX `auditlog_createdAt_idx`(`createdAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE `RolePermission` ADD CONSTRAINT `RolePermission_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `Role`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `rolepermission` ADD CONSTRAINT `rolepermission_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `role`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `RolePermission` ADD CONSTRAINT `RolePermission_permissionId_fkey` FOREIGN KEY (`permissionId`) REFERENCES `Permission`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `rolepermission` ADD CONSTRAINT `rolepermission_permissionId_fkey` FOREIGN KEY (`permissionId`) REFERENCES `permission`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `User` ADD CONSTRAINT `User_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `Role`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `user` ADD CONSTRAINT `user_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `role`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Session` ADD CONSTRAINT `Session_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `session` ADD CONSTRAINT `session_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `user`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `AuditLog` ADD CONSTRAINT `AuditLog_actorId_fkey` FOREIGN KEY (`actorId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `auditlog` ADD CONSTRAINT `auditlog_actorId_fkey` FOREIGN KEY (`actorId`) REFERENCES `user`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

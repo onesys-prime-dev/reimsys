@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE `Setting` (
+CREATE TABLE `setting` (
     `key` VARCHAR(60) NOT NULL,
     `value` TEXT NOT NULL,
     `updatedAt` DATETIME(3) NOT NULL,
