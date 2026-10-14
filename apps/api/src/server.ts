@@ -7,7 +7,8 @@ import helmet from 'helmet';
 import { config } from './config.js';
 import { prisma } from './db.js';
 import { errorHandler } from './middleware/error.js';
-import { loadAuth } from './middleware/auth.js';
+import { loadAuth, requireAuth } from './middleware/auth.js';
+import { hub } from './lib/realtime.js';
 import { csrfGuard } from './middleware/security.js';
 import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
@@ -59,6 +60,8 @@ app.use('/api', rateLimit({
 }));
 app.use('/api', csrfGuard, loadAuth);
 app.use('/api/auth', authRouter);
+/** Live updates for the signed-in browser. See lib/realtime.ts. */
+app.get('/api/events', requireAuth, (req, res) => void hub.connect(req.auth!.user.id, req, res));
 app.use('/api/me', meRouter);
 app.use('/api/users', usersRouter);
 app.use('/api', rolesRouter);

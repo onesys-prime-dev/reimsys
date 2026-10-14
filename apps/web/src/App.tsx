@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './auth';
 import { NotificationBell } from './components/Notifications';
+import { LiveLight, useLive } from './live';
 import { AccessPage } from './pages/Access';
 import { AuditPage } from './pages/Audit';
 import { DashboardPage } from './pages/Dashboard';
@@ -30,6 +31,7 @@ function Shell() {
   const { me, can, signOut } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
+  const live = useLive(!!me && !me.mustChangePassword);
   if (!me) return null;
   const own = can('receipt.create') && !can('receipt.view_all');
   const items = [
@@ -61,6 +63,7 @@ function Shell() {
       <div className="main">
         <header className="top">
           <div className="t">{titleFor(loc.pathname)}</div>
+          <LiveLight state={live} />
           <NotificationBell />
           <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} size={30} /></button>
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>

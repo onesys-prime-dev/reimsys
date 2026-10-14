@@ -74,6 +74,17 @@ The API process also serves the built web app and runs the background worker (em
 server {
   server_name reimsys.example.com;
   client_max_body_size 12m;            # evidence files are up to 10 MB
+  # Live updates: a long-lived stream that must not be buffered or cut off.
+  location /api/events {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_http_version 1.1;
+    proxy_set_header Connection '';
+    proxy_set_header Host $host;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 1h;
+  }
+
   location / {
     proxy_pass http://127.0.0.1:4000;
     proxy_set_header Host $host;
@@ -132,3 +143,12 @@ pm2 restart reimsys
    It stops with an explanation if no real Super Admin exists yet, so it cannot lock everyone out.
 4. Set `WEB_ORIGIN` to the real `https://` address. Emails then include the "Open the receipt" button, and forgot-password and invitation links point at it.
 5. Apply `docs/db-grants.sql` so the app cannot change or delete audit entries.
+
+## Live updates
+
+Screens update by themselves: when someone approves a receipt, the person watching it sees it change, the checker's queue fills in, and the bell lights up, with no refresh.
+
+- It uses one small open connection per browser tab (Server-Sent Events, `/api/events`). Nothing private travels on it. It only says which area changed, and the screen then asks for the new data in the normal way with its own permissions.
+- If the connection drops (Wi-Fi blip, sleeping phone), the screen shows **Offline**, reconnects on its own, and refreshes everything once.
+- Behind nginx, keep the `/api/events` block above (`proxy_buffering off`), or updates arrive late in lumps.
+- The signals are kept in the API process. That is right for one API process. If you ever run several API processes behind a load balancer, add Redis publish/subscribe so a change made on one reaches people connected to another (the hub in `apps/api/src/lib/realtime.ts` is the only place to change).
