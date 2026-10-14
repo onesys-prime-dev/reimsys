@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_SETTINGS, type AppSettings } from './settings';
 export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
@@ -53,17 +54,103 @@ export const canEditReceipt = (status: ReceiptStatus) => status === 'draft' || s
 /* ---------- validation ---------- */
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the date format YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(s)), 'Enter a valid date.');
 
-export const receiptInputSchema = z.object({
-  payee: z.string().trim().min(2, 'Enter who was paid.').max(160),
-  receiptDate: dateString.refine((s) => s <= new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), 'The receipt date cannot be in the future.'),
+const money = (label: string) =>
+  z.coerce.number({ invalid_type_error: `Enter a valid ${label}.` }).min(0, `The ${label} cannot be negative.`).max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100);
+const optional = <T extends z.ZodTypeAny>(t: T) => z.preprocess((v) => (v === '' || v === undefined ? null : v), t.nullish());
+const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'false' || v === 'no' ? false : v), z.boolean({ invalid_type_error: 'Choose Yes or No.', required_error: 'Choose Yes or No.' }));
+
+export const TRANSACTION_TYPES = ['product', 'service'] as const;
+export const VAT_TYPES = ['vatable', 'non_vatable'] as const;
+export const TRANSACTION_LABEL: Record<(typeof TRANSACTION_TYPES)[number], string> = { product: 'Product', service: 'Service' };
+export const VAT_LABEL: Record<(typeof VAT_TYPES)[number], string> = { vatable: 'Vatable', non_vatable: 'Non-vatable' };
+
+/** The client's reimbursement form. What is required depends on the answers, so it is checked as a whole. */
+const receiptShape = z.object({
+  birInvoice: flag,
+  seenCompany: optional(z.boolean()),
+  seenTin: optional(z.boolean()),
+  seenAddress: optional(z.boolean()),
+  noBirReason: optional(z.string().trim().max(500)),
+  receiptDate: dateString.refine((s) => s <= new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), 'The invoice date cannot be in the future.'),
+  invoiceNo: optional(z.string().trim().max(60)),
+  payee: z.string().trim().min(2, 'Enter the vendor name.').max(160),
+  vendorAddress: optional(z.string().trim().max(300)),
+  vendorTin: optional(z.string().trim().max(30)),
   amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
-  categoryId: z.coerce.number().int().positive('Choose a category.'),
+  transactionType: z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) }),
+  vatType: optional(z.enum(VAT_TYPES)),
+  vatableAmount: optional(money('vatable amount')),
+  vatAmount: optional(money('VAT amount')),
+  withheld: optional(flag),
+  whtRate: optional(money('withholding rate').refine((n) => n <= 100, 'The rate cannot be over 100.')),
+  whtAmount: optional(money('withholding amount')),
   description: z.string().trim().max(500).nullish(),
 });
+
+/** What the "it depends on the answers" rules look at. Every field may be missing. */
+interface Answers {
+  birInvoice?: boolean | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
+  invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
+  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+}
+function conditionalIssues(d: Answers, rules: AppSettings): { path: string; message: string }[] {
+  const out: { path: string; message: string }[] = [];
+  const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };
+  const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) out.push({ path, message }); };
+  if (d.birInvoice === true) {
+    need(d.seenCompany, 'seenCompany', 'Tick to confirm the company name can be seen completely on the invoice.');
+    need(d.seenTin, 'seenTin', 'Tick to confirm the TIN can be seen completely on the invoice.');
+    need(d.seenAddress, 'seenAddress', 'Tick to confirm the complete address can be seen on the invoice.');
+    if (rules.requireInvoiceNo) need(d.invoiceNo, 'invoiceNo', 'Enter the invoice number.');
+    if (rules.requireVendorAddress) need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
+    if (rules.requireVendorTin) need(d.vendorTin, 'vendorTin', 'Enter the vendor TIN.');
+    need(d.vatType, 'vatType', 'Choose Vatable or Non-vatable.');
+    missing(d.vatableAmount, 'vatableAmount', 'Enter the vatable amount.');
+    missing(d.vatAmount, 'vatAmount', 'Enter the VAT amount, or 0 if there is none.');
+    if (rules.askWithholding) missing(d.withheld, 'withheld', 'Choose Yes or No.');
+    if (d.withheld && rules.askWithholding) {
+      missing(d.whtRate, 'whtRate', 'Enter the withholding tax rate.');
+      missing(d.whtAmount, 'whtAmount', 'Enter the withholding tax amount.');
+    }
+  } else if (d.birInvoice === false && !rules.allowNoBir) {
+    out.push({ path: 'birInvoice', message: 'Receipts without a BIR-registered invoice are not accepted.' });
+  } else if (d.birInvoice === false && (!d.noBirReason || d.noBirReason.length < 5)) {
+    out.push({ path: 'noBirReason', message: 'Explain why there is no BIR-registered invoice.' });
+  }
+  return out;
+}
+
+/** The form's rules with the administrator's settings applied. */
+export const makeReceiptSchema = (rules: AppSettings = DEFAULT_SETTINGS) =>
+  receiptShape.superRefine((d, ctx) => {
+    for (const i of conditionalIssues(d, rules)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
+  });
+export const receiptInputSchema = makeReceiptSchema();
+
+/**
+ * Every problem in the form, by field, even when several things are wrong at once. (A schema stops at the first kind of
+ * mistake, which would hide the "tick this box" messages behind an empty vendor name.)
+ */
+export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings = DEFAULT_SETTINGS): Record<string, string> {
+  const out: Record<string, string> = {};
+  const r = receiptShape.safeParse(raw);
+  if (!r.success) for (const i of r.error.issues) out[String(i.path[0])] ||= i.message;
+  const n = (v: unknown) => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
+  const b = (v: unknown) => (v === true || v === 'yes' || v === 'true' ? true : v === false || v === 'no' || v === 'false' ? false : null);
+  const t = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  for (const i of conditionalIssues({
+    birInvoice: b(raw.birInvoice), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
+    invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
+    vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
+  }, rules)) out[i.path] ||= i.message;
+  return out;
+}
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;
 
 export const actionBodySchema = z.object({
   note: z.string().trim().max(1000).optional(),
+  /** The Checker's answer to "can it be seen completely on the invoice?" for the company name, TIN and address. */
+  seen: z.object({ company: z.boolean(), tin: z.boolean(), address: z.boolean() }).optional(),
   version: z.number().int().min(0),
 });
 
@@ -76,6 +163,7 @@ export const reportRequestSchema = z.object({
   from: dateString,
   to: dateString,
   categoryId: z.number().int().positive().nullish(),
+  transactionType: z.enum(TRANSACTION_TYPES).nullish(),
   encoderId: z.number().int().positive().nullish(),
   format: z.enum(['pdf', 'xlsx', 'csv']),
 });
@@ -84,6 +172,8 @@ export const listQuerySchema = z.object({
   status: z.enum(RECEIPT_STATUSES).optional(),
   q: z.string().trim().max(100).optional(),
   categoryId: z.coerce.number().int().positive().optional(),
+  transactionType: z.enum(TRANSACTION_TYPES).optional(),
+  vatType: z.enum(VAT_TYPES).optional(),
   encoderId: z.coerce.number().int().positive().optional(),
   from: dateString.optional(),
   to: dateString.optional(),
@@ -107,3 +197,66 @@ export const bulkSchema = z.object({
 });
 
 export const commentSchema = z.object({ body: z.string().trim().min(1, 'Write a comment first.').max(1000, 'Keep it under 1,000 characters.') });
+
+/* ---------- warnings (never block, only flag) ---------- */
+export const TIN_PATTERN = /^\d{3}-?\d{3}-?\d{3}(-?\d{3,5})?$/;
+export const VAT_RATE = DEFAULT_SETTINGS.vatRate;
+
+export interface FormFigures {
+  birInvoice?: boolean | null; amount: number; vendorTin?: string | null; vatType?: string | null;
+  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+}
+
+/** Things worth a second look. The Med Ref sees them while typing; the Checker and Approver see them on the receipt. */
+export function receiptWarnings(f: FormFigures, rules: AppSettings = DEFAULT_SETTINGS): string[] {
+  const out: string[] = [];
+  const close = (a: number, b: number) => Math.abs(a - b) <= rules.tolerance + 1e-9;
+  const VAT_RATE = rules.vatRate;
+  const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+  const vatable = n(f.vatableAmount), vat = n(f.vatAmount), rate = n(f.whtRate), wht = n(f.whtAmount);
+  if (f.vendorTin && !TIN_PATTERN.test(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
+  if (f.birInvoice === false) return out;
+  if (f.vatType === 'vatable' && vatable !== null && vat !== null) {
+    if (!close(vatable + vat, f.amount)) out.push(`Vatable amount plus VAT (${(vatable + vat).toFixed(2)}) is not the same as the invoice gross amount (${f.amount.toFixed(2)}).`);
+    if (!close(vatable * (VAT_RATE / 100), vat)) out.push(`VAT is usually ${VAT_RATE}% of the vatable amount (${(vatable * VAT_RATE / 100).toFixed(2)}), but ${vat.toFixed(2)} was entered.`);
+  }
+  if (f.vatType === 'non_vatable' && vat !== null && vat !== 0) out.push('The invoice is marked non-vatable, but a VAT amount was entered.');
+  if (f.vatType === 'non_vatable' && vatable !== null && !close(vatable, f.amount)) out.push('For a non-vatable invoice the amount without VAT is usually the same as the gross amount.');
+  if (f.withheld && rate !== null && wht !== null) {
+    const base = vatable ?? f.amount;
+    if (!close(base * rate / 100, wht)) out.push(`${rate}% of ${base.toFixed(2)} is ${(base * rate / 100).toFixed(2)}, but a withholding amount of ${wht.toFixed(2)} was entered.`);
+  }
+  if (f.withheld === false && ((wht ?? 0) > 0 || (rate ?? 0) > 0)) out.push('Withholding tax was answered No, but a rate or amount was entered.');
+  return out;
+}
+
+/** The fields the form saves, cleaned so that answers that no longer apply are not kept. */
+export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETTINGS) {
+  const bir = d.birInvoice;
+  const wht = bir && rules.askWithholding && d.withheld === true;
+  const t = (v: string | null | undefined) => (v ? v : null);
+  return {
+    birInvoice: bir,
+    seenCompany: bir ? !!d.seenCompany : null, seenTin: bir ? !!d.seenTin : null, seenAddress: bir ? !!d.seenAddress : null,
+    noBirReason: bir ? null : t(d.noBirReason),
+    invoiceNo: t(d.invoiceNo), vendorAddress: t(d.vendorAddress), vendorTin: t(d.vendorTin),
+    transactionType: d.transactionType,
+    vatType: bir ? d.vatType ?? null : null,
+    vatableAmount: bir ? d.vatableAmount ?? null : null,
+    vatAmount: bir ? d.vatAmount ?? null : null,
+    withheld: bir ? (rules.askWithholding ? d.withheld ?? null : false) : null,
+    whtRate: wht ? d.whtRate ?? null : null,
+    whtAmount: wht ? d.whtAmount ?? null : null,
+  };
+}
+
+/** The company the invoices must be addressed to. The Med Ref confirms these can be seen completely on the invoice. */
+export const companySchema = z.object({
+  name: z.string().trim().min(2, 'Enter the company name.').max(160),
+  tin: z.string().trim().min(5, 'Enter the company TIN.').max(30),
+  address: z.string().trim().min(5, 'Enter the company address.').max(300),
+});
+export type Company = z.infer<typeof companySchema>;
+export const DEFAULT_COMPANY: Company = {
+  name: 'SOLARA PHARMA CORP.', tin: '801-590-238-00000', address: 'U-1704 Empire Tower AIC Burgandy Bldg. ADB Ave. Ortigas Center, San Antonio, Pasig City',
+};

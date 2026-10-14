@@ -5,6 +5,7 @@ import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';
 import { EmailTemplatesTab } from './EmailTemplates';
+import { AppSettingsTab } from './AppSettings';
 import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '../ui';
 
 interface UserRow {
@@ -14,18 +15,19 @@ interface UserRow {
 
 export function AccessPage() {
   const { can } = useAuth();
-  const [tab, setTab] = useState<'users' | 'perms' | 'cats' | 'mail' | 'tpl'>(can('user.manage') ? 'users' : 'perms');
+  const [tab, setTab] = useState<'users' | 'perms' | 'settings' | 'company' | 'mail' | 'tpl'>(can('user.manage') ? 'users' : 'perms');
   return (
     <>
       <div className="ph"><div><h1>Access control</h1><p>Manage who can sign in and what each role can do.</p></div></div>
       <div className="tabs" role="tablist">
         {can('user.manage') && <button role="tab" aria-selected={tab === 'users'} className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Users</button>}
         <button role="tab" aria-selected={tab === 'perms'} className={tab === 'perms' ? 'on' : ''} onClick={() => setTab('perms')}>Roles and permissions</button>
-        {can('category.manage') && <button role="tab" aria-selected={tab === 'cats'} className={tab === 'cats' ? 'on' : ''} onClick={() => setTab('cats')}>Categories</button>}
+        {can('settings.manage') && <button role="tab" aria-selected={tab === 'settings'} className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>}
+        {can('settings.manage') && <button role="tab" aria-selected={tab === 'company'} className={tab === 'company' ? 'on' : ''} onClick={() => setTab('company')}>Company</button>}
         {can('settings.manage') && <button role="tab" aria-selected={tab === 'mail'} className={tab === 'mail' ? 'on' : ''} onClick={() => setTab('mail')}>Email</button>}
         {can('settings.manage') && <button role="tab" aria-selected={tab === 'tpl'} className={tab === 'tpl' ? 'on' : ''} onClick={() => setTab('tpl')}>Email templates</button>}
       </div>
-      {tab === 'users' ? <UsersTab /> : tab === 'cats' ? <CategoriesTab /> : tab === 'mail' ? <EmailSettingsTab /> : tab === 'tpl' ? <EmailTemplatesTab /> : <PermsTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'settings' ? <AppSettingsTab /> : tab === 'company' ? <CompanyTab /> : tab === 'mail' ? <EmailSettingsTab /> : tab === 'tpl' ? <EmailTemplatesTab /> : <PermsTab />}
     </>
   );
 }
@@ -310,41 +312,32 @@ function AddRole({ maxRank, onClose, onDone }: { maxRank: number; onClose: () =>
   );
 }
 
-/* ================= categories ================= */
+/* ================= company ================= */
 
-function CategoriesTab() {
+function CompanyTab() {
   const toast = useToast();
   const qc = useQueryClient();
-  const [name, setName] = useState('');
-  const list = useQuery({ queryKey: ['categories', 'all'], queryFn: () => api<{ categories: { id: number; name: string; isActive: boolean; receiptCount: number }[] }>('/categories?all=true') });
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['categories'] }); };
-  const add = useMutation({
-    mutationFn: () => api('/categories', { method: 'POST', body: { name } }),
-    onSuccess: () => { setName(''); toast('Category added.'); refresh(); },
+  const q = useQuery({ queryKey: ['company'], queryFn: () => api<{ company: { name: string; tin: string; address: string } }>('/company') });
+  const [f, setF] = useState<{ name: string; tin: string; address: string } | null>(null);
+  const v = f ?? q.data?.company;
+  const save = useMutation({
+    mutationFn: () => api('/company', { method: 'PUT', body: v }),
+    onSuccess: () => { setF(null); toast('Company details saved.'); qc.invalidateQueries({ queryKey: ['company'] }); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
-  const patch = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: object }) => api(`/categories/${id}`, { method: 'PATCH', body }),
-    onSuccess: refresh,
-    onError: (e) => { toast(errMsg(e), 'bad'); refresh(); },
-  });
+  if (!v) return <div className="empty">Loading…</div>;
+  const change = (k: 'name' | 'tin' | 'address', val: string) => setF({ ...v, [k]: val });
   return (
-    <>
-      <form className="tools" onSubmit={(e) => { e.preventDefault(); if (name.trim().length >= 2) add.mutate(); }}>
-        <div style={{ flex: '1 1 240px', maxWidth: 360 }}><input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category name" aria-label="New category name" /></div>
-        <button className="btn pri" type="submit" disabled={name.trim().length < 2 || add.isPending}><Icon name="plus" size={18} />Add category</button>
+    <section className="card">
+      <div className="card-h"><h3>Company on the invoice</h3><small>Shown to the Med Ref when they confirm the invoice</small></div>
+      <form className="card-b" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
+        <div className="form">
+          <Field label="Company name" className="full"><input type="text" value={v.name} maxLength={160} onChange={(e) => change('name', e.target.value)} /></Field>
+          <Field label="Tax ID No. (TIN)"><input type="text" value={v.tin} maxLength={30} onChange={(e) => change('tin', e.target.value)} /></Field>
+          <Field label="Complete address" className="full"><input type="text" value={v.address} maxLength={300} onChange={(e) => change('address', e.target.value)} /></Field>
+        </div>
+        <div className="formbar"><button className="btn pri" type="submit" disabled={!f || save.isPending}>Save</button></div>
       </form>
-      <section className="card cats">
-        {list.data?.categories.map((c) => (
-          <div className="urow" key={c.id}>
-            <b>{c.name}</b>
-            <span className="muted">{c.receiptCount} receipt{c.receiptCount === 1 ? '' : 's'}</span>
-            <span><Switch checked={c.isActive} label={`Active: ${c.name}`} onChange={(v) => patch.mutate({ id: c.id, body: { isActive: v } })} /></span>
-          </div>
-        ))}
-        {!list.data && <div className="empty">Loading…</div>}
-      </section>
-      <p className="muted" style={{ fontSize: '.84rem' }}>Turning a category off hides it from new receipts. Existing receipts and reports keep it.</p>
-    </>
+    </section>
   );
 }

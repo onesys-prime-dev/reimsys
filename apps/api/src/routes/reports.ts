@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { reportRequestSchema } from '@reimsys/shared';
+import { reportRequestSchema, TRANSACTION_LABEL } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';
@@ -28,6 +28,7 @@ reportsRouter.get('/preview', requirePerm('report.generate'), async (req, res) =
   const q = reportRequestSchema.omit({ format: true }).parse({
     from: req.query.from, to: req.query.to,
     categoryId: req.query.categoryId ? Number(req.query.categoryId) : null,
+    transactionType: req.query.transactionType || null,
     encoderId: req.query.encoderId ? Number(req.query.encoderId) : null,
   });
   const { rows, total } = await reportRows({ ...q, scope: scopeFor(req) });
@@ -37,7 +38,7 @@ reportsRouter.get('/preview', requirePerm('report.generate'), async (req, res) =
 reportsRouter.post('/', requirePerm('report.generate'), async (req, res) => {
   const body = reportRequestSchema.parse(req.body);
   if (body.from > body.to) throw conflict('The start date must be before the end date.', 'BAD_RANGE');
-  const filters = { from: body.from, to: body.to, categoryId: body.categoryId ?? null, encoderId: body.encoderId ?? null, scope: scopeFor(req) };
+  const filters = { from: body.from, to: body.to, categoryId: body.categoryId ?? null, transactionType: body.transactionType ?? null, encoderId: body.encoderId ?? null, scope: scopeFor(req) };
   const rep = await prisma.liquidationReport.create({ data: { requestedById: req.auth!.user.id, format: body.format, filters: JSON.stringify(filters) } });
   await enqueue('report', { reportId: rep.id });
   await audit(req, { action: 'report.requested', entityType: 'report', entityId: rep.id, summary: `requested a ${body.format.toUpperCase()} liquidation report for ${body.from} to ${body.to}` });
@@ -47,7 +48,7 @@ reportsRouter.post('/', requirePerm('report.generate'), async (req, res) => {
 reportsRouter.get('/', async (req, res) => {
   const all = req.auth!.permissions.has('audit.view');
   const rows = await prisma.liquidationReport.findMany({ where: all ? {} : { requestedById: req.auth!.user.id }, orderBy: { id: 'desc' }, take: 50 });
-  const parsed = rows.map((r) => JSON.parse(r.filters) as { encoderId?: number | null; categoryId?: number | null });
+  const parsed = rows.map((r) => JSON.parse(r.filters) as { encoderId?: number | null; categoryId?: number | null; transactionType?: string | null });
   const personIds = [...new Set(parsed.map((f) => f.encoderId).filter((x): x is number => !!x))];
   const users = await prisma.user.findMany({ where: { id: { in: [...rows.map((r) => r.requestedById), ...personIds] } }, select: { id: true, name: true } });
   const names = new Map(users.map((u) => [u.id, u.name]));
@@ -56,7 +57,7 @@ reportsRouter.get('/', async (req, res) => {
   res.json({
     reports: rows.map((r) => {
       const f = JSON.parse(r.filters);
-      return { id: r.id, format: r.format, status: r.status, from: f.from, to: f.to, personId: f.encoderId ?? null, person: f.encoderId ? names.get(f.encoderId) ?? null : null, category: f.categoryId ? cats.get(f.categoryId) ?? null : null, rowCount: r.rowCount, total: r.total == null ? null : Number(r.total), error: r.error, createdAt: r.createdAt, requestedBy: users.find((u) => u.id === r.requestedById)?.name ?? '' };
+      return { id: r.id, format: r.format, status: r.status, from: f.from, to: f.to, personId: f.encoderId ?? null, person: f.encoderId ? names.get(f.encoderId) ?? null : null, category: f.transactionType ? (TRANSACTION_LABEL[f.transactionType as keyof typeof TRANSACTION_LABEL] ?? f.transactionType) : f.categoryId ? cats.get(f.categoryId) ?? null : null, rowCount: r.rowCount, total: r.total == null ? null : Number(r.total), error: r.error, createdAt: r.createdAt, requestedBy: users.find((u) => u.id === r.requestedById)?.name ?? '' };
     }),
   });
 });
@@ -67,7 +68,7 @@ reportsRouter.get('/:id/data', async (req, res) => {
   if (!rep) throw notFound('Report not found.');
   if (rep.requestedById !== req.auth!.user.id && !req.auth!.permissions.has('audit.view')) throw forbidden();
   const f = JSON.parse(rep.filters);
-  const { rows, total } = await reportRows(f);
+  const { rows, total, totals } = await reportRows(f);
   const byCategory = new Map<string, { count: number; total: number }>();
   for (const r of rows) {
     const c = byCategory.get(r.category) ?? { count: 0, total: 0 };
@@ -84,11 +85,11 @@ reportsRouter.get('/:id/data', async (req, res) => {
   }
   const requester = await prisma.user.findUnique({ where: { id: rep.requestedById }, select: { name: true } });
   const person = f.encoderId ? (await prisma.user.findUnique({ where: { id: f.encoderId }, select: { name: true } }))?.name ?? null : null;
-  const category = f.categoryId ? (await prisma.category.findUnique({ where: { id: f.categoryId }, select: { name: true } }))?.name ?? null : null;
+  const category = f.transactionType ? (TRANSACTION_LABEL[f.transactionType as keyof typeof TRANSACTION_LABEL] ?? f.transactionType) : f.categoryId ? (await prisma.category.findUnique({ where: { id: f.categoryId }, select: { name: true } }))?.name ?? null : null;
   const rank = (m: Map<string, { count: number; total: number }>, key: string) => [...m.entries()].map(([k, v]) => ({ [key]: k, ...v })).sort((a, b) => b.total - a.total);
   res.json({
     report: { id: rep.id, format: rep.format, status: rep.status, from: f.from, to: f.to, person, category, createdAt: rep.createdAt, requestedBy: requester?.name ?? '' },
-    rows, total,
+    rows, total, totals,
     byCategory: rank(byCategory, 'category'),
     byPerson: rank(byPerson, 'person'),
   });

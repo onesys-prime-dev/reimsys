@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { registerJob } from './jobs.js';
 import { drawLogo } from './logo.js';
 import { saveFile } from './storage.js';
+import { typeLabel } from './receipts.js';
 
 const php = (n: number | string) => 'PHP ' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' }) : '-');
@@ -20,7 +21,7 @@ function toBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
 
 /**
  * Reimbursement document for one approved receipt.
- * The layout is a placeholder until the client's manual form is supplied.
+ * Carries the answers from the client's reimbursement form (invoice, VAT and withholding) so the paper copy matches the screen.
  */
 export async function buildReimbursementPdf(receiptId: number) {
   const r = await prisma.receipt.findUniqueOrThrow({
@@ -42,21 +43,33 @@ export async function buildReimbursementPdf(receiptId: number) {
 
   let y = 136;
   const row = (label: string, value: string) => {
-    doc.font('Helvetica').fontSize(9).fillColor('#546770').text(label.toUpperCase(), L, y, { width: 150 });
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#12232b').text(value, L + 160, y - 1, { width: W - 160 });
-    y += Math.max(24, doc.heightOfString(value, { width: W - 160 }) + 12);
+    doc.font('Helvetica').fontSize(8.5).fillColor('#546770').text(label.toUpperCase(), L, y + 1, { width: 150 });
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#12232b').text(value, L + 160, y - 1, { width: W - 160 });
+    y += Math.max(19, doc.heightOfString(value, { width: W - 160 }) + 8);
   };
+  const money = (n: unknown) => (n === null || n === undefined ? '-' : php(Number(n)));
   row('Receipt reference', r.refNo);
-  row('Paid to', r.payee);
-  row('Receipt date', fmtDate(r.receiptDate));
-  row('Category', r.category.name);
+  row('Vendor', r.payee);
+  if (r.vendorAddress) row('Vendor address', r.vendorAddress);
+  if (r.vendorTin) row('Vendor TIN', r.vendorTin);
+  row('Invoice no.', r.invoiceNo || '-');
+  row('Invoice date', fmtDate(r.receiptDate));
+  row('Type', typeLabel(r));
+  row('BIR-registered invoice', r.birInvoice === null ? '-' : r.birInvoice ? 'Yes' : 'No');
+  if (r.birInvoice === false && r.noBirReason) row('Reason (no BIR invoice)', r.noBirReason);
+  if (r.birInvoice) {
+    row('VAT', r.vatType === 'vatable' ? 'Vatable' : r.vatType === 'non_vatable' ? 'Non-vatable' : '-');
+    row('Vatable amount', money(r.vatableAmount));
+    row('VAT amount', money(r.vatAmount));
+    row('Withholding tax', r.withheld ? `${Number(r.whtRate ?? 0)}%  ·  ${money(r.whtAmount)}` : r.withheld === false ? 'None' : '-');
+  }
   row('Description', r.description || '-');
   row('Evidence files', String(r.evidence.length));
   doc.moveTo(L, y).lineTo(L + W, y).strokeColor('#d6dfe2').stroke();
   y += 14;
-  doc.font('Helvetica').fontSize(9).fillColor('#546770').text('AMOUNT APPROVED FOR REIMBURSEMENT', L, y);
-  doc.font('Helvetica-Bold').fontSize(24).fillColor('#12232b').text(php(Number(r.amount)), L, y + 14);
-  y += 66;
+  doc.font('Helvetica').fontSize(9).fillColor('#546770').text('INVOICE GROSS AMOUNT APPROVED FOR REIMBURSEMENT', L, y);
+  doc.font('Helvetica-Bold').fontSize(22).fillColor('#12232b').text(php(Number(r.amount)), L, y + 13);
+  y += 52;
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#12232b').text('Workflow', L, y);
   y += 20;
@@ -66,7 +79,7 @@ export async function buildReimbursementPdf(receiptId: number) {
   row('Approved by', `${nameOf(r.decidedById)}  ·  ${fmtDate(r.decidedAt)}`);
   if (r.decisionNote) row('Approver remarks', r.decisionNote);
 
-  const sy = Math.max(y + 50, 640);
+  const sy = Math.max(y + 40, 640);
   const cols = [['Prepared by', r.encoder.name], ['Checked by', nameOf(r.checkedById)], ['Approved by', nameOf(r.decidedById)]];
   const cw = W / 3;
   cols.forEach(([label, name], i) => {

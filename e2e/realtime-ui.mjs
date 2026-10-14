@@ -4,6 +4,8 @@ import { chromium } from 'playwright';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 
 const WEB = process.env.WEB ?? 'http://localhost:4000';
 const out = path.resolve(process.argv[2] ?? 'storage/realtime');
@@ -20,7 +22,7 @@ const api = async (c, m, p, b) => { const r = await fetch(WEB + '/api' + p, { me
 const login = async (e, pw = 'Reimsys#2026') => (await api('', 'POST', '/auth/login', { email: e, password: pw })).cookie;
 async function makeReceipt(c, tag) {
   const cat = (await api(c, 'GET', '/categories')).data.categories[0].id;
-  let r = (await api(c, 'POST', '/receipts', { payee: tag, receiptDate: '2026-10-11', amount: 88, categoryId: cat })).data.receipt;
+  let r = (await api(c, 'POST', '/receipts', { payee: tag, receiptDate: '2026-10-11', amount: 88, ...F })).data.receipt;
   const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from(tag + Math.random())])], { type: 'image/png' }), 'r.png');
   r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsys', origin: WEB }, body: f })).json()).receipt;
   return r;

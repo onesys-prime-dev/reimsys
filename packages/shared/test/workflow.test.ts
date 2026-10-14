@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GRANTS, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
-  changePasswordSchema, isLockedGrant, receiptInputSchema, transitionFor,
+  DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
 } from '../src/index';
 
 const perms = (...p: string[]) => new Set(p);
@@ -81,10 +81,73 @@ describe('permissions', () => {
 });
 
 describe('validation', () => {
-  const base = { payee: 'Mercury Drug', receiptDate: '2026-10-12', amount: '1284.5', categoryId: 1 };
+  // A complete "BIR invoice: yes" answer, as the form sends it.
+  const base = {
+    birInvoice: 'yes', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
+    vendorAddress: 'Mandaue City', vendorTin: '123-456-789-00000', amount: '1120', transactionType: 'product', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', withheld: 'no',
+  };
+  const field = (input: object) => { const r = receiptInputSchema.safeParse(input); return r.success ? [] : r.error.issues.map((i) => String(i.path[0])); };
 
   it('accepts a valid receipt and rounds the amount to centavos', () => {
     expect(receiptInputSchema.parse({ ...base, amount: '10.005' }).amount).toBeCloseTo(10.01, 2);
+  });
+
+  it('needs the invoice answers when there is a BIR invoice', () => {
+    expect(field(base)).toEqual([]);
+    expect(field({ ...base, invoiceNo: '', vendorTin: undefined, vatableAmount: '' })).toEqual(expect.arrayContaining(['invoiceNo', 'vendorTin', 'vatableAmount']));
+    expect(field({ ...base, seenTin: false })).toContain('seenTin');
+    expect(field({ ...base, transactionType: '' })).toContain('transactionType');
+    expect(field({ ...base, vatAmount: '0' })).toEqual([]); // zero VAT is a real answer
+  });
+
+  it('asks for the withholding numbers only when tax was withheld', () => {
+    expect(field({ ...base, withheld: 'yes' })).toEqual(expect.arrayContaining(['whtRate', 'whtAmount']));
+    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10' })).toEqual([]);
+  });
+
+  it('lets a receipt without a BIR invoice through only with a reason', () => {
+    const none = { birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'service' };
+    expect(field(none)).toEqual(['noBirReason']);
+    expect(field({ ...none, noBirReason: 'Only an acknowledgement receipt' })).toEqual([]);
+  });
+
+  it('drops answers that no longer apply', () => {
+    const d = receiptInputSchema.parse({ ...base, withheld: 'no', whtRate: '5', whtAmount: '50' });
+    expect(cleanFormData(d)).toMatchObject({ withheld: false, whtRate: null, whtAmount: null });
+    const n = receiptInputSchema.parse({ birInvoice: 'no', noBirReason: 'No registered invoice', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'product', vatType: 'vatable', vatAmount: '9' });
+    expect(cleanFormData(n)).toMatchObject({ birInvoice: false, vatType: null, vatAmount: null, seenCompany: null });
+  });
+
+  it('warns, but does not block, when the numbers do not add up', () => {
+    const ok = { birInvoice: true, amount: 1120, vendorTin: '123-456-789-00000', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false };
+    expect(receiptWarnings(ok)).toEqual([]);
+    expect(receiptWarnings({ ...ok, vatAmount: 100 }).length).toBeGreaterThan(0);
+    expect(receiptWarnings({ ...ok, vatType: 'non_vatable', vatAmount: 120 })[0]).toMatch(/non-vatable/i);
+    expect(receiptWarnings({ ...ok, withheld: true, whtRate: 2, whtAmount: 99 })[0]).toMatch(/2%/);
+    expect(receiptWarnings({ ...ok, withheld: true, whtRate: 2, whtAmount: 20 })).toEqual([]);
+    expect(receiptWarnings({ ...ok, vendorTin: 'abc' })[0]).toMatch(/TIN/);
+    expect(receiptWarnings({ birInvoice: false, amount: 350 })).toEqual([]);
+  });
+
+  it('follows the administrator settings', () => {
+    const rules = { ...DEFAULT_SETTINGS, allowNoBir: false, requireVendorTin: false, askWithholding: false, vatRate: 10 };
+    const f = (input: object, r = rules) => { const x = makeReceiptSchema(r).safeParse(input); return x.success ? [] : x.error.issues.map((i) => String(i.path[0])); };
+    expect(f({ birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', transactionType: 'product', noBirReason: 'No invoice at all' })).toEqual(['birInvoice']);
+    expect(f({ ...base, vendorTin: undefined, withheld: undefined })).toEqual([]);
+    expect(f({ ...base, vendorTin: undefined }, DEFAULT_SETTINGS)).toContain('vendorTin');
+    const okVat = { birInvoice: true, amount: 1100, vatType: 'vatable', vatableAmount: 1000, vatAmount: 100 };
+    expect(receiptWarnings(okVat, rules)).toEqual([]);
+    expect(receiptWarnings(okVat).length).toBeGreaterThan(0); // 12% is the default, so 100 on 1,000 is flagged
+    expect(receiptWarnings({ ...okVat, vatAmount: 100.5 }, { ...rules, tolerance: 1 })).toEqual([]);
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, withheld: 'yes', whtRate: '2', whtAmount: '20' }), rules)).toMatchObject({ withheld: false, whtRate: null });
+  });
+
+  it('refuses nonsense settings', () => {
+    expect(appSettingsSchema.safeParse(DEFAULT_SETTINGS).success).toBe(true);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, vatRate: 'abc' }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, sessionIdleMinutes: 1 }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxMb: 500 }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxFiles: 0 }).success).toBe(false);
   });
 
   it('rejects zero, negative and future-dated receipts', () => {

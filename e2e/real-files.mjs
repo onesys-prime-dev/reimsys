@@ -1,10 +1,13 @@
 // Real-size files and printing, in a browser: a 12-megapixel photo, a multi-page PDF, an oversize file, and the Print buttons.
 // Usage: WEB=http://localhost:4000 node e2e/real-files.mjs <screenshot-dir>
+import { fillQuickForm, toLastStep } from './form-helpers.mjs';
 import { chromium } from 'playwright';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 
 const WEB = process.env.WEB ?? 'http://localhost:4000';
 const out = path.resolve(process.argv[2] ?? 'storage/real-files');
@@ -50,7 +53,7 @@ ok('the test photo is a realistic size (over 1 MB, under the 10 MB limit)', phot
 /* ---- Ana uploads both and submits ---- */
 const ana = await as('ana.reyes@example.com');
 await ana.goto('/receipts/new'); await ana.waitForSelector('form');
-await ana.fill('input[placeholder="Store or provider name"]', 'Real Files ' + stamp); await ana.fill('input[placeholder="0.00"]', '1284.50');
+await fillQuickForm(ana, { payee: 'Real Files ' + stamp, amount: '1284.50' });
 await ana.setInputFiles('input[type=file]', [{ name: 'IMG_2041.jpg', mimeType: 'image/jpeg', buffer: photo }, { name: 'prescription.pdf', mimeType: 'application/pdf', buffer: pdf }]);
 await ana.waitForSelector('text=IMG_2041.jpg');
 ok('both files are listed before sending', (await ana.locator('.file').count()) === 2);
@@ -110,6 +113,7 @@ ok('Print on the reimbursement document opens the print dialog', docPrinted, JSO
 
 /* ---- a file that is too big ---- */
 await ana.goto('/receipts/new'); await ana.waitForSelector('form');
+await fillQuickForm(ana, { payee: 'Too Big ' + stamp });
 await ana.setInputFiles('input[type=file]', [{ name: 'huge.jpg', mimeType: 'image/jpeg', buffer: Buffer.concat([photo, Buffer.alloc(11 * 1048576, 1)]) }]);
 await ana.waitForSelector('.toast');
 ok('an over-10-MB file is refused in the form with a clear message', /10 MB/.test(await ana.locator('.toast').first().innerText()) && (await ana.locator('.file').count()) === 0);
@@ -117,7 +121,7 @@ const cookies = await ana.context().cookies();
 const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
 const big = new FormData(); big.append('files', new Blob([Buffer.concat([photo, Buffer.alloc(11 * 1048576, 1)])], { type: 'image/jpeg' }), 'huge.jpg');
 const me = await (await fetch(WEB + '/api/receipts?pageSize=1', { headers: { cookie, 'x-requested-with': 'reimsys' } })).json();
-const draft = await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' }, body: JSON.stringify({ payee: 'Too Big ' + stamp, receiptDate: '2026-10-11', amount: 5, categoryId: (await (await fetch(WEB + '/api/categories', { headers: { cookie, 'x-requested-with': 'reimsys' } })).json()).categories[0].id }) })).json();
+const draft = await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' }, body: JSON.stringify({ payee: 'Too Big ' + stamp, receiptDate: '2026-10-11', amount: 5, ...F }) })).json();
 const rBig = await fetch(`${WEB}/api/receipts/${draft.receipt.id}/evidence`, { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsys', origin: WEB }, body: big });
 const jBig = await rBig.json().catch(() => null);
 ok('the server refuses it too, with a plain message instead of a crash', rBig.status >= 400 && rBig.status < 500 && !!jBig?.error?.message, `${rBig.status} ${JSON.stringify(jBig)}`);

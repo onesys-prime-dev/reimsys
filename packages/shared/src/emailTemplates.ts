@@ -24,7 +24,7 @@ export const PLACEHOLDERS: PlaceholderDef[] = [
   { key: 'refNo', label: 'Receipt number', example: 'RC-2026-000123' },
   { key: 'payee', label: 'Who was paid', example: 'Mercury Drug - Mandaue' },
   { key: 'amount', label: 'Amount', example: 'PHP 1,284.50' },
-  { key: 'category', label: 'Category', example: 'Medicine' },
+  { key: 'category', label: 'Type (product or service)', example: 'Product' },
   { key: 'date', label: 'Receipt date', example: 'Oct 12, 2026' },
   { key: 'status', label: 'Status of the receipt', example: 'Approved' },
   { key: 'note', label: 'Reason or note that was written', example: 'The receipt photo is blurry.' },

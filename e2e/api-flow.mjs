@@ -2,6 +2,8 @@
 // Usage: node e2e/api-flow.mjs
 const BASE = process.env.API ?? 'http://localhost:4000/api';
 import { execFileSync } from 'node:child_process';
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 const PASSWORD = 'Reimsys#2026';
 let failed = 0, passed = 0;
 
@@ -46,10 +48,10 @@ const med = cats.find((c) => c.name === 'Medicine').id;
 const stamp = Date.now();
 
 console.log('\nMed Ref encodes and submits');
-let r = (await ana.post('/receipts', { payee: 'Test Pharmacy ' + stamp, receiptDate: '2026-10-12', amount: 1284.5, categoryId: med, description: 'flow test' })).data.receipt;
+let r = (await ana.post('/receipts', { payee: 'Test Pharmacy ' + stamp, receiptDate: '2026-10-12', amount: 1284.5, ...F, description: 'flow test' })).data.receipt;
 check('draft created', r.status === 'draft' && /^RC-\d{4}-\d{6}$/.test(r.refNo), r.refNo);
-check('future date rejected', (await ana.post('/receipts', { payee: 'X Y', receiptDate: '2999-01-01', amount: 5, categoryId: med })).status === 400);
-check('zero amount rejected', (await ana.post('/receipts', { payee: 'X Y', receiptDate: '2026-10-12', amount: 0, categoryId: med })).status === 400);
+check('future date rejected', (await ana.post('/receipts', { payee: 'X Y', receiptDate: '2999-01-01', amount: 5, ...F })).status === 400);
+check('zero amount rejected', (await ana.post('/receipts', { payee: 'X Y', receiptDate: '2026-10-12', amount: 0, ...F })).status === 400);
 check('submit without evidence blocked', (await ana.post(`/receipts/${r.id}/submit`, { version: r.version })).data?.error?.code === 'NO_EVIDENCE');
 let up = await ana.req('POST', `/receipts/${r.id}/evidence`, form('receipt.png', png('a')));
 check('png uploaded', up.status === 201 && up.data.receipt.evidence.length === 1, JSON.stringify(up.data));
@@ -64,7 +66,7 @@ let s = await ana.post(`/receipts/${r.id}/submit`, { version: r.version });
 check('submitted', s.status === 200 && s.data.receipt.status === 'submitted', JSON.stringify(s.data));
 r = s.data.receipt;
 check('evidence locked after submit', (await ana.req('POST', `/receipts/${r.id}/evidence`, form('late.png', png('b')))).data?.error?.code === 'INVALID_STATE');
-check('edit locked after submit', (await ana.req('PATCH', `/receipts/${r.id}`, { payee: 'Changed Name', receiptDate: '2026-10-12', amount: 5, categoryId: med })).status === 409);
+check('edit locked after submit', (await ana.req('PATCH', `/receipts/${r.id}`, { payee: 'Changed Name', receiptDate: '2026-10-12', amount: 5, ...F })).status === 409);
 
 console.log('\nChecker reviews');
 check('checker sees it', (await liza.get(`/receipts/${r.id}`)).status === 200);
@@ -130,7 +132,7 @@ const hist = (await ana.get(`/receipts/${r.id}/history`)).data.items;
 check('history has the whole story', ['receipt.submit', 'receipt.check', 'receipt.return', 'receipt.reserve', 'receipt.release', 'receipt.approve', 'evidence.viewed'].every((a) => hist.some((h) => h.action === a)));
 
 console.log('\nDisapprove and copy');
-let d = (await ana.post('/receipts', { payee: 'Disapprove Me ' + stamp, receiptDate: '2026-10-11', amount: 300, categoryId: med })).data.receipt;
+let d = (await ana.post('/receipts', { payee: 'Disapprove Me ' + stamp, receiptDate: '2026-10-11', amount: 300, ...F })).data.receipt;
 d = (await ana.req('POST', `/receipts/${d.id}/evidence`, form('d.png', png('d')))).data.receipt;
 d = (await ana.post(`/receipts/${d.id}/submit`, { version: d.version })).data.receipt;
 await liza.req('GET', `/receipts/${d.id}/evidence/${d.evidence[0].id}/file?mode=view`, undefined, { raw: true });
@@ -145,15 +147,15 @@ check('copy creates a new draft with evidence', copy.status === 201 && copy.data
 console.log('\nWithdraw, delete a draft, duplicate warning');
 const wName = 'Withdraw Test ' + stamp;
 const mk = async (name = wName) => {
-  let x = (await ana.post('/receipts', { payee: name, receiptDate: '2026-10-12', amount: 77.7, categoryId: med })).data.receipt;
+  let x = (await ana.post('/receipts', { payee: name, receiptDate: '2026-10-12', amount: 77.7, ...F })).data.receipt;
   x = (await ana.req('POST', `/receipts/${x.id}/evidence`, form('w.png', png('w' + Math.random())))).data.receipt;
   return x;
 };
 let w1 = await mk();
 let w2 = await mk();
 check('a second receipt with the same payee, amount and date shows a duplicate warning', ((await ana.get(`/receipts/${w2.id}`)).data.receipt.possibleDuplicates ?? []).some((x) => x.id === w1.id));
-check('a different amount is not flagged', ((await ana.post('/receipts', { payee: wName, receiptDate: '2026-10-12', amount: 78, categoryId: med })).data.receipt.possibleDuplicates ?? []).length === 0);
-check('the other Med Ref does not see it as a duplicate (they cannot see it)', (((await mark.post('/receipts', { payee: wName, receiptDate: '2026-10-12', amount: 77.7, categoryId: med })).data.receipt).possibleDuplicates ?? []).length === 0);
+check('a different amount is not flagged', ((await ana.post('/receipts', { payee: wName, receiptDate: '2026-10-12', amount: 78, ...F })).data.receipt.possibleDuplicates ?? []).length === 0);
+check('the other Med Ref does not see it as a duplicate (they cannot see it)', (((await mark.post('/receipts', { payee: wName, receiptDate: '2026-10-12', amount: 77.7, ...F })).data.receipt).possibleDuplicates ?? []).length === 0);
 w1 = (await ana.post(`/receipts/${w1.id}/submit`, { version: w1.version })).data.receipt;
 check('checker sees the submitted receipt', (await liza.get(`/receipts/${w1.id}`)).status === 200);
 check('the checker cannot withdraw it', (await liza.post(`/receipts/${w1.id}/withdraw`, { version: w1.version })).status === 403);
@@ -193,7 +195,7 @@ for (const format of ['csv', 'xlsx', 'pdf']) {
 check('reports of other people are private', (await mark.req('GET', '/reports')).data.reports.every((x) => x.requestedBy === 'Mark Dela Cruz'));
 
 console.log('\nImport and export');
-const csv = `payee,receipt_date,amount,category,description\nImport Store A ${stamp},2026-10-10,150.25,Medicine,ok\nImport Store B,2026-10-10,abc,Medicine,bad amount\nImport Store C,2026-10-10,99,Nonsense,bad category\n`;
+const csv = `payee,receipt_date,amount,category,description\nImport Store A ${stamp},2026-10-10,150.25,Medicine,ok\nImport Store B,2026-10-10,abc,Medicine,bad amount\nImport Store C,not-a-date,99,Medicine,bad date\n`;
 const imf = new FormData(); imf.append('file', new Blob([csv], { type: 'text/csv' }), 'import.csv');
 const pv = await ana.req('POST', '/imports', imf);
 check('import preview finds 1 valid and 2 bad rows', pv.status === 201 && pv.data.validRows === 1 && pv.data.errorCount === 2, JSON.stringify(pv.data));
@@ -207,7 +209,7 @@ check('export contains imported row', (await ex.text()).includes('Import Store A
 console.log('\nUndo a decision, comments, bulk actions');
 {
   const mk = async (who, tag, amount = 100) => {
-    let x = (await who.post('/receipts', { payee: `${tag} ${stamp}`, receiptDate: '2026-10-11', amount, categoryId: med })).data.receipt;
+    let x = (await who.post('/receipts', { payee: `${tag} ${stamp}`, receiptDate: '2026-10-11', amount, ...F })).data.receipt;
     x = (await who.req('POST', `/receipts/${x.id}/evidence`, form('n.png', png(tag + stamp + Math.random())))).data.receipt;
     return (await who.post(`/receipts/${x.id}/submit`, { version: x.version })).data.receipt;
   };

@@ -13,7 +13,7 @@ const REFRESH: Record<string, string[]> = {
   categories: ['categories'],
   emails: ['email-log', 'email-status'],
   audit: ['audit', 'my-activity', 'dashboard'],
-  settings: ['mail-settings', 'email-templates', 'email-status'],
+  settings: ['mail-settings', 'email-templates', 'email-status', 'app-settings', 'company'],
 };
 const EVERYTHING = [...new Set(Object.values(REFRESH).flat())];
 

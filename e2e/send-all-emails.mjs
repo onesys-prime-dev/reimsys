@@ -1,3 +1,5 @@
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 // Walks the whole workflow so that every kind of email is sent, with all of it redirected to ONE address (test mode).
 // Uses the mail account already saved in the app. Usage: node e2e/send-all-emails.mjs you@example.com
 const TO = process.argv[2];
@@ -40,7 +42,7 @@ await call(ana, 'PATCH', '/me/preferences', { reservationReleased: true });
 /* 2. A receipt that goes through every decision */
 const cat = (await call(ana, 'GET', '/categories')).d.categories[0].id;
 const make = async (name, amount) => {
-  let r = (await call(ana, 'POST', '/receipts', { payee: `${name} ${tag}`, receiptDate: new Date().toISOString().slice(0, 10), amount, categoryId: cat, description: 'Created by the email test' })).d.receipt;
+  let r = (await call(ana, 'POST', '/receipts', { payee: `${name} ${tag}`, receiptDate: new Date().toISOString().slice(0, 10), amount, ...F, description: 'Created by the email test' })).d.receipt;
   const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from(name + tag)])], { type: 'image/png' }), 'receipt.png');
   r = (await (await fetch(`${B}/receipts/${r.id}/evidence`, { method: 'POST', headers: H(ana, false), body: f })).json()).receipt;
   return r;

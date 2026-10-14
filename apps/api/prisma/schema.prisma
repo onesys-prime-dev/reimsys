@@ -129,9 +129,28 @@ model Receipt {
   payee        String                   @db.VarChar(160)
   receiptDate  DateTime                 @db.Date
   amount       Decimal                  @db.Decimal(12, 2)
-  categoryId   Int
-  category     Category                 @relation(fields: [categoryId], references: [id])
+  categoryId   Int?
+  category     Category?                @relation(fields: [categoryId], references: [id])
   description  String?                  @db.VarChar(500)
+  // Client form (phase 2). All optional so receipts made before it still load.
+  birInvoice      Boolean?
+  seenCompany     Boolean?
+  seenTin         Boolean?
+  seenAddress     Boolean?
+  noBirReason     String?                  @db.VarChar(500)
+  invoiceNo       String?                  @db.VarChar(60)
+  vendorAddress   String?                  @db.VarChar(300)
+  vendorTin       String?                  @db.VarChar(30)
+  transactionType String?                  @db.VarChar(10)
+  vatType         String?                  @db.VarChar(12)
+  vatableAmount   Decimal?                 @db.Decimal(12, 2)
+  vatAmount       Decimal?                 @db.Decimal(12, 2)
+  withheld        Boolean?
+  whtRate         Decimal?                 @db.Decimal(5, 2)
+  whtAmount       Decimal?                 @db.Decimal(12, 2)
+  ckCompany       Boolean?
+  ckTin           Boolean?
+  ckAddress       Boolean?
   status       String                   @default("draft") @db.VarChar(20)
   version      Int                      @default(0)
   submittedAt  DateTime?
@@ -152,6 +171,7 @@ model Receipt {
   @@index([encoderId])
   @@index([receiptDate])
   @@index([categoryId])
+  @@index([vendorTin, invoiceNo])
   @@map("receipt")
 }
 
