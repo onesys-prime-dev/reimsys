@@ -75,6 +75,9 @@ authRouter.post('/reset', linkLimiter, async (req, res) => {
   res.json({ ok: true });
 });
 
+/** A real password hash nobody knows, checked when the account does not exist so a wrong guess takes the same time either way. */
+const DUMMY_HASH = hashPassword('not-a-real-password-' + Math.random());
+
 authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = loginSchema.parse(req.body);
   const now = new Date();
@@ -88,7 +91,10 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
     throw unauthorized('Email or password is incorrect.', 'INVALID_CREDENTIALS');
   };
 
-  if (!user || !user.isActive) return reject(`failed to sign in as ${email}`, user?.id);
+  if (!user || !user.isActive) {
+    await verifyPassword(await DUMMY_HASH, password);
+    return reject(`failed to sign in as ${email}`, user?.id);
+  }
   if (user.lockedUntil && user.lockedUntil > now) {
     const mins = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60000);
     throw new HttpError(423, 'LOCKED', `This account is locked. Try again in ${mins} minute${mins === 1 ? '' : 's'} or ask an administrator.`);

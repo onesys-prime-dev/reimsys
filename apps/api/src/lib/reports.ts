@@ -60,17 +60,6 @@ export function neutraliseFormula(v: string | number | null | undefined): string
   return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
 }
 
-/**
- * A spreadsheet program treats a cell that starts with = + - @ (or a tab or line break) as a formula, so someone could save
- * a receipt called =HYPERLINK(...) and have it run on whoever opens the export. A leading apostrophe makes it plain text.
- * Numbers are left alone so totals still add up.
- */
-export function neutraliseFormula(v: string | number | null | undefined): string | number {
-  if (typeof v === 'number') return v;
-  const s = String(v ?? '');
-  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
-}
-
 export function toCsv(rows: (string | number)[][]) {
   const q = (v: string | number) => {
     const s = String(neutraliseFormula(v));
@@ -112,7 +101,7 @@ export function buildPdf(rows: Row[], t: Totals, f: { from: string; to: string; 
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     const L = 40, W = doc.page.width - 80;
-    const cols = [{ h: 'Document no.', w: 84 }, { h: 'Invoice no.', w: 70 }, { h: 'Date', w: 58 }, { h: 'Vendor', w: 168 }, { h: 'Type', w: 50 }, { h: 'Encoded by', w: 88 }, { h: 'VAT', w: 66 }, { h: 'Withheld', w: 66 }, { h: 'Amount', w: 0 }];
+    const cols = [{ h: 'Document no.', w: 84 }, { h: 'Invoice no.', w: 98 }, { h: 'Date', w: 58 }, { h: 'Vendor', w: 140 }, { h: 'Type', w: 50 }, { h: 'Encoded by', w: 88 }, { h: 'VAT', w: 66 }, { h: 'Withheld', w: 66 }, { h: 'Amount', w: 0 }];
     cols[8]!.w = W - cols.slice(0, 8).reduce((s, c) => s + c.w, 0);
     const header = () => {
       drawLogo(doc, L, 32, 38);
