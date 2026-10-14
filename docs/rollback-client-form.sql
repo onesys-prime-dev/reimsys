@@ -12,3 +12,11 @@ ALTER TABLE `receipt`
   DROP COLUMN whtAmount, DROP COLUMN whtRate, DROP COLUMN withheld, MODIFY `categoryId` INTEGER NOT NULL;
 ALTER TABLE `receipt` ADD CONSTRAINT `receipt_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `category`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 DELETE FROM `_prisma_migrations` WHERE migration_name = '20261015000000_client_form';
+
+-- Second step (migration 20261015010000_form_flow, the flow-chart form): run this too if you are going back past it.
+ALTER TABLE `receipt` DROP COLUMN classification, DROP COLUMN invoiceUnderCompany, DROP COLUMN reasonForSpending;
+DELETE FROM `_prisma_migrations` WHERE migration_name = '20261015010000_form_flow';
+
+-- Third step (migration 20261015020000_classification_other, the "Other:" text): run this too if you are going back past it.
+ALTER TABLE `receipt` DROP COLUMN classificationOther;
+DELETE FROM `_prisma_migrations` WHERE migration_name = '20261015020000_classification_other';

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
+import { classificationText, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -171,12 +171,18 @@ export function ReceiptDetailPage() {
               <div className="card-b">
                 <dl className="dl">
                   <dt>BIR-registered invoice</dt><dd>{yn(r.form.birInvoice)}</dd>
-                  {r.form.birInvoice === false && <><dt>Reason</dt><dd>{r.form.noBirReason || '-'}</dd></>}
-                  {r.form.birInvoice && (
+                  {r.form.birInvoice && <><dt>Invoice under the company</dt><dd>{r.form.invoiceUnderCompany === null ? 'Yes' : yn(r.form.invoiceUnderCompany)}</dd></>}
+                  {r.form.classification && <><dt>Classification</dt><dd>{classificationText(r.form.classification, r.form.classificationOther)}</dd></>}
+                  {r.form.reasonForSpending && <><dt>Reason for spending</dt><dd>{r.form.reasonForSpending}</dd></>}
+                  {r.form.birInvoice && r.form.invoiceUnderCompany !== false && (
                     <>
                       <dt>Company name seen</dt><dd>{seenText(r.form.seenCompany, r.form.checked?.company)}</dd>
                       <dt>Company TIN seen</dt><dd>{seenText(r.form.seenTin, r.form.checked?.tin)}</dd>
                       <dt>Company address seen</dt><dd>{seenText(r.form.seenAddress, r.form.checked?.address)}</dd>
+                    </>
+                  )}
+                  {r.form.birInvoice && (
+                    <>
                       <dt>VAT</dt><dd>{r.form.vatType ? VAT_LABEL[r.form.vatType as keyof typeof VAT_LABEL] ?? r.form.vatType : '-'}</dd>
                       <dt>Vatable amount</dt><dd>{r.form.vatableAmount === null ? '-' : money(r.form.vatableAmount)}</dd>
                       <dt>VAT amount</dt><dd>{r.form.vatAmount === null ? '-' : money(r.form.vatAmount)}</dd>
@@ -226,7 +232,7 @@ const seenText = (ticked: boolean | null, checker: boolean | null | undefined) =
 function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string, seen?: Seen) => void }) {
   const [text, setText] = useState('');
   // For a receipt with a BIR invoice, the Checker answers for themselves whether the company details can be seen on it.
-  const askSeen = action === 'check' && receipt.form.birInvoice === true;
+  const askSeen = action === 'check' && receipt.form.birInvoice === true && receipt.form.invoiceUnderCompany !== false;
   const [seen, setSeen] = useState<Partial<Record<keyof Seen, boolean>>>({});
   const answered = !askSeen || (seen.company !== undefined && seen.tin !== undefined && seen.address !== undefined);
   const anyNo = askSeen && (seen.company === false || seen.tin === false || seen.address === false);

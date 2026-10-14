@@ -134,6 +134,10 @@ model Receipt {
   description  String?                  @db.VarChar(500)
   // Client form (phase 2). All optional so receipts made before it still load.
   birInvoice      Boolean?
+  invoiceUnderCompany Boolean?
+  reasonForSpending   String?                  @db.VarChar(300)
+  classification      String?                  @db.VarChar(30)
+  classificationOther String?                  @db.VarChar(100)
   seenCompany     Boolean?
   seenTin         Boolean?
   seenAddress     Boolean?

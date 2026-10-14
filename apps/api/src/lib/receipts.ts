@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import { getSettings } from './appSettings.js';
@@ -26,14 +26,16 @@ type ReceiptRow = Prisma.ReceiptGetPayload<{ include: typeof receiptInclude }>;
 
 export const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
 /** What the receipt is, for lists, emails and reports: Product or Service, or the old category on receipts made before the form changed. */
-export const typeLabel = (r: { transactionType: string | null; category: { name: string } | null }) =>
-  r.transactionType ? TRANSACTION_LABEL[r.transactionType as keyof typeof TRANSACTION_LABEL] ?? r.transactionType : r.category?.name ?? '';
+export const typeLabel = (r: { transactionType: string | null; classification?: string | null; category: { name: string } | null }) =>
+  r.transactionType ? TRANSACTION_LABEL[r.transactionType as keyof typeof TRANSACTION_LABEL] ?? r.transactionType
+    : r.classification ? CLASSIFICATION_LABEL[r.classification as keyof typeof CLASSIFICATION_LABEL] ?? r.classification
+    : r.category?.name ?? '';
 const dec = (v: { toString(): string } | null) => (v === null ? null : Number(v));
 
 /** The answers on the client's reimbursement form, in the shape the screens use. Old receipts have these empty. */
 export function receiptForm(r: ReceiptRow) {
   return {
-    birInvoice: r.birInvoice, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
+    birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, classificationOther: r.classificationOther, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
     invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType,
     vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount),
     withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount),

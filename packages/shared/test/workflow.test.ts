@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GRANTS, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
-  DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
+  CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
 } from '../src/index';
 
 const perms = (...p: string[]) => new Set(p);
@@ -83,7 +83,7 @@ describe('permissions', () => {
 describe('validation', () => {
   // A complete "BIR invoice: yes" answer, as the form sends it.
   const base = {
-    birInvoice: 'yes', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
+    birInvoice: 'yes', invoiceUnderCompany: 'yes', reasonForSpending: 'Clinic supplies', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
     vendorAddress: 'Mandaue City', vendorTin: '123-456-789-00000', amount: '1120', transactionType: 'product', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', withheld: 'no',
   };
   const field = (input: object) => { const r = receiptInputSchema.safeParse(input); return r.success ? [] : r.error.issues.map((i) => String(i.path[0])); };
@@ -102,20 +102,29 @@ describe('validation', () => {
 
   it('asks for the withholding numbers only when tax was withheld', () => {
     expect(field({ ...base, withheld: 'yes' })).toEqual(expect.arrayContaining(['whtRate', 'whtAmount']));
-    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10' })).toEqual([]);
+    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10', reasonForSpending: undefined, classification: undefined })).toEqual([]);
+    // ...and the ticks only matter when the invoice is under the company
+    expect(field({ ...base, seenTin: false })).toContain('seenTin');
+    expect(field({ ...base, invoiceUnderCompany: 'no', seenTin: false, seenCompany: false, seenAddress: false })).toEqual([]);
   });
 
   it('lets a receipt without a BIR invoice through only with a reason', () => {
-    const none = { birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'service' };
-    expect(field(none)).toEqual(['noBirReason']);
-    expect(field({ ...none, noBirReason: 'Only an acknowledgement receipt' })).toEqual([]);
+    // The chart's short path: date, vendor, address, amount, then the reason for spending. No invoice number, TIN or type.
+    const none = { birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350' };
+    expect(field(none)).toEqual(expect.arrayContaining(['vendorAddress', 'reasonForSpending', 'classification']));
+    expect(field({ ...none, vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'meal' })).toEqual([]);
+    expect(field({ ...none, vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'nonsense' })).toContain('classification');
   });
 
   it('drops answers that no longer apply', () => {
     const d = receiptInputSchema.parse({ ...base, withheld: 'no', whtRate: '5', whtAmount: '50' });
     expect(cleanFormData(d)).toMatchObject({ withheld: false, whtRate: null, whtAmount: null });
-    const n = receiptInputSchema.parse({ birInvoice: 'no', noBirReason: 'No registered invoice', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'product', vatType: 'vatable', vatAmount: '9' });
-    expect(cleanFormData(n)).toMatchObject({ birInvoice: false, vatType: null, vatAmount: null, seenCompany: null });
+    const n = receiptInputSchema.parse({ birInvoice: 'no', vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'meal', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'product', vatType: 'vatable', vatAmount: '9' });
+    expect(cleanFormData(n)).toMatchObject({ birInvoice: false, vatType: null, vatAmount: null, seenCompany: null, transactionType: null, classification: 'meal' });
+    // Not under the company: the three ticks are not asked and are dropped.
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, invoiceUnderCompany: 'no', seenCompany: false, seenTin: false, seenAddress: false }))).toMatchObject({ invoiceUnderCompany: false, seenCompany: null });
+    // Tax withheld finishes the form right after, so no reason for spending is kept.
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, withheld: 'yes', whtRate: '2', whtAmount: '20', reasonForSpending: undefined, classification: undefined }))).toMatchObject({ withheld: true, reasonForSpending: null, classification: null });
   });
 
   it('warns, but does not block, when the numbers do not add up', () => {
@@ -132,7 +141,7 @@ describe('validation', () => {
   it('follows the administrator settings', () => {
     const rules = { ...DEFAULT_SETTINGS, allowNoBir: false, requireVendorTin: false, askWithholding: false, vatRate: 10 };
     const f = (input: object, r = rules) => { const x = makeReceiptSchema(r).safeParse(input); return x.success ? [] : x.error.issues.map((i) => String(i.path[0])); };
-    expect(f({ birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', transactionType: 'product', noBirReason: 'No invoice at all' })).toEqual(['birInvoice']);
+    expect(f({ birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', vendorAddress: 'Mandaue', reasonForSpending: 'Water', classification: 'meal' })).toEqual(['birInvoice']);
     expect(f({ ...base, vendorTin: undefined, withheld: undefined })).toEqual([]);
     expect(f({ ...base, vendorTin: undefined }, DEFAULT_SETTINGS)).toContain('vendorTin');
     const okVat = { birInvoice: true, amount: 1100, vatType: 'vatable', vatableAmount: 1000, vatAmount: 100 };
@@ -148,6 +157,15 @@ describe('validation', () => {
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, sessionIdleMinutes: 1 }).success).toBe(false);
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxMb: 500 }).success).toBe(false);
     expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxFiles: 0 }).success).toBe(false);
+  });
+
+  it('matches the client form for the classification, with words for "Other"', () => {
+    expect(CLASSIFICATIONS.map((c) => CLASSIFICATION_LABEL[c])).toEqual(['Fuel', 'Meeting, Seminar, or Convention', 'Representation', 'Transportation', 'Parking', 'Printing or Photocopying', 'Meal', 'Other']);
+    expect(field({ ...base, classification: 'other' })).toContain('classificationOther');
+    expect(field({ ...base, classification: 'other', classificationOther: 'Team building' })).toEqual([]);
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, classification: 'meal', classificationOther: 'leftover' }))).toMatchObject({ classification: 'meal', classificationOther: null });
+    expect(classificationText('other', 'Team building')).toBe('Other: Team building');
+    expect(classificationText('meeting')).toBe('Meeting, Seminar, or Convention');
   });
 
   it('rejects zero, negative and future-dated receipts', () => {

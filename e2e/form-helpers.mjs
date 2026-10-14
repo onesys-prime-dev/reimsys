@@ -5,12 +5,13 @@ export async function fillQuickForm(page, { payee, amount = '100', date, descrip
   await page.waitForSelector('.steps');
   await page.getByRole('radio', { name: /^No/ }).first().click();
   await page.click('button:has-text("Next")');
-  await page.getByLabel(/Why is there no BIR/).fill('Test receipt with no BIR invoice');
-  await page.click('button:has-text("Next")');
   if (date) await page.getByLabel(/date/i).first().fill(date);
   await page.getByLabel('Vendor complete name').fill(payee);
-  await page.getByLabel(/Invoice gross amount/).fill(String(amount));
-  await page.getByRole('radio', { name: /^Product/ }).first().click();
+  await page.getByLabel('Vendor complete address').fill('Test Street, Test City');
+  await page.getByLabel(/Amount paid to vendor/).fill(String(amount));
+  await page.click('button:has-text("Next")');
+  await page.getByLabel('Specific reason for spending').fill('Test receipt');
+  await page.getByRole('radio', { name: /^Fuel/ }).first().click();
   await page.click('button:has-text("Next")');
   await page.waitForSelector('.drop');
   if (description) await page.getByLabel(/Description/).fill(description);

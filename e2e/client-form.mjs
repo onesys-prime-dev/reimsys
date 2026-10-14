@@ -38,7 +38,7 @@ const stamp = Date.now();
 
 // A complete answer for "BIR invoice: yes", vatable, no withholding.
 const full = (over = {}) => ({
-  birInvoice: true, seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
+  birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
   vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, ...over,
 });
 const codes = (r) => (r.data?.error?.issues ?? []).map((i) => i.path[0]);
@@ -58,13 +58,27 @@ check('Product or Service is required', codes(await ana.post('/receipts', full({
 check('zero VAT is a real answer', (await ana.post('/receipts', full({ invoiceNo: 'Z-' + stamp, vatableAmount: 1120, vatAmount: 0, vatType: 'non_vatable' }))).status === 201);
 const w1 = await ana.post('/receipts', full({ invoiceNo: 'W1-' + stamp, withheld: true }));
 check('withholding needs a rate and an amount when "Yes"', w1.status === 400 && ['whtRate', 'whtAmount'].every((k) => codes(w1).includes(k)), JSON.stringify(codes(w1)));
-const w = await ana.post('/receipts', full({ invoiceNo: 'W2-' + stamp, withheld: true, whtRate: 2, whtAmount: 20 }));
+const w = await ana.post('/receipts', full({ invoiceNo: 'W2-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
 check('withholding saved with rate and amount', w.status === 201 && w.data.receipt.form.whtRate === 2 && w.data.receipt.form.whtAmount === 20);
-const none = { birInvoice: false, receiptDate: '2026-10-12', payee: 'Form Test Corner ' + stamp, amount: 350, transactionType: 'service' };
-check('no BIR invoice needs a reason', codes(await ana.post('/receipts', none)).includes('noBirReason'));
-const nb = await ana.post('/receipts', { ...none, noBirReason: 'Only an acknowledgement receipt', vatType: 'vatable', vatAmount: 9, seenCompany: true });
-check('no BIR invoice with a reason is accepted', nb.status === 201 && nb.data.receipt.form.noBirReason === 'Only an acknowledgement receipt');
-check('answers that do not apply are not kept', nb.data.receipt.form.vatType === null && nb.data.receipt.form.vatAmount === null && nb.data.receipt.form.seenCompany === null);
+const none = { birInvoice: false, receiptDate: '2026-10-12', payee: 'Form Test Corner ' + stamp, amount: 350 };
+const noneBad = await ana.post('/receipts', none);
+check('no BIR invoice still needs the address and the reason for spending', noneBad.status === 400 && ['vendorAddress', 'reasonForSpending', 'classification'].every((k) => codes(noneBad).includes(k)), JSON.stringify(codes(noneBad)));
+const noneOk = { ...none, vendorAddress: 'Mandaue City, Cebu', reasonForSpending: 'Water refills for the clinic', classification: 'meal' };
+const nb = await ana.post('/receipts', { ...noneOk, vatType: 'vatable', vatAmount: 9, seenCompany: true, transactionType: 'service' });
+check('the short no-BIR path is accepted', nb.status === 201 && nb.data.receipt.form.reasonForSpending === 'Water refills for the clinic' && nb.data.receipt.form.classification === 'meal');
+check('a classification outside the list is refused', codes(await ana.post('/receipts', { ...noneOk, classification: 'holiday' })).includes('classification'));
+check('"Other" needs the person to write what it is', codes(await ana.post('/receipts', { ...noneOk, classification: 'other' })).includes('classificationOther'));
+const oth = await ana.post('/receipts', { ...noneOk, classification: 'other', classificationOther: 'Team building' });
+check('"Other" with its words is saved', oth.status === 201 && oth.data.receipt.form.classification === 'other' && oth.data.receipt.form.classificationOther === 'Team building');
+const oth3 = await ana.post('/receipts', { ...noneOk, classification: 'meal', classificationOther: 'left over' });
+check('the "Other" words are dropped when another classification is chosen', oth3.status === 201 && oth3.data.receipt.form.classificationOther === null);
+const notCo = await ana.post('/receipts', full({ invoiceNo: 'NC-' + stamp, invoiceUnderCompany: false, seenCompany: false, seenTin: false, seenAddress: false }));
+check('an invoice not under the company skips the three ticks', notCo.status === 201 && notCo.data.receipt.form.invoiceUnderCompany === false && notCo.data.receipt.form.seenCompany === null, JSON.stringify(notCo.data?.error));
+const tax = await ana.post('/receipts', full({ invoiceNo: 'TX-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
+check('tax withheld finishes after the withholding step, with no reason for spending', tax.status === 201 && tax.data.receipt.form.reasonForSpending === null, JSON.stringify(tax.data?.error));
+const noTax = await ana.post('/receipts', full({ invoiceNo: 'NT-' + stamp, reasonForSpending: undefined, classification: undefined }));
+check('without withheld tax the reason for spending is required', noTax.status === 400 && codes(noTax).includes('reasonForSpending'));
+check('answers that do not apply are not kept', nb.data.receipt.form.vatType === null && nb.data.receipt.form.vatAmount === null && nb.data.receipt.form.seenCompany === null && nb.data.receipt.form.transactionType === null);
 check('future invoice dates are refused', codes(await ana.post('/receipts', full({ receiptDate: '2999-01-01' }))).includes('receiptDate'));
 check('text in an amount is refused', (await ana.post('/receipts', full({ amount: 'abc' }))).status === 400);
 check('negative VAT is refused', (await ana.post('/receipts', full({ vatAmount: -5 }))).status === 400);
@@ -94,10 +108,10 @@ check('and cannot be submitted until they are filled in', (await ana.post(`/rece
 
 console.log('\nThe full import template');
 const fullCsv = [
-  'vendor,invoice_date,invoice_no,vendor_tin,vendor_address,gross_amount,type,bir_invoice,company_check,no_bir_reason,vat_type,vatable_amount,vat_amount,withheld,wht_rate,wht_amount,description',
-  `Form Test Import A ${stamp},2026-10-10,IMP-1,111-222-333-00000,Cebu City,1120,product,yes,yes,,vatable,1000,120,no,,,ok`,
-  `Form Test Import B ${stamp},2026-10-10,,,,350,service,no,,Small store,,,,,,,no invoice`,
-  `Form Test Import C ${stamp},2026-10-10,IMP-3,,,500,product,yes,no,,vatable,400,48,no,,,missing TIN and unticked`,
+  'vendor,invoice_date,invoice_no,vendor_tin,vendor_address,gross_amount,type,bir_invoice,invoice_under_company,company_check,reason_for_spending,classification,vat_type,vatable_amount,vat_amount,withheld,wht_rate,wht_amount,description',
+  `Form Test Import A ${stamp},2026-10-10,IMP-1,111-222-333-00000,Cebu City,1120,product,yes,yes,yes,Clinic supplies,Other: Clinic supplies,vatable,1000,120,no,,,ok`,
+  `Form Test Import B ${stamp},2026-10-10,,,Cebu City,350,,no,,,Water refills,meal,,,,,,,no invoice`,
+  `Form Test Import C ${stamp},2026-10-10,IMP-3,,,500,product,yes,yes,no,Supplies,fuel,vatable,400,48,no,,,missing TIN and unticked`,
 ].join('\n') + '\n';
 const ff = new FormData(); ff.append('file', new Blob([fullCsv], { type: 'text/csv' }), 'full.csv');
 const fpv = await ana.req('POST', '/imports', ff);
@@ -105,6 +119,8 @@ check('two rows are valid and the incomplete one is rejected with reasons', fpv.
 await ana.post(`/imports/${fpv.data.id}/confirm`);
 const imported = (await ana.get(`/receipts?q=${encodeURIComponent('Form Test Import A ' + stamp)}`)).data.items[0];
 check('imported rows keep their invoice answers', imported?.invoiceNo === 'IMP-1' && imported.birInvoice === true && imported.transactionType === 'product');
+const importedFull = imported ? (await ana.get('/receipts/' + imported.id)).data.receipt : null;
+check('an imported "Other: ..." classification keeps its words', importedFull?.form?.classification === 'other' && importedFull.form.classificationOther === 'Clinic supplies', JSON.stringify(importedFull?.form));
 
 console.log('\nThe Checker confirms the company details');
 r = edit.data.receipt;
@@ -157,7 +173,7 @@ check('a Med Ref cannot change them', (await ana.put('/app-settings', s0.setting
 check('nonsense values are refused', (await admin.put('/app-settings', { ...s0.settings, vatRate: 'abc' })).status === 400 && (await admin.put('/app-settings', { ...s0.settings, sessionIdleMinutes: 1 })).status === 400);
 try {
   await admin.put('/app-settings', { ...s0.settings, allowNoBir: false, requireVendorTin: false, askWithholding: false });
-  check('with "no BIR" switched off it is refused', codes(await ana.post('/receipts', { ...none, noBirReason: 'Only an acknowledgement receipt' })).includes('birInvoice'));
+  check('with "no BIR" switched off it is refused', codes(await ana.post('/receipts', noneOk)).includes('birInvoice'));
   const noTin = await ana.post('/receipts', full({ invoiceNo: 'S1-' + stamp, vendorTin: '', withheld: undefined }));
   check('with the TIN made optional it is accepted, and withholding is not asked', noTin.status === 201 && noTin.data.receipt.form.withheld === false, JSON.stringify(noTin.data?.error));
   await admin.put('/app-settings', { ...s0.settings, warningsBlock: true });
