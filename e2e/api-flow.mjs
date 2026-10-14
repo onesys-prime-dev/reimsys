@@ -3,7 +3,7 @@
 const BASE = process.env.API ?? 'http://localhost:4000/api';
 import { execFileSync } from 'node:child_process';
 // The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
-const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
+const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'other' };
 const PASSWORD = 'Reimsys#2026';
 let failed = 0, passed = 0;
 

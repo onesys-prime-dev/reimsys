@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
+import { CLASSIFICATIONS, CLASSIFICATION_LABEL, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { Field, Icon, useToast } from '../ui';
@@ -12,32 +12,33 @@ const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
 /** Everything on the form, as text, exactly as typed. Turned into numbers and flags only when it is checked or saved. */
 interface FormState {
   bir: '' | 'yes' | 'no';
+  underCo: '' | 'yes' | 'no';
   seenCompany: boolean; seenTin: boolean; seenAddress: boolean;
-  noBirReason: string;
+  spendReason: string; classification: '' | (typeof CLASSIFICATIONS)[number];
   date: string; invoiceNo: string; payee: string; vendorAddress: string; vendorTin: string; amount: string; type: '' | 'product' | 'service';
   vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string;
   withheld: '' | 'yes' | 'no'; whtRate: string; whtAmount: string;
   description: string;
 }
 const EMPTY: FormState = {
-  bir: '', seenCompany: false, seenTin: false, seenAddress: false, noBirReason: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
+  bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
   type: '', vatType: '', vatable: '', vat: '', withheld: '', whtRate: '', whtAmount: '', description: '',
 };
 
-type StepId = 'bir' | 'company' | 'reason' | 'invoice' | 'vat' | 'wht' | 'evidence';
+type StepId = 'bir' | 'underco' | 'company' | 'invoice' | 'vat' | 'wht' | 'spend' | 'evidence';
 const STEP_TITLE: Record<StepId, string> = {
-  bir: 'Reimbursement details', company: 'Invoice under the company', reason: 'No BIR-registered invoice', invoice: 'Invoice details', vat: 'VAT details', wht: 'Withholding tax', evidence: 'Proof and review',
+  bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Withholding tax', spend: 'Reason for spending', evidence: 'Proof and review',
 };
 const STEP_FIELDS: Record<StepId, string[]> = {
-  bir: ['birInvoice'], company: ['seenCompany', 'seenTin', 'seenAddress'], reason: ['noBirReason'],
+  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
   vat: ['vatType', 'vatableAmount', 'vatAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
-  birInvoice: f.bir, seenCompany: f.bir === 'yes' ? f.seenCompany : null, seenTin: f.bir === 'yes' ? f.seenTin : null, seenAddress: f.bir === 'yes' ? f.seenAddress : null,
-  noBirReason: f.noBirReason, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
-  transactionType: f.type, vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
+  birInvoice: f.bir, invoiceUnderCompany: f.bir === 'yes' ? f.underCo : '', seenCompany: f.underCo === 'yes' ? f.seenCompany : null, seenTin: f.underCo === 'yes' ? f.seenTin : null, seenAddress: f.underCo === 'yes' ? f.seenAddress : null,
+  reasonForSpending: f.spendReason, classification: f.classification, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
+  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
 const fromReceipt = (r: ReceiptDetail): FormState => {
@@ -45,7 +46,8 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
   const yn = (v: boolean | null) => (v === null ? '' : v ? 'yes' : 'no');
   const n = (v: number | null) => (v === null ? '' : String(v));
   return {
-    bir: yn(x.birInvoice), seenCompany: !!x.seenCompany, seenTin: !!x.seenTin, seenAddress: !!x.seenAddress, noBirReason: x.noBirReason ?? '',
+    bir: yn(x.birInvoice), underCo: x.birInvoice ? (x.invoiceUnderCompany === null ? 'yes' : yn(x.invoiceUnderCompany)) : '', seenCompany: !!x.seenCompany, seenTin: !!x.seenTin, seenAddress: !!x.seenAddress,
+    spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
     type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount),
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
@@ -110,12 +112,15 @@ export function ReceiptFormPage() {
   // The steps follow the client's form, and skip whatever the answers make unnecessary.
   const steps = useMemo<StepId[]>(() => {
     const s: StepId[] = ['bir'];
-    if (f.bir === 'yes') s.push('company'); else if (f.bir === 'no') s.push('reason');
+    if (f.bir === 'yes') { s.push('underco'); if (f.underCo === 'yes') s.push('company'); }
     s.push('invoice');
-    if (f.bir === 'yes') { s.push('vat'); if (f.withheld === 'yes') s.push('wht'); }
+    const taxWithheld = f.bir === 'yes' && rules.askWithholding && f.withheld === 'yes';
+    if (f.bir === 'yes') { s.push('vat'); if (taxWithheld) s.push('wht'); }
+    // As in the client's chart, a receipt with withheld tax finishes after the withholding step; every other path asks why the money was spent.
+    if (!taxWithheld) s.push('spend');
     s.push('evidence');
     return s;
-  }, [f.bir, f.withheld]);
+  }, [f.bir, f.underCo, f.withheld, rules.askWithholding]);
   const step = steps[Math.min(stepIx, steps.length - 1)]!;
 
   const files = rec?.evidence ?? [];
@@ -235,9 +240,19 @@ export function ReceiptFormPage() {
           {step === 'bir' && (
             <div className="form">
               <div className="full">
-                <div className="q">With BIR-registered invoice under <b>{co.name}</b>? <i>*</i></div>
-                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'The invoice is addressed to the company' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'There is no registered invoice, so you will explain why' }] : [])]} />
+                <div className="q">With BIR-registered invoice? <i>*</i></div>
+                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
                 {e.birInvoice && <span className="err">{e.birInvoice}</span>}
+              </div>
+            </div>
+          )}
+
+          {step === 'underco' && (
+            <div className="form">
+              <div className="full">
+                <div className="q">Invoice under <b>{co.name}</b>? <i>*</i></div>
+                <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
+                {e.invoiceUnderCompany && <span className="err">{e.invoiceUnderCompany}</span>}
               </div>
             </div>
           )}
@@ -251,28 +266,19 @@ export function ReceiptFormPage() {
             </div>
           )}
 
-          {step === 'reason' && (
-            <div className="form">
-              <div className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>This will get a closer look</b><span>The Checker decides whether a receipt without a BIR-registered invoice can be reimbursed.</span></div></div>
-              <Field label="Why is there no BIR-registered invoice?" className="full" error={e.noBirReason}>
-                <textarea rows={4} value={f.noBirReason} maxLength={500} onChange={(ev) => set('noBirReason', ev.target.value, 'noBirReason')} placeholder="For example: small store that only gave an acknowledgement receipt" autoFocus />
-              </Field>
-            </div>
-          )}
-
           {step === 'invoice' && (
             <div className="form">
-              <Field label={required ? 'Invoice date' : 'Date on the receipt'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
-              <Field label="Invoice no." hint={required && rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>
+              <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
+              {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
               <Field label="Vendor complete name" className="full" error={e.payee}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
-              <Field label="Vendor complete address" hint={required && rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
-              <Field label="Vendor Tax ID No. (TIN)" hint={required && rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>
-              <Field label="Invoice gross amount, without any deduction (PHP)" error={e.amount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
-              <div className="full">
+              <Field label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
+              {required && <Field label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>}
+              <Field label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
+              {required && <div className="full">
                 <div className="q">Business transaction? <i>*</i></div>
                 <Choice name="Business transaction" value={f.type} onChange={(v) => set('type', v, 'transactionType')} options={[{ value: 'product', label: 'Product' }, { value: 'service', label: 'Service' }]} />
                 {e.transactionType && <span className="err">{e.transactionType}</span>}
-              </div>
+              </div>}
               {warnings.filter((w) => w.includes('TIN')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><span>{w}</span></div></div>)}
             </div>
           )}
@@ -300,6 +306,19 @@ export function ReceiptFormPage() {
               <Field label="Withholding tax rate (%)" error={e.whtRate}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
               <Field label="Withholding tax amount (PHP)" error={e.whtAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" /></Field>
               {warnings.filter((w) => w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
+            </div>
+          )}
+
+          {step === 'spend' && (
+            <div className="form">
+              <Field label="Specific reason for spending" className="full" error={e.reasonForSpending}>
+                <textarea rows={3} value={f.spendReason} maxLength={300} onChange={(ev) => set('spendReason', ev.target.value, 'reasonForSpending')} placeholder="What was the money spent on, and why?" autoFocus />
+              </Field>
+              <div className="full">
+                <div className="q">Classification <i>*</i></div>
+                <Choice name="Classification" value={f.classification} onChange={(v) => set('classification', v, 'classification')} options={CLASSIFICATIONS.map((c) => ({ value: c, label: CLASSIFICATION_LABEL[c] }))} />
+                {e.classification && <span className="err">{e.classification}</span>}
+              </div>
             </div>
           )}
 
@@ -335,11 +354,13 @@ export function ReceiptFormPage() {
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
                 <div className="review">
                   {inv('BIR-registered invoice', f.bir === 'yes' ? 'Yes' : f.bir === 'no' ? 'No' : '-')}
-                  {f.bir === 'no' && inv('Reason', f.noBirReason || '-')}
                   {inv('Vendor', f.payee || '-')}
-                  {inv('Invoice no. · date', `${f.invoiceNo || '-'} · ${f.date || '-'}`)}
+                  {inv(f.bir === 'yes' ? 'Invoice no. · date' : 'Date', f.bir === 'yes' ? `${f.invoiceNo || '-'} · ${f.date || '-'}` : f.date || '-')}
                   {f.vendorTin && inv('Vendor TIN', f.vendorTin)}
-                  {inv('Type', f.type ? TRANSACTION_LABEL[f.type] : '-')}
+                  {f.bir === 'yes' && inv('Invoice under the company', f.underCo === 'yes' ? 'Yes' : f.underCo === 'no' ? 'No' : '-')}
+                  {f.bir === 'yes' && inv('Type', f.type ? TRANSACTION_LABEL[f.type] : '-')}
+                  {steps.includes('spend') && inv('Reason for spending', f.spendReason || '-')}
+                  {steps.includes('spend') && inv('Classification', f.classification ? CLASSIFICATION_LABEL[f.classification] : '-')}
                   {inv('Gross amount', money(f.amount))}
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
                   {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}

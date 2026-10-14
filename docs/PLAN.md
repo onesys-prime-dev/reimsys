@@ -216,3 +216,13 @@ The work lives on its own branch, so `main` is untouched until it is merged.
 1. **Before merging:** just do not merge, or switch back with `git checkout main`. The git tag `before-client-form` marks the exact starting point.
 2. **Database:** the migration only adds columns and makes the category optional. Old code keeps working on the new database as long as every receipt has a category (new receipts do not). `docs/rollback-client-form.sql` removes the new columns and gives category-less receipts a category first.
 3. **Full restore:** a complete backup of the database and the evidence files was taken just before starting (`reimsys-backups/before-client-form-*.sql` and `storage-before-client-form.tgz`, next to the project folder). Restoring it loses anything done since.
+
+### Form flow updated to the client's flow chart (reimbursement_form_flow_spacious.png)
+1. **Reimbursement details:** With BIR-registered invoice? Yes / No.
+2. **No:** a short screen (date, vendor name, vendor address, amount paid to vendor), then the reason for spending.
+3. **Yes:** "Invoice under SOLARA PHARMA CORP.?" Yes leads to the company check (three ticks); No skips the ticks. Then the BIR invoice details (date, invoice no., vendor name, address, TIN, gross amount, Product / Service), then VAT details.
+4. **Withheld tax: Yes** leads to the withholding step and the form finishes there (as drawn: no reason for spending). **No** leads to the reason for spending.
+5. **Reason for spending:** a specific reason and one classification (Fuel, Representation, Meal, Meeting/seminar/convention, Transportation, Parking, Printing or photocopying, Other).
+6. **Proof and review:** proof stays required (up to the file limit in Settings), then submit. The chart's "Review the details?" question, the "new reimbursement code" and the "reference no. cancellation" are left out: REIMSYS shows a review page, numbers every receipt, and keeps the history.
+
+Changes in data: three new optional columns (`invoiceUnderCompany`, `reasonForSpending`, `classification`; migration `20261015010000_form_flow`, undone by the second part of `docs/rollback-client-form.sql`). The written "no BIR reason" is no longer asked. Product / Service is asked only on the BIR path; reports fall back to the classification for receipts without a BIR invoice. The Checker's "seen / not seen" answers are asked only when the invoice is under the company.

@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 // The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
-const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
+const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'other' };
 
 const BASE = process.env.WEB ?? 'http://localhost:4000';
 const API = BASE + '/api';
@@ -122,7 +122,7 @@ check('an enormous request body is refused', bigJson.status === 413 || bigJson.s
 check('malformed JSON gets a clean error, not a crash', [400, 413].includes((await raw('POST', '/receipts', { cookie: ana, body: '{"payee": ' })).status));
 check('a number where text is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: { $ne: 1 }, receiptDate: '2026-10-11', amount: 1, ...F } })).status === 400);
 check('an array where a number is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: 'Ok Name', receiptDate: '2026-10-11', amount: [1, 2], ...F } })).status === 400);
-check('a "__proto__" key does not poison anything', (await raw('POST', '/receipts', { cookie: ana, body: '{"payee":"Proto Test","receiptDate":"2026-10-11","amount":1,"birInvoice":false,"noBirReason":"no invoice here","transactionType":"product","__proto__":{"isAdmin":true},"constructor":{"prototype":{"x":1}}}' })).status < 500 && (await raw('GET', '/me', { cookie: ana })).data.user.role.code === 'medref');
+check('a "__proto__" key does not poison anything', (await raw('POST', '/receipts', { cookie: ana, body: '{"payee":"Proto Test","receiptDate":"2026-10-11","amount":1,"birInvoice":false,"vendorAddress":"Test Street","reasonForSpending":"Test receipt","classification":"other","__proto__":{"isAdmin":true},"constructor":{"prototype":{"x":1}}}' })).status < 500 && (await raw('GET', '/me', { cookie: ana })).data.user.role.code === 'medref');
 const err500 = await raw('GET', '/receipts/abc', { cookie: ana });
 check('a bad id is a clean "not found", with no stack trace', err500.status === 404 && !/at .*\.(ts|js):\d+|node_modules|Prisma/.test(err500.text));
 check('error messages never mention the database or file paths', ![await raw('GET', '/receipts?page=-1', { cookie: ana }), await raw('POST', '/receipts', { cookie: ana, body: 'not json' })].some((r) => /prisma|mysql|C:\\|\/usr\/|stack/i.test(r.text)));

@@ -62,11 +62,19 @@ const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'fa
 export const TRANSACTION_TYPES = ['product', 'service'] as const;
 export const VAT_TYPES = ['vatable', 'non_vatable'] as const;
 export const TRANSACTION_LABEL: Record<(typeof TRANSACTION_TYPES)[number], string> = { product: 'Product', service: 'Service' };
+export const CLASSIFICATIONS = ['fuel', 'representation', 'meal', 'meeting', 'transportation', 'parking', 'printing', 'other'] as const;
+export const CLASSIFICATION_LABEL: Record<(typeof CLASSIFICATIONS)[number], string> = {
+  fuel: 'Fuel', representation: 'Representation', meal: 'Meal', meeting: 'Meeting, seminar or convention', transportation: 'Transportation',
+  parking: 'Parking', printing: 'Printing or photocopying', other: 'Other',
+};
 export const VAT_LABEL: Record<(typeof VAT_TYPES)[number], string> = { vatable: 'Vatable', non_vatable: 'Non-vatable' };
 
 /** The client's reimbursement form. What is required depends on the answers, so it is checked as a whole. */
 const receiptShape = z.object({
   birInvoice: flag,
+  invoiceUnderCompany: optional(flag),
+  reasonForSpending: optional(z.string().trim().max(300)),
+  classification: optional(z.enum(CLASSIFICATIONS)),
   seenCompany: optional(z.boolean()),
   seenTin: optional(z.boolean()),
   seenAddress: optional(z.boolean()),
@@ -77,7 +85,7 @@ const receiptShape = z.object({
   vendorAddress: optional(z.string().trim().max(300)),
   vendorTin: optional(z.string().trim().max(30)),
   amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
-  transactionType: z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) }),
+  transactionType: optional(z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) })),
   vatType: optional(z.enum(VAT_TYPES)),
   vatableAmount: optional(money('vatable amount')),
   vatAmount: optional(money('VAT amount')),
@@ -89,18 +97,24 @@ const receiptShape = z.object({
 
 /** What the "it depends on the answers" rules look at. Every field may be missing. */
 interface Answers {
-  birInvoice?: boolean | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
+  birInvoice?: boolean | null; invoiceUnderCompany?: boolean | null; reasonForSpending?: string | null; classification?: string | null; transactionType?: string | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
   invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
   vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
+const needsReason = (d: Answers, rules: AppSettings) => d.birInvoice === false || (d.birInvoice === true && !(rules.askWithholding && d.withheld === true));
+
 function conditionalIssues(d: Answers, rules: AppSettings): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [];
   const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };
   const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) out.push({ path, message }); };
   if (d.birInvoice === true) {
-    need(d.seenCompany, 'seenCompany', 'Tick to confirm the company name can be seen completely on the invoice.');
-    need(d.seenTin, 'seenTin', 'Tick to confirm the TIN can be seen completely on the invoice.');
-    need(d.seenAddress, 'seenAddress', 'Tick to confirm the complete address can be seen on the invoice.');
+    missing(d.invoiceUnderCompany, 'invoiceUnderCompany', 'Choose Yes or No.');
+    if (d.invoiceUnderCompany === true) {
+      need(d.seenCompany, 'seenCompany', 'Tick to confirm the company name can be seen completely on the invoice.');
+      need(d.seenTin, 'seenTin', 'Tick to confirm the TIN can be seen completely on the invoice.');
+      need(d.seenAddress, 'seenAddress', 'Tick to confirm the complete address can be seen on the invoice.');
+    }
+    need(d.transactionType, 'transactionType', 'Choose Product or Service.');
     if (rules.requireInvoiceNo) need(d.invoiceNo, 'invoiceNo', 'Enter the invoice number.');
     if (rules.requireVendorAddress) need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
     if (rules.requireVendorTin) need(d.vendorTin, 'vendorTin', 'Enter the vendor TIN.');
@@ -114,8 +128,13 @@ function conditionalIssues(d: Answers, rules: AppSettings): { path: string; mess
     }
   } else if (d.birInvoice === false && !rules.allowNoBir) {
     out.push({ path: 'birInvoice', message: 'Receipts without a BIR-registered invoice are not accepted.' });
-  } else if (d.birInvoice === false && (!d.noBirReason || d.noBirReason.length < 5)) {
-    out.push({ path: 'noBirReason', message: 'Explain why there is no BIR-registered invoice.' });
+  } else if (d.birInvoice === false) {
+    need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
+  }
+  // The reason and classification are asked on every path except when tax was withheld, which finishes right after that step.
+  if (needsReason(d, rules)) {
+    need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
+    need(d.classification, 'classification', 'Choose a classification.');
   }
   return out;
 }
@@ -139,7 +158,7 @@ export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings
   const b = (v: unknown) => (v === true || v === 'yes' || v === 'true' ? true : v === false || v === 'no' || v === 'false' ? false : null);
   const t = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
   for (const i of conditionalIssues({
-    birInvoice: b(raw.birInvoice), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
+    birInvoice: b(raw.birInvoice), invoiceUnderCompany: b(raw.invoiceUnderCompany), reasonForSpending: t(raw.reasonForSpending), classification: t(raw.classification), transactionType: t(raw.transactionType), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
     invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
     vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
   }, rules)) out[i.path] ||= i.message;
@@ -233,14 +252,19 @@ export function receiptWarnings(f: FormFigures, rules: AppSettings = DEFAULT_SET
 /** The fields the form saves, cleaned so that answers that no longer apply are not kept. */
 export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETTINGS) {
   const bir = d.birInvoice;
+  const under = bir && d.invoiceUnderCompany === true;
   const wht = bir && rules.askWithholding && d.withheld === true;
   const t = (v: string | null | undefined) => (v ? v : null);
+  const reason = needsReason({ birInvoice: bir, withheld: d.withheld }, rules);
   return {
     birInvoice: bir,
-    seenCompany: bir ? !!d.seenCompany : null, seenTin: bir ? !!d.seenTin : null, seenAddress: bir ? !!d.seenAddress : null,
-    noBirReason: bir ? null : t(d.noBirReason),
-    invoiceNo: t(d.invoiceNo), vendorAddress: t(d.vendorAddress), vendorTin: t(d.vendorTin),
-    transactionType: d.transactionType,
+    invoiceUnderCompany: bir ? d.invoiceUnderCompany ?? null : null,
+    seenCompany: under ? !!d.seenCompany : null, seenTin: under ? !!d.seenTin : null, seenAddress: under ? !!d.seenAddress : null,
+    noBirReason: null,
+    invoiceNo: bir ? t(d.invoiceNo) : null, vendorAddress: t(d.vendorAddress), vendorTin: bir ? t(d.vendorTin) : null,
+    transactionType: bir ? d.transactionType ?? null : null,
+    reasonForSpending: reason ? t(d.reasonForSpending) : null,
+    classification: reason ? d.classification ?? null : null,
     vatType: bir ? d.vatType ?? null : null,
     vatableAmount: bir ? d.vatableAmount ?? null : null,
     vatAmount: bir ? d.vatAmount ?? null : null,

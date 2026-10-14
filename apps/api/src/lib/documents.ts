@@ -54,9 +54,11 @@ export async function buildReimbursementPdf(receiptId: number) {
   if (r.vendorTin) row('Vendor TIN', r.vendorTin);
   row('Invoice no.', r.invoiceNo || '-');
   row('Invoice date', fmtDate(r.receiptDate));
-  row('Type', typeLabel(r));
+  if (r.transactionType) row('Type', typeLabel(r));
   row('BIR-registered invoice', r.birInvoice === null ? '-' : r.birInvoice ? 'Yes' : 'No');
-  if (r.birInvoice === false && r.noBirReason) row('Reason (no BIR invoice)', r.noBirReason);
+  if (r.birInvoice && r.invoiceUnderCompany !== null) row('Invoice under the company', r.invoiceUnderCompany ? 'Yes' : 'No');
+  if (r.classification) row('Classification', typeLabel({ transactionType: null, classification: r.classification, category: null }));
+  if (r.reasonForSpending) row('Reason for spending', r.reasonForSpending);
   if (r.birInvoice) {
     row('VAT', r.vatType === 'vatable' ? 'Vatable' : r.vatType === 'non_vatable' ? 'Non-vatable' : '-');
     row('Vatable amount', money(r.vatableAmount));

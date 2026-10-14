@@ -6,7 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
-  cleanFormData, VAT_LABEL,
+  cleanFormData, VAT_LABEL, CLASSIFICATION_LABEL,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -77,8 +77,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'No-BIR reason', 'Description', 'Encoded by', 'Document no.'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), r.noBirReason ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '']);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), r.classification ? CLASSIFICATION_LABEL[r.classification as keyof typeof CLASSIFICATION_LABEL] ?? r.classification : '', r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '']);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -90,7 +90,7 @@ receiptsRouter.get('/export', async (req, res) => {
   ws.addRow(head).font = { bold: true };
   data.forEach((d) => ws.addRow(d));
   for (const c of [10, 12, 13, 15, 16]) ws.getColumn(c).numFmt = '#,##0.00';
-  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 28, 30, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 22, 30, 30, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`receipts-${stamp}.xlsx`).send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
@@ -145,7 +145,8 @@ receiptsRouter.post('/:id/copy', requirePerm('receipt.create'), async (req, res)
     tx.receipt.create({
       data: {
         refNo: await nextReceiptRef(tx), encoderId: r.encoderId, payee: r.payee, receiptDate: r.receiptDate, amount: r.amount, categoryId: r.categoryId, description: r.description,
-        birInvoice: r.birInvoice, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason, invoiceNo: r.invoiceNo,
+        birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification,
+        seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason, invoiceNo: r.invoiceNo,
         vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType, vatType: r.vatType, vatableAmount: r.vatableAmount,
         vatAmount: r.vatAmount, withheld: r.withheld, whtRate: r.whtRate, whtAmount: r.whtAmount,
       },
@@ -272,7 +273,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     const n = await prisma.receiptEvidence.count({ where: { receiptId: r.id, deletedAt: null } });
     if (!n) throw badRequest('Add at least one photo or PDF of the receipt before submitting.', 'NO_EVIDENCE');
     // Receipts made before the form changed, or imported from the old template, have no invoice answers yet.
-    if (r.birInvoice === null || !r.transactionType) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
+    if (r.birInvoice === null || (r.birInvoice && !r.transactionType)) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
     if (getSettings().warningsBlock) {
       const num = (v: { toString(): string } | null) => (v === null ? null : Number(v));
       const w = receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings());
@@ -302,7 +303,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     });
     if (!viewed) throw badRequest('Open the evidence before marking this checked.', 'EVIDENCE_NOT_VIEWED');
     // A receipt with a BIR invoice needs the Checker's own answer on the company name, TIN and address. Anything not seen needs a reason.
-    if (r.birInvoice) {
+    if (r.birInvoice && r.invoiceUnderCompany !== false) {
       if (!body.seen) throw badRequest('Confirm whether the company name, TIN and address can be seen completely on the invoice.', 'SEEN_REQUIRED');
       if ((!body.seen.company || !body.seen.tin || !body.seen.address) && !note) throw badRequest('Say what could not be seen on the invoice.', 'NOTE_REQUIRED');
     }
