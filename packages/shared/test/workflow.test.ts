@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_GRANTS, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
-  changePasswordSchema, cleanFormData, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
+  DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
 } from '../src/index';
 
 const perms = (...p: string[]) => new Set(p);
@@ -127,6 +127,27 @@ describe('validation', () => {
     expect(receiptWarnings({ ...ok, withheld: true, whtRate: 2, whtAmount: 20 })).toEqual([]);
     expect(receiptWarnings({ ...ok, vendorTin: 'abc' })[0]).toMatch(/TIN/);
     expect(receiptWarnings({ birInvoice: false, amount: 350 })).toEqual([]);
+  });
+
+  it('follows the administrator settings', () => {
+    const rules = { ...DEFAULT_SETTINGS, allowNoBir: false, requireVendorTin: false, askWithholding: false, vatRate: 10 };
+    const f = (input: object, r = rules) => { const x = makeReceiptSchema(r).safeParse(input); return x.success ? [] : x.error.issues.map((i) => String(i.path[0])); };
+    expect(f({ birInvoice: 'no', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', transactionType: 'product', noBirReason: 'No invoice at all' })).toEqual(['birInvoice']);
+    expect(f({ ...base, vendorTin: undefined, withheld: undefined })).toEqual([]);
+    expect(f({ ...base, vendorTin: undefined }, DEFAULT_SETTINGS)).toContain('vendorTin');
+    const okVat = { birInvoice: true, amount: 1100, vatType: 'vatable', vatableAmount: 1000, vatAmount: 100 };
+    expect(receiptWarnings(okVat, rules)).toEqual([]);
+    expect(receiptWarnings(okVat).length).toBeGreaterThan(0); // 12% is the default, so 100 on 1,000 is flagged
+    expect(receiptWarnings({ ...okVat, vatAmount: 100.5 }, { ...rules, tolerance: 1 })).toEqual([]);
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, withheld: 'yes', whtRate: '2', whtAmount: '20' }), rules)).toMatchObject({ withheld: false, whtRate: null });
+  });
+
+  it('refuses nonsense settings', () => {
+    expect(appSettingsSchema.safeParse(DEFAULT_SETTINGS).success).toBe(true);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, vatRate: 'abc' }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, sessionIdleMinutes: 1 }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxMb: 500 }).success).toBe(false);
+    expect(appSettingsSchema.safeParse({ ...DEFAULT_SETTINGS, evidenceMaxFiles: 0 }).success).toBe(false);
   });
 
   it('rejects zero, negative and future-dated receipts', () => {

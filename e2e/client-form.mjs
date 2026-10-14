@@ -150,6 +150,39 @@ const done = await until(async () => { const l = (await ana.get('/reports')).dat
 check('Excel and PDF reports are produced too', done && done.every((x) => x.status === 'ready'), JSON.stringify(done));
 
 console.log('\nCompany details');
+console.log('\nAdministrator settings');
+const s0 = (await ana.get('/app-settings')).data;
+check('anyone signed in can read the settings', s0?.settings?.vatRate === 12 && s0.defaults.vatRate === 12, JSON.stringify(s0));
+check('a Med Ref cannot change them', (await ana.put('/app-settings', s0.settings)).status === 403);
+check('nonsense values are refused', (await admin.put('/app-settings', { ...s0.settings, vatRate: 'abc' })).status === 400 && (await admin.put('/app-settings', { ...s0.settings, sessionIdleMinutes: 1 })).status === 400);
+try {
+  await admin.put('/app-settings', { ...s0.settings, allowNoBir: false, requireVendorTin: false, askWithholding: false });
+  check('with "no BIR" switched off it is refused', codes(await ana.post('/receipts', { ...none, noBirReason: 'Only an acknowledgement receipt' })).includes('birInvoice'));
+  const noTin = await ana.post('/receipts', full({ invoiceNo: 'S1-' + stamp, vendorTin: '', withheld: undefined }));
+  check('with the TIN made optional it is accepted, and withholding is not asked', noTin.status === 201 && noTin.data.receipt.form.withheld === false, JSON.stringify(noTin.data?.error));
+  await admin.put('/app-settings', { ...s0.settings, warningsBlock: true });
+  const bad = (await ana.post('/receipts', full({ invoiceNo: 'S2-' + stamp, vatAmount: 50 }))).data.receipt;
+  await ana.req('POST', '/receipts/' + bad.id + '/evidence', upload('blk' + stamp));
+  const cur = (await ana.get('/receipts/' + bad.id)).data.receipt;
+  check('with "stop on warnings" on, a receipt with wrong numbers cannot be submitted', (await ana.post('/receipts/' + bad.id + '/submit', { version: cur.version })).data?.error?.code === 'WARNINGS_BLOCK');
+  await admin.put('/app-settings', { ...s0.settings, warningsBlock: false });
+  check('and can be submitted once the setting is off', (await ana.post('/receipts/' + bad.id + '/submit', { version: cur.version })).data?.receipt?.status === 'submitted');
+  await admin.put('/app-settings', { ...s0.settings, evidenceMaxFiles: 1 });
+  const two = (await ana.post('/receipts', full({ invoiceNo: 'S3-' + stamp }))).data.receipt;
+  await ana.req('POST', '/receipts/' + two.id + '/evidence', upload('one' + stamp));
+  check('the file limit setting applies', (await ana.req('POST', '/receipts/' + two.id + '/evidence', upload('two' + stamp))).data?.error?.code === 'TOO_MANY_FILES');
+  await admin.put('/app-settings', { ...s0.settings, sessionIdleMinutes: 30 });
+  await sleep(300);
+  check('the idle limit applies at once', (await ana.get('/me')).data?.session?.idleMinutes === 30, JSON.stringify((await ana.get('/me')).data?.session));
+} finally {
+  await admin.put('/app-settings', s0.settings);
+}
+check('the settings are put back as they were', JSON.stringify((await ana.get('/app-settings')).data.settings) === JSON.stringify(s0.settings));
+const rs = await admin.post('/app-settings/reset');
+check('"reset to default" works', rs.status === 200 && JSON.stringify(rs.data.settings) === JSON.stringify(rs.data.defaults));
+await admin.put('/app-settings', s0.settings);
+check('changes appear in the audit log', (await admin.get('/audit?q=setting')).data?.items?.some((x) => /setting/.test(x.summary ?? '')));
+
 const co0 = (await ana.get('/company')).data.company;
 check('anyone signed in can read the company details', co0?.name && co0.tin && co0.address);
 check('a Med Ref cannot change them', (await ana.put('/company', { name: 'Hacked Corp', tin: '000', address: 'nowhere at all' })).status === 403);

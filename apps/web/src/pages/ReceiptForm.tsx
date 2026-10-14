@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { DEFAULT_COMPANY, EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSACTION_LABEL, VAT_LABEL, peso, receiptInputSchema, receiptProblems, receiptWarnings, type Company } from '@reimsys/shared';
+import { DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { Field, Icon, useToast } from '../ui';
@@ -34,10 +34,10 @@ const STEP_FIELDS: Record<StepId, string[]> = {
   vat: ['vatType', 'vatableAmount', 'vatAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
 };
 
-const toCandidate = (f: FormState) => ({
+const toCandidate = (f: FormState, rules: AppSettings) => ({
   birInvoice: f.bir, seenCompany: f.bir === 'yes' ? f.seenCompany : null, seenTin: f.bir === 'yes' ? f.seenTin : null, seenAddress: f.bir === 'yes' ? f.seenAddress : null,
   noBirReason: f.noBirReason, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
-  transactionType: f.type, vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: f.withheld, whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
+  transactionType: f.type, vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
 const fromReceipt = (r: ReceiptDetail): FormState => {
@@ -93,6 +93,10 @@ export function ReceiptFormPage() {
 
   const company = useQuery({ queryKey: ['company'], queryFn: () => api<{ company: Company }>('/company') });
   const co = company.data?.company ?? DEFAULT_COMPANY;
+  const appSet = useQuery({ queryKey: ['app-settings'], queryFn: () => api<{ settings: AppSettings }>('/app-settings') });
+  const rules = appSet.data?.settings ?? DEFAULT_SETTINGS;
+  const MAX_FILES = rules.evidenceMaxFiles;
+  const MAX_BYTES = rules.evidenceMaxMb * 1_048_576;
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
   const rec = existing.data?.receipt;
 
@@ -125,14 +129,14 @@ export function ReceiptFormPage() {
     return receiptWarnings({
       birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat),
       withheld: f.withheld === '' ? null : f.withheld === 'yes', whtRate: n(f.whtRate), whtAmount: n(f.whtAmount),
-    });
-  }, [f]);
+    }, rules);
+  }, [f, rules]);
 
   /** Problems in the whole form, grouped by the field they belong to. */
   const validate = () => {
-    const candidate = toCandidate(f);
-    const errs = receiptProblems(candidate);
-    return { parsed: receiptInputSchema.safeParse(candidate), errs };
+    const candidate = toCandidate(f, rules);
+    const errs = receiptProblems(candidate, rules);
+    return { parsed: makeReceiptSchema(rules).safeParse(candidate), errs };
   };
 
   function next() {
@@ -149,11 +153,11 @@ export function ReceiptFormPage() {
     const incoming = Array.from(list);
     const nextFiles: File[] = [];
     for (const x of incoming) {
-      if (x.size > EVIDENCE_MAX_BYTES) { toast(`"${x.name}" is over 10 MB.`, 'bad'); continue; }
+      if (x.size > MAX_BYTES) { toast(`"${x.name}" is over ${rules.evidenceMaxMb} MB.`, 'bad'); continue; }
       if (!ACCEPT.split(',').includes(x.type) && !/\.(heic|pdf|jpe?g|png|webp)$/i.test(x.name)) { toast(`"${x.name}" is not a photo or PDF.`, 'bad'); continue; }
       nextFiles.push(x);
     }
-    if (files.length + queued.length + nextFiles.length > EVIDENCE_MAX_FILES) { toast(`A receipt can have up to ${EVIDENCE_MAX_FILES} files.`, 'bad'); return; }
+    if (files.length + queued.length + nextFiles.length > MAX_FILES) { toast(`A receipt can have up to ${MAX_FILES} files.`, 'bad'); return; }
     setQueued((q) => [...q, ...nextFiles]);
     setErrors((e) => ({ ...e, evidence: '' }));
   }
@@ -232,7 +236,7 @@ export function ReceiptFormPage() {
             <div className="form">
               <div className="full">
                 <div className="q">With BIR-registered invoice under <b>{co.name}</b>? <i>*</i></div>
-                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'The invoice is addressed to the company' }, { value: 'no', label: 'No', sub: 'There is no registered invoice, so you will explain why' }]} />
+                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'The invoice is addressed to the company' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'There is no registered invoice, so you will explain why' }] : [])]} />
                 {e.birInvoice && <span className="err">{e.birInvoice}</span>}
               </div>
             </div>
@@ -259,10 +263,10 @@ export function ReceiptFormPage() {
           {step === 'invoice' && (
             <div className="form">
               <Field label={required ? 'Invoice date' : 'Date on the receipt'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
-              <Field label="Invoice no." hint={required ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>
+              <Field label="Invoice no." hint={required && rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>
               <Field label="Vendor complete name" className="full" error={e.payee}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
-              <Field label="Vendor complete address" hint={required ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
-              <Field label="Vendor Tax ID No. (TIN)" hint={required ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>
+              <Field label="Vendor complete address" hint={required && rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
+              <Field label="Vendor Tax ID No. (TIN)" hint={required && rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>
               <Field label="Invoice gross amount, without any deduction (PHP)" error={e.amount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
               <div className="full">
                 <div className="q">Business transaction? <i>*</i></div>
@@ -282,11 +286,11 @@ export function ReceiptFormPage() {
               </div>
               <Field label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
               <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" /></Field>
-              <div className="full">
+              {rules.askWithholding && <div className="full">
                 <div className="q">Withheld tax? <i>*</i></div>
                 <Choice name="Withheld tax" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
                 {e.withheld && <span className="err">{e.withheld}</span>}
-              </div>
+              </div>}
               {warnings.filter((w) => !w.includes('TIN') && !w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
             </div>
           )}
@@ -302,10 +306,10 @@ export function ReceiptFormPage() {
           {step === 'evidence' && (
             <div className="form">
               <div className="full">
-                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {EVIDENCE_MAX_FILES}</span></div>
+                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {MAX_FILES}</span></div>
                 <div className={`drop ${over ? 'over' : ''}`} onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
                   <Icon name="upload" />
-                  <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to 10 MB each</div>
+                  <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to {rules.evidenceMaxMb} MB each</div>
                   <div className="btns">
                     <button type="button" className="btn" onClick={() => { pick.current?.removeAttribute('capture'); pick.current?.click(); }}><Icon name="upload" size={18} />Choose files</button>
                     <button type="button" className="btn" onClick={() => { pick.current?.setAttribute('capture', 'environment'); pick.current?.click(); }}><Icon name="camera" size={18} />Take photo</button>
@@ -325,7 +329,7 @@ export function ReceiptFormPage() {
                 </div>
               </div>
 
-              <Field label="Description" hint="Optional" className="full"><input type="text" value={f.description} onChange={(ev) => set('description', ev.target.value)} placeholder="What was this for?" maxLength={500} /></Field>
+              {rules.showDescription && <Field label="Description" hint="Optional" className="full"><input type="text" value={f.description} onChange={(ev) => set('description', ev.target.value)} placeholder="What was this for?" maxLength={500} /></Field>}
 
               <div className="full">
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
@@ -338,7 +342,7 @@ export function ReceiptFormPage() {
                   {inv('Type', f.type ? TRANSACTION_LABEL[f.type] : '-')}
                   {inv('Gross amount', money(f.amount))}
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
-                  {f.bir === 'yes' && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
+                  {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}
               </div>

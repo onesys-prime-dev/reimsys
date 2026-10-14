@@ -5,6 +5,7 @@ import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';
 import { EmailTemplatesTab } from './EmailTemplates';
+import { AppSettingsTab } from './AppSettings';
 import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '../ui';
 
 interface UserRow {
@@ -14,18 +15,19 @@ interface UserRow {
 
 export function AccessPage() {
   const { can } = useAuth();
-  const [tab, setTab] = useState<'users' | 'perms' | 'company' | 'mail' | 'tpl'>(can('user.manage') ? 'users' : 'perms');
+  const [tab, setTab] = useState<'users' | 'perms' | 'settings' | 'company' | 'mail' | 'tpl'>(can('user.manage') ? 'users' : 'perms');
   return (
     <>
       <div className="ph"><div><h1>Access control</h1><p>Manage who can sign in and what each role can do.</p></div></div>
       <div className="tabs" role="tablist">
         {can('user.manage') && <button role="tab" aria-selected={tab === 'users'} className={tab === 'users' ? 'on' : ''} onClick={() => setTab('users')}>Users</button>}
         <button role="tab" aria-selected={tab === 'perms'} className={tab === 'perms' ? 'on' : ''} onClick={() => setTab('perms')}>Roles and permissions</button>
+        {can('settings.manage') && <button role="tab" aria-selected={tab === 'settings'} className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>}
         {can('settings.manage') && <button role="tab" aria-selected={tab === 'company'} className={tab === 'company' ? 'on' : ''} onClick={() => setTab('company')}>Company</button>}
         {can('settings.manage') && <button role="tab" aria-selected={tab === 'mail'} className={tab === 'mail' ? 'on' : ''} onClick={() => setTab('mail')}>Email</button>}
         {can('settings.manage') && <button role="tab" aria-selected={tab === 'tpl'} className={tab === 'tpl' ? 'on' : ''} onClick={() => setTab('tpl')}>Email templates</button>}
       </div>
-      {tab === 'users' ? <UsersTab /> : tab === 'company' ? <CompanyTab /> : tab === 'mail' ? <EmailSettingsTab /> : tab === 'tpl' ? <EmailTemplatesTab /> : <PermsTab />}
+      {tab === 'users' ? <UsersTab /> : tab === 'settings' ? <AppSettingsTab /> : tab === 'company' ? <CompanyTab /> : tab === 'mail' ? <EmailSettingsTab /> : tab === 'tpl' ? <EmailTemplatesTab /> : <PermsTab />}
     </>
   );
 }

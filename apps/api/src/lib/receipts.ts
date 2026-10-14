@@ -1,7 +1,8 @@
 import type { Prisma } from '@prisma/client';
-import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
+import { getSettings } from './appSettings.js';
 import type { AuthContext } from '../types.js';
 
 /** Which receipts this user may see. Driven by permissions, not role names. */
@@ -85,18 +86,18 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     ...receiptBrief(r),
     description: r.description,
     form: receiptForm(r),
-    warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }),
+    warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }, getSettings()),
     checkedBy: name(r.checkedById), checkedAt: r.checkedAt, checkNote: r.checkNote,
     decidedBy: name(r.decidedById), decidedAt: r.decidedAt, decisionNote: r.decisionNote,
     lastNote: r.lastNote,
     createdAt: r.createdAt,
     isOwner,
     canEdit: isOwner && auth.permissions.has('receipt.create') && canEditReceipt(status),
-    actions: availableActions(status, auth.permissions, isOwner).filter((t) => t.action !== 'undo' || (r.decidedById === auth.user.id && !!r.decidedAt && Date.now() - r.decidedAt.getTime() <= UNDO_WINDOW_MINUTES * 60_000)).map((t) => ({ action: t.action, note: t.note })),
+    actions: availableActions(status, auth.permissions, isOwner).filter((t) => t.action !== 'undo' || (r.decidedById === auth.user.id && !!r.decidedAt && Date.now() - r.decidedAt.getTime() <= getSettings().undoMinutes * 60_000)).map((t) => ({ action: t.action, note: t.note })),
     evidence: evidence.map((e) => ({ id: e.id, fileName: e.fileName, mime: e.mime, size: e.size, createdAt: e.createdAt })),
     document: r.document ? { id: r.document.id, docNo: r.document.docNo, status: r.document.status } : null,
     canCopy: isOwner && status === 'disapproved',
-    undoUntil: r.decidedById === auth.user.id && r.decidedAt && (status === 'approved' || status === 'disapproved') ? new Date(r.decidedAt.getTime() + UNDO_WINDOW_MINUTES * 60_000).toISOString() : null,
+    undoUntil: r.decidedById === auth.user.id && r.decidedAt && (status === 'approved' || status === 'disapproved') ? new Date(r.decidedAt.getTime() + getSettings().undoMinutes * 60_000).toISOString() : null,
     canDelete: isOwner && auth.permissions.has('receipt.create') && status === 'draft',
     possibleDuplicates: dupes.map((d) => ({ id: d.id, refNo: d.refNo, status: d.status as ReceiptStatus, encoder: d.encoder.name })),
   };

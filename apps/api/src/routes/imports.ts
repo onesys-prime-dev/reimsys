@@ -3,7 +3,8 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { parse } from 'csv-parse/sync';
 import { assertSafeZip } from '../lib/zipGuard.js';
-import { cleanFormData, receiptInputSchema } from '@reimsys/shared';
+import { cleanFormData, makeReceiptSchema } from '@reimsys/shared';
+import { getSettings } from '../lib/appSettings.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
@@ -111,12 +112,12 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
         withheld: yesNo(r.withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
       } : { birInvoice: false, noBirReason: 'x'.repeat(5), transactionType: 'product' }),
     };
-    const parsed = receiptInputSchema.safeParse(candidate);
+    const parsed = makeReceiptSchema(getSettings()).safeParse(candidate);
     if (!parsed.success) {
       const label: Record<string, string> = { receiptDate: 'invoice_date', payee: 'vendor', amount: 'gross_amount', birInvoice: 'bir_invoice', transactionType: 'type', noBirReason: 'no_bir_reason', seenCompany: 'company_check', seenTin: 'company_check', seenAddress: 'company_check' };
       return void errors.push({ row: rowNo, message: parsed.error.issues.map((x) => `${label[String(x.path[0])] ?? x.path[0]}: ${x.message}`).join(' ') });
     }
-    valid.push({ payee: parsed.data.payee, receiptDate: parsed.data.receiptDate, amount: parsed.data.amount, description: parsed.data.description ?? null, form: full ? cleanFormData(parsed.data) : null, encoderId });
+    valid.push({ payee: parsed.data.payee, receiptDate: parsed.data.receiptDate, amount: parsed.data.amount, description: parsed.data.description ?? null, form: full ? cleanFormData(parsed.data, getSettings()) : null, encoderId });
   });
 
   const job = await prisma.importJob.create({

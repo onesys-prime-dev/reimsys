@@ -4,14 +4,15 @@ import rateLimit from 'express-rate-limit';
 import ExcelJS from 'exceljs';
 import type { Prisma } from '@prisma/client';
 import {
-  EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, receiptInputSchema,
-  type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, UNDO_WINDOW_MINUTES, bulkSchema, commentSchema,
+  EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
+  type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
   cleanFormData, VAT_LABEL,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { enqueue } from '../lib/jobs.js';
+import { getSettings } from '../lib/appSettings.js';
 import { receiptData } from '../lib/emailTemplates.js';
 import { notify, usersWithPermission } from '../lib/notify.js';
 import { assertOwner, typeLabel, dateOnly, filterWhere, loadVisible, receiptBrief, receiptDetail, receiptInclude, visibleWhere } from '../lib/receipts.js';
@@ -33,10 +34,10 @@ const yn = (v: boolean | null) => (v === null ? '' : v ? 'Yes' : 'No');
 const num = (v: { toString(): string } | null) => (v === null ? '' : Number(v));
 
 /** The fields of the form as they are written to the database. */
-function formColumns(data: ReturnType<typeof receiptInputSchema.parse>) {
+function formColumns(data: ReturnType<ReturnType<typeof makeReceiptSchema>['parse']>) {
   return {
     payee: data.payee, receiptDate: new Date(data.receiptDate + 'T00:00:00Z'), amount: data.amount, description: data.description || null,
-    ...cleanFormData(data),
+    ...cleanFormData(data, getSettings()),
   };
 }
 
@@ -95,7 +96,7 @@ receiptsRouter.get('/export', async (req, res) => {
 });
 
 receiptsRouter.post('/', requirePerm('receipt.create'), async (req, res) => {
-  const data = receiptInputSchema.parse(req.body);
+  const data = makeReceiptSchema(getSettings()).parse(req.body);
   const r = await prisma.$transaction(async (tx) =>
     tx.receipt.create({ data: { refNo: await nextReceiptRef(tx), encoderId: req.auth!.user.id, ...formColumns(data) }, include: receiptInclude }),
   );
@@ -114,7 +115,7 @@ receiptsRouter.patch('/:id', requirePerm('receipt.create'), async (req, res) => 
   const r = await loadVisible(req.auth!, idParam(req.params.id));
   assertOwner(req.auth!, r);
   if (!canEditReceipt(r.status as ReceiptStatus)) throw conflict('This receipt can no longer be edited.', 'INVALID_STATE');
-  const data = receiptInputSchema.parse(req.body);
+  const data = makeReceiptSchema(getSettings()).parse(req.body);
   const updated = await prisma.receipt.update({ where: { id: r.id }, data: formColumns(data), include: receiptInclude });
   await audit(req, {
     action: 'receipt.updated', entityType: 'receipt', entityId: r.id, summary: 'updated the receipt',
@@ -172,7 +173,11 @@ receiptsRouter.post('/:id/evidence', requirePerm('receipt.create'), uploadLimite
   const files = (req.files as Express.Multer.File[]) ?? [];
   if (!files.length) throw badRequest('Choose at least one file.');
   const existing = await prisma.receiptEvidence.findMany({ where: { receiptId: r.id, deletedAt: null } });
-  if (existing.length + files.length > EVIDENCE_MAX_FILES) throw badRequest(`A receipt can have up to ${EVIDENCE_MAX_FILES} files.`, 'TOO_MANY_FILES');
+  if (existing.length + files.length > getSettings().evidenceMaxFiles) throw badRequest(`A receipt can have up to ${getSettings().evidenceMaxFiles} files.`, 'TOO_MANY_FILES');
+
+  const maxMb = getSettings().evidenceMaxMb;
+  const tooBig = files.find((f) => f.size > maxMb * 1_048_576);
+  if (tooBig) throw badRequest(`"${tooBig.originalname}" is over ${maxMb} MB.`, 'FILE_TOO_LARGE');
 
   const created: Awaited<ReturnType<typeof prisma.receiptEvidence.create>>[] = [];
   const warnings: string[] = [];
@@ -268,6 +273,11 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     if (!n) throw badRequest('Add at least one photo or PDF of the receipt before submitting.', 'NO_EVIDENCE');
     // Receipts made before the form changed, or imported from the old template, have no invoice answers yet.
     if (r.birInvoice === null || !r.transactionType) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
+    if (getSettings().warningsBlock) {
+      const num = (v: { toString(): string } | null) => (v === null ? null : Number(v));
+      const w = receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings());
+      if (w.length) throw badRequest(`Fix these before submitting: ${w.join(' ')}`, 'WARNINGS_BLOCK');
+    }
   }
   const now = new Date();
   // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.
@@ -282,8 +292,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   }
   if (action === 'undo') {
     if (r.decidedById !== auth.user.id) throw forbidden('Only the person who made the decision can take it back.', 'NOT_DECIDER');
-    if (!r.decidedAt || now.getTime() - r.decidedAt.getTime() > UNDO_WINDOW_MINUTES * 60_000) {
-      throw conflict(`A decision can only be taken back within ${UNDO_WINDOW_MINUTES} minutes.`, 'UNDO_EXPIRED');
+    if (!r.decidedAt || now.getTime() - r.decidedAt.getTime() > getSettings().undoMinutes * 60_000) {
+      throw conflict(`A decision can only be taken back within ${getSettings().undoMinutes} minutes.`, 'UNDO_EXPIRED');
     }
   }
   if (action === 'check') {

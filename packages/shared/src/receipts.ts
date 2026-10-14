@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_SETTINGS, type AppSettings } from './settings';
 export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
@@ -92,7 +93,7 @@ interface Answers {
   invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
   vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
-function conditionalIssues(d: Answers): { path: string; message: string }[] {
+function conditionalIssues(d: Answers, rules: AppSettings): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [];
   const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };
   const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) out.push({ path, message }); };
@@ -100,32 +101,37 @@ function conditionalIssues(d: Answers): { path: string; message: string }[] {
     need(d.seenCompany, 'seenCompany', 'Tick to confirm the company name can be seen completely on the invoice.');
     need(d.seenTin, 'seenTin', 'Tick to confirm the TIN can be seen completely on the invoice.');
     need(d.seenAddress, 'seenAddress', 'Tick to confirm the complete address can be seen on the invoice.');
-    need(d.invoiceNo, 'invoiceNo', 'Enter the invoice number.');
-    need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
-    need(d.vendorTin, 'vendorTin', 'Enter the vendor TIN.');
+    if (rules.requireInvoiceNo) need(d.invoiceNo, 'invoiceNo', 'Enter the invoice number.');
+    if (rules.requireVendorAddress) need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
+    if (rules.requireVendorTin) need(d.vendorTin, 'vendorTin', 'Enter the vendor TIN.');
     need(d.vatType, 'vatType', 'Choose Vatable or Non-vatable.');
     missing(d.vatableAmount, 'vatableAmount', 'Enter the vatable amount.');
     missing(d.vatAmount, 'vatAmount', 'Enter the VAT amount, or 0 if there is none.');
-    missing(d.withheld, 'withheld', 'Choose Yes or No.');
-    if (d.withheld) {
+    if (rules.askWithholding) missing(d.withheld, 'withheld', 'Choose Yes or No.');
+    if (d.withheld && rules.askWithholding) {
       missing(d.whtRate, 'whtRate', 'Enter the withholding tax rate.');
       missing(d.whtAmount, 'whtAmount', 'Enter the withholding tax amount.');
     }
+  } else if (d.birInvoice === false && !rules.allowNoBir) {
+    out.push({ path: 'birInvoice', message: 'Receipts without a BIR-registered invoice are not accepted.' });
   } else if (d.birInvoice === false && (!d.noBirReason || d.noBirReason.length < 5)) {
     out.push({ path: 'noBirReason', message: 'Explain why there is no BIR-registered invoice.' });
   }
   return out;
 }
 
-export const receiptInputSchema = receiptShape.superRefine((d, ctx) => {
-  for (const i of conditionalIssues(d)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
-});
+/** The form's rules with the administrator's settings applied. */
+export const makeReceiptSchema = (rules: AppSettings = DEFAULT_SETTINGS) =>
+  receiptShape.superRefine((d, ctx) => {
+    for (const i of conditionalIssues(d, rules)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
+  });
+export const receiptInputSchema = makeReceiptSchema();
 
 /**
  * Every problem in the form, by field, even when several things are wrong at once. (A schema stops at the first kind of
  * mistake, which would hide the "tick this box" messages behind an empty vendor name.)
  */
-export function receiptProblems(raw: Record<string, unknown>): Record<string, string> {
+export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings = DEFAULT_SETTINGS): Record<string, string> {
   const out: Record<string, string> = {};
   const r = receiptShape.safeParse(raw);
   if (!r.success) for (const i of r.error.issues) out[String(i.path[0])] ||= i.message;
@@ -136,7 +142,7 @@ export function receiptProblems(raw: Record<string, unknown>): Record<string, st
     birInvoice: b(raw.birInvoice), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
     invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
     vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
-  })) out[i.path] ||= i.message;
+  }, rules)) out[i.path] ||= i.message;
   return out;
 }
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;
@@ -194,17 +200,18 @@ export const commentSchema = z.object({ body: z.string().trim().min(1, 'Write a 
 
 /* ---------- warnings (never block, only flag) ---------- */
 export const TIN_PATTERN = /^\d{3}-?\d{3}-?\d{3}(-?\d{3,5})?$/;
-export const VAT_RATE = 12;
+export const VAT_RATE = DEFAULT_SETTINGS.vatRate;
 
 export interface FormFigures {
   birInvoice?: boolean | null; amount: number; vendorTin?: string | null; vatType?: string | null;
   vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
-const close = (a: number, b: number) => Math.abs(a - b) <= 0.02;
 
 /** Things worth a second look. The Med Ref sees them while typing; the Checker and Approver see them on the receipt. */
-export function receiptWarnings(f: FormFigures): string[] {
+export function receiptWarnings(f: FormFigures, rules: AppSettings = DEFAULT_SETTINGS): string[] {
   const out: string[] = [];
+  const close = (a: number, b: number) => Math.abs(a - b) <= rules.tolerance + 1e-9;
+  const VAT_RATE = rules.vatRate;
   const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
   const vatable = n(f.vatableAmount), vat = n(f.vatAmount), rate = n(f.whtRate), wht = n(f.whtAmount);
   if (f.vendorTin && !TIN_PATTERN.test(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
@@ -224,9 +231,9 @@ export function receiptWarnings(f: FormFigures): string[] {
 }
 
 /** The fields the form saves, cleaned so that answers that no longer apply are not kept. */
-export function cleanFormData(d: ReceiptInput) {
+export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETTINGS) {
   const bir = d.birInvoice;
-  const wht = bir && d.withheld === true;
+  const wht = bir && rules.askWithholding && d.withheld === true;
   const t = (v: string | null | undefined) => (v ? v : null);
   return {
     birInvoice: bir,
@@ -237,7 +244,7 @@ export function cleanFormData(d: ReceiptInput) {
     vatType: bir ? d.vatType ?? null : null,
     vatableAmount: bir ? d.vatableAmount ?? null : null,
     vatAmount: bir ? d.vatAmount ?? null : null,
-    withheld: bir ? d.withheld ?? null : null,
+    withheld: bir ? (rules.askWithholding ? d.withheld ?? null : false) : null,
     whtRate: wht ? d.whtRate ?? null : null,
     whtAmount: wht ? d.whtAmount ?? null : null,
   };
