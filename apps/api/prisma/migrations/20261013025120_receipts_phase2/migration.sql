@@ -1,17 +1,17 @@
 -- CreateTable
-CREATE TABLE `Category` (
+CREATE TABLE `category` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(80) NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
     `sortOrder` INTEGER NOT NULL DEFAULT 0,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `Category_name_key`(`name`),
+    UNIQUE INDEX `category_name_key`(`name`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Receipt` (
+CREATE TABLE `receipt` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `refNo` VARCHAR(30) NOT NULL,
     `encoderId` INTEGER NOT NULL,
@@ -33,16 +33,16 @@ CREATE TABLE `Receipt` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `Receipt_refNo_key`(`refNo`),
-    INDEX `Receipt_status_idx`(`status`),
-    INDEX `Receipt_encoderId_idx`(`encoderId`),
-    INDEX `Receipt_receiptDate_idx`(`receiptDate`),
-    INDEX `Receipt_categoryId_idx`(`categoryId`),
+    UNIQUE INDEX `receipt_refNo_key`(`refNo`),
+    INDEX `receipt_status_idx`(`status`),
+    INDEX `receipt_encoderId_idx`(`encoderId`),
+    INDEX `receipt_receiptDate_idx`(`receiptDate`),
+    INDEX `receipt_categoryId_idx`(`categoryId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ReceiptEvidence` (
+CREATE TABLE `receiptevidence` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `receiptId` INTEGER NOT NULL,
     `fileName` VARCHAR(200) NOT NULL,
@@ -54,12 +54,12 @@ CREATE TABLE `ReceiptEvidence` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `deletedAt` DATETIME(3) NULL,
 
-    INDEX `ReceiptEvidence_receiptId_idx`(`receiptId`),
+    INDEX `receiptevidence_receiptId_idx`(`receiptId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ReimbursementDocument` (
+CREATE TABLE `reimbursementdocument` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `receiptId` INTEGER NOT NULL,
     `docNo` VARCHAR(30) NOT NULL,
@@ -69,13 +69,13 @@ CREATE TABLE `ReimbursementDocument` (
     `error` VARCHAR(300) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    UNIQUE INDEX `ReimbursementDocument_receiptId_key`(`receiptId`),
-    UNIQUE INDEX `ReimbursementDocument_docNo_key`(`docNo`),
+    UNIQUE INDEX `reimbursementdocument_receiptId_key`(`receiptId`),
+    UNIQUE INDEX `reimbursementdocument_docNo_key`(`docNo`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Notification` (
+CREATE TABLE `notification` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `userId` INTEGER NOT NULL,
     `type` VARCHAR(40) NOT NULL,
@@ -84,12 +84,12 @@ CREATE TABLE `Notification` (
     `readAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `Notification_userId_readAt_idx`(`userId`, `readAt`),
+    INDEX `notification_userId_readAt_idx`(`userId`, `readAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `EmailLog` (
+CREATE TABLE `emaillog` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `userId` INTEGER NULL,
     `toEmail` VARCHAR(160) NOT NULL,
@@ -102,12 +102,12 @@ CREATE TABLE `EmailLog` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `sentAt` DATETIME(3) NULL,
 
-    INDEX `EmailLog_status_idx`(`status`),
+    INDEX `emaillog_status_idx`(`status`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Job` (
+CREATE TABLE `job` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `type` VARCHAR(30) NOT NULL,
     `payload` TEXT NOT NULL,
@@ -118,12 +118,12 @@ CREATE TABLE `Job` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `finishedAt` DATETIME(3) NULL,
 
-    INDEX `Job_status_runAt_idx`(`status`, `runAt`),
+    INDEX `job_status_runAt_idx`(`status`, `runAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `LiquidationReport` (
+CREATE TABLE `liquidationreport` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `requestedById` INTEGER NOT NULL,
     `format` VARCHAR(5) NOT NULL,
@@ -136,12 +136,12 @@ CREATE TABLE `LiquidationReport` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `finishedAt` DATETIME(3) NULL,
 
-    INDEX `LiquidationReport_requestedById_idx`(`requestedById`),
+    INDEX `liquidationreport_requestedById_idx`(`requestedById`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `ImportJob` (
+CREATE TABLE `importjob` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `userId` INTEGER NOT NULL,
     `fileName` VARCHAR(200) NOT NULL,
@@ -157,7 +157,7 @@ CREATE TABLE `ImportJob` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `Sequence` (
+CREATE TABLE `sequence` (
     `key` VARCHAR(40) NOT NULL,
     `value` INTEGER NOT NULL,
 
@@ -165,16 +165,16 @@ CREATE TABLE `Sequence` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE `Receipt` ADD CONSTRAINT `Receipt_encoderId_fkey` FOREIGN KEY (`encoderId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `receipt` ADD CONSTRAINT `receipt_encoderId_fkey` FOREIGN KEY (`encoderId`) REFERENCES `user`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Receipt` ADD CONSTRAINT `Receipt_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `Category`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `receipt` ADD CONSTRAINT `receipt_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `category`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `ReceiptEvidence` ADD CONSTRAINT `ReceiptEvidence_receiptId_fkey` FOREIGN KEY (`receiptId`) REFERENCES `Receipt`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `receiptevidence` ADD CONSTRAINT `receiptevidence_receiptId_fkey` FOREIGN KEY (`receiptId`) REFERENCES `receipt`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `ReimbursementDocument` ADD CONSTRAINT `ReimbursementDocument_receiptId_fkey` FOREIGN KEY (`receiptId`) REFERENCES `Receipt`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `reimbursementdocument` ADD CONSTRAINT `reimbursementdocument_receiptId_fkey` FOREIGN KEY (`receiptId`) REFERENCES `receipt`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `Notification` ADD CONSTRAINT `Notification_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE `notification` ADD CONSTRAINT `notification_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `user`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

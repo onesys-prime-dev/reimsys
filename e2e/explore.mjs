@@ -75,7 +75,7 @@ await step(ana, 'receipt of someone else', async (p) => {
   const t = await text(p);
   // Receipt 1 may be hers; find one of Mark's through the API instead
   // A receipt that really belongs to someone else, straight from the database.
-  const other = Number(execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', "SELECT id FROM Receipt WHERE encoderId <> (SELECT id FROM User WHERE email='ana.reyes@example.com') ORDER BY id DESC LIMIT 1"], { encoding: 'utf8' }).trim());
+  const other = Number(execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', "SELECT id FROM receipt WHERE encoderId <> (SELECT id FROM user WHERE email='ana.reyes@example.com') ORDER BY id DESC LIMIT 1"], { encoding: 'utf8' }).trim());
   await p.goto('/receipts/' + other); await p.waitForTimeout(800);
   if (!/not found/i.test(await text(p))) flag('medref', '/receipts/' + other, 'another user\'s receipt did not show "not found"');
 }, [404]);

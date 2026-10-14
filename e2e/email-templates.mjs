@@ -12,7 +12,7 @@ const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : 
 const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 
 // start clean so the test is repeatable
-sql("DELETE FROM Setting WHERE `key` IN ('email.templates','email.branding')");
+sql("DELETE FROM setting WHERE `key` IN ('email.templates','email.branding')");
 
 const b = await chromium.launch({ channel: 'chrome' });
 async function login(email, size = { width: 1280, height: 1000 }) {
@@ -66,9 +66,9 @@ await p.waitForTimeout(500);
 await saveBtn.click();
 await p.waitForSelector('.toast:has-text("Saved")');
 ok('saved, and the list marks it as edited', await p.locator('.tpl-list button:has-text("Receipt returned") .pill:has-text("Edited")').isVisible());
-const stored = sql("SELECT value FROM Setting WHERE `key`='email.templates'");
+const stored = sql("SELECT value FROM setting WHERE `key`='email.templates'");
 ok('the edit is stored', stored.includes('Action needed on {{refNo}}'));
-ok('the change is in the audit log with before and after', sql("SELECT COUNT(*) FROM AuditLog WHERE action='settings.email_template_saved'").trim() !== '0');
+ok('the change is in the audit log with before and after', sql("SELECT COUNT(*) FROM auditlog WHERE action='settings.email_template_saved'").trim() !== '0');
 
 // the real renderer now uses it
 const real = await api(p, '/api/settings/email-templates/returned/preview', { method: 'POST', body: JSON.stringify({}) });
@@ -104,13 +104,13 @@ const html = await frame(p).locator('body').innerHTML();
 ok('preview picks up the organisation name, footer and colour before saving', html.includes('SAMPLE PHARMACY CEBU') && html.includes('032 555 0100') && html.includes('#b3362f'));
 await p.locator('button:has-text("Save look and feel")').click();
 await p.waitForSelector('.toast:has-text("saved")');
-ok('look and feel is stored', sql("SELECT value FROM Setting WHERE `key`='email.branding'").includes('Sample Pharmacy Cebu'));
+ok('look and feel is stored', sql("SELECT value FROM setting WHERE `key`='email.branding'").includes('Sample Pharmacy Cebu'));
 await p.screenshot({ path: path.join(OUT, 'tpl-branded.png'), fullPage: true });
 await p.locator('input[placeholder="#0c7480"]').fill('red');
 await p.waitForTimeout(700);
 ok('a bad colour shows a message and Save look and feel is blocked', (await p.locator('.err:has-text("Use a colour like")').count()) === 1 && await p.locator('button:has-text("Save look and feel")').isDisabled());
 ok('the preview stays visible while the colour is wrong', (await p.locator('iframe[title="Email preview"]').count()) === 1);
-ok('nothing bad was stored', sql("SELECT value FROM Setting WHERE `key`='email.branding'").includes('#b3362f'));
+ok('nothing bad was stored', sql("SELECT value FROM setting WHERE `key`='email.branding'").includes('#b3362f'));
 
 // phone preview + layout
 await p.locator('button:has-text("Phone")').click(); await p.waitForTimeout(400);
@@ -122,7 +122,7 @@ await p.waitForTimeout(600);
 await p.locator('button:has-text("Reset to default wording")').click();
 await p.waitForSelector('.toast:has-text("default wording")');
 ok('reset puts the original wording back', (await p.locator('input[maxlength="150"]').inputValue()) === '{{refNo}} needs a correction');
-ok('and removes the stored edit', !sql("SELECT value FROM Setting WHERE `key`='email.templates'").includes('Action needed'));
+ok('and removes the stored edit', !sql("SELECT value FROM setting WHERE `key`='email.templates'").includes('Action needed'));
 
 // permissions
 for (const who of ['ana.reyes@example.com', 'liza.santos@example.com', 'paolo.v@example.com']) {
@@ -142,7 +142,7 @@ ok('no sideways scrolling on a phone', (await m.evaluate(() => document.document
 await m.screenshot({ path: path.join(OUT, 'tpl-phone.png'), fullPage: true });
 
 ok('no browser errors', p.errors.length === 0, JSON.stringify(p.errors.slice(0, 3)));
-sql("DELETE FROM Setting WHERE `key` IN ('email.templates','email.branding')");
+sql("DELETE FROM setting WHERE `key` IN ('email.templates','email.branding')");
 await b.close();
 console.log(failed ? `\n${failed} FAILED` : '\nAll email template checks passed');
 process.exit(failed ? 1 : 0);

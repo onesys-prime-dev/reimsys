@@ -18,12 +18,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(400); } return null; };
 
 /* ---- point the app at the local test mailbox, remembering what was there ---- */
-const backup = sql("SELECT value FROM Setting WHERE `key`='mail'");
+const backup = sql("SELECT value FROM setting WHERE `key`='mail'");
 fs.writeFileSync(path.join(dir, 'mail-setting.backup.json'), backup);
 const catcher = spawn(process.execPath, ['e2e/smtp-catcher.mjs', box], { stdio: 'ignore' });
 await sleep(1500);
 const esc = (s) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-sql(`REPLACE INTO Setting (\`key\`, value, updatedAt) VALUES ('mail', '${esc(JSON.stringify({ host: 'localhost', port: 1025, secure: false, user: '', passEnc: null, fromName: 'REIMSYS', fromAddress: 'no-reply@reimsys.test', testRedirect: '' }))}', UTC_TIMESTAMP())`);
+sql(`REPLACE INTO setting (\`key\`, value, updatedAt) VALUES ('mail', '${esc(JSON.stringify({ host: 'localhost', port: 1025, secure: false, user: '', passEnc: null, fromName: 'REIMSYS', fromAddress: 'no-reply@reimsys.test', testRedirect: '' }))}', UTC_TIMESTAMP())`);
 await sleep(16000); // the app re-reads mail settings every 15 seconds
 
 const mails = () => fs.readdirSync(box).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(box, f), 'utf8')));
@@ -107,10 +107,10 @@ try {
   ok('asking again cancels the earlier link', true);
   await p4.screenshot({ path: path.join(dir, 'old-link.png') });
 
-  sql(`UPDATE PasswordToken SET expiresAt = UTC_TIMESTAMP() - INTERVAL 1 MINUTE WHERE userId = (SELECT id FROM User WHERE email='${email}') AND usedAt IS NULL`);
+  sql(`UPDATE passwordtoken SET expiresAt = UTC_TIMESTAMP() - INTERVAL 1 MINUTE WHERE userId = (SELECT id FROM user WHERE email='${email}') AND usedAt IS NULL`);
   await p4.goto(link2); await p4.waitForSelector('text=no longer works');
   ok('an expired link is refused', true);
-  sql(`UPDATE PasswordToken SET expiresAt = UTC_TIMESTAMP() + INTERVAL 30 MINUTE WHERE userId = (SELECT id FROM User WHERE email='${email}') AND usedAt IS NULL`);
+  sql(`UPDATE passwordtoken SET expiresAt = UTC_TIMESTAMP() + INTERVAL 30 MINUTE WHERE userId = (SELECT id FROM user WHERE email='${email}') AND usedAt IS NULL`);
 
   await p4.goto(link2); await p4.waitForSelector('text=Choose a new password');
   await p4.screenshot({ path: path.join(dir, 'reset-page.png') });
@@ -120,8 +120,8 @@ try {
   ok('the new password works', (await loginApi(email, 'FreshStart456')).status === 200);
   ok('the old password does not', (await loginApi(email, 'InviteOne123')).status === 401);
   ok('every older sign-in was ended', (await api(sess, 'GET', '/me')).status === 401);
-  ok('the reset is in the audit log', Number(sql("SELECT COUNT(*) FROM AuditLog WHERE action IN ('auth.reset_requested','auth.password_reset')")) >= 3);
-  ok('the token is stored hashed, never as the link', sql('SELECT COUNT(*) FROM PasswordToken WHERE tokenHash LIKE \'%reset%\'') === '0' && !JSON.stringify(sql('SELECT tokenHash FROM PasswordToken ORDER BY id DESC LIMIT 1')).includes(link2.split('token=')[1]));
+  ok('the reset is in the audit log', Number(sql("SELECT COUNT(*) FROM auditlog WHERE action IN ('auth.reset_requested','auth.password_reset')")) >= 3);
+  ok('the token is stored hashed, never as the link', sql('SELECT COUNT(*) FROM passwordtoken WHERE tokenHash LIKE \'%reset%\'') === '0' && !JSON.stringify(sql('SELECT tokenHash FROM passwordtoken ORDER BY id DESC LIMIT 1')).includes(link2.split('token=')[1]));
 
   /* ---- rate limit on asking for links ---- */
   let limited = false;
@@ -138,12 +138,12 @@ try {
   await b.close();
   catcher.kill();
   // put the saved mail account back exactly as it was
-  if (backup) sql(`REPLACE INTO Setting (\`key\`, value, updatedAt) VALUES ('mail', '${esc(backup)}', UTC_TIMESTAMP())`);
-  else sql("DELETE FROM Setting WHERE `key`='mail'");
-  const after = sql("SELECT value FROM Setting WHERE `key`='mail'");
+  if (backup) sql(`REPLACE INTO setting (\`key\`, value, updatedAt) VALUES ('mail', '${esc(backup)}', UTC_TIMESTAMP())`);
+  else sql("DELETE FROM setting WHERE `key`='mail'");
+  const after = sql("SELECT value FROM setting WHERE `key`='mail'");
   console.log(after === backup ? '\nSaved mail account restored exactly.' : '\nWARNING: the saved mail account differs from the backup, see ' + path.join(dir, 'mail-setting.backup.json'));
-  sql("DELETE FROM Session WHERE userId IN (SELECT id FROM User WHERE email LIKE 'reset.%@example.com')");
-  sql("DELETE FROM User WHERE email LIKE 'reset.%@example.com'");
+  sql("DELETE FROM session WHERE userId IN (SELECT id FROM user WHERE email LIKE 'reset.%@example.com')");
+  sql("DELETE FROM user WHERE email LIKE 'reset.%@example.com'");
 }
 console.log(bad ? `\n${bad} FAILED` : '\nAll password-link checks passed');
 process.exit(bad ? 1 : 0);
