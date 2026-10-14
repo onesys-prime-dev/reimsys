@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -48,6 +49,8 @@ app.use(
     },
   }),
 );
+// Text compresses to about a third. The live-update stream must stay uncompressed, or the browser would wait for the buffer to fill.
+app.use(compression({ filter: (req, res) => !req.path.startsWith('/api/events') && compression.filter(req, res) }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
@@ -84,6 +87,8 @@ app.use('/api', (_req, res) => void res.status(404).json({ error: { code: 'NOT_F
 // In production the API also serves the built web app, so one process and one origin is enough.
 const indexHtml = path.join(config.webDist, 'index.html');
 if (fs.existsSync(indexHtml)) {
+  // Built files have a fingerprint in their name, so they can be kept for a year; the page itself is always re-checked.
+  app.use('/assets', express.static(path.join(config.webDist, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
   app.use(express.static(config.webDist, { index: false, maxAge: '1h' }));
   app.get(/^\/(?!api\/).*/, (_req, res) => void res.sendFile(indexHtml));
 }

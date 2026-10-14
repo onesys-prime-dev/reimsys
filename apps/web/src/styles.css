@@ -402,3 +402,9 @@ a.btn.ghost{color:var(--muted)}
 .review .rv span{color:var(--muted)}.review .rv b{font-weight:600;overflow-wrap:anywhere}
 .formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (max-width:640px){.formgrid{grid-template-columns:minmax(0,1fr)}.review .rv{grid-template-columns:1fr;gap:2px}}
+
+.pw{position:relative}
+.pw input{padding-right:44px}
+.pw .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:grid;place-items:center;border:0;background:none;color:var(--muted,#6b7a82);cursor:pointer;border-radius:8px}
+.pw .eye:hover{color:inherit}
+.pw .eye:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}

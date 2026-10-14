@@ -3,19 +3,22 @@ import { useAuth } from './auth';
 import { NotificationBell } from './components/Notifications';
 import { LiveLight, useLive } from './live';
 import { SessionGuard } from './components/SessionGuard';
-import { AccessPage } from './pages/Access';
-import { AuditPage } from './pages/Audit';
+import { Suspense, lazy } from 'react';
 import { DashboardPage } from './pages/Dashboard';
 import { ForcePasswordPage } from './pages/ForcePassword';
-import { ImportPage } from './pages/Import';
 import { LoginPage } from './pages/Login';
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordLink';
-import { ProfilePage } from './pages/Profile';
 import { ReceiptDetailPage } from './pages/ReceiptDetail';
-import { ReceiptFormPage } from './pages/ReceiptForm';
 import { ReceiptsPage } from './pages/Receipts';
-import { ReportsPage } from './pages/Reports';
-import { ReportViewPage } from './pages/ReportView';
+
+// Screens most people open rarely load on demand, so the first page is much smaller.
+const AccessPage = lazy(() => import('./pages/Access').then((m) => ({ default: m.AccessPage })));
+const AuditPage = lazy(() => import('./pages/Audit').then((m) => ({ default: m.AuditPage })));
+const ImportPage = lazy(() => import('./pages/Import').then((m) => ({ default: m.ImportPage })));
+const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default: m.ProfilePage })));
+const ReceiptFormPage = lazy(() => import('./pages/ReceiptForm').then((m) => ({ default: m.ReceiptFormPage })));
+const ReportsPage = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsPage })));
+const ReportViewPage = lazy(() => import('./pages/ReportView').then((m) => ({ default: m.ReportViewPage })));
 import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
 
@@ -71,6 +74,7 @@ function Shell() {
         </header>
         <SessionGuard />
         <main className="page">
+          <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/receipts" element={<ReceiptsPage />} />
@@ -85,6 +89,7 @@ function Shell() {
             <Route path="/audit" element={can('audit.view') ? <AuditPage /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </main>
       </div>
       <nav className="bnav" aria-label="Main">{items.map(link)}</nav>
