@@ -361,3 +361,5 @@ a.btn.ghost{color:var(--muted)}
 /* Zoom changes the real size of the photo, so every part of it can be scrolled to (scaling around the centre hid the top and left edges). */
 .stage:has(.evimg){display:flex;overflow:auto}
 .stage .evimg{margin:auto;flex:none;height:auto;transition:none;cursor:zoom-in}
+
+.showoff{display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--muted);font-weight:600}

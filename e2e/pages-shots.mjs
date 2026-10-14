@@ -18,7 +18,7 @@ const ROLES = {
 };
 
 for (const [role, [email, pages]] of Object.entries(ROLES)) {
-  const ctx = await browser.newContext({ viewport: size, baseURL: 'http://localhost:5173' });
+  const ctx = await browser.newContext({ viewport: size, baseURL: process.env.WEB ?? 'http://localhost:5173' });
   const p = await ctx.newPage();
   await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
   await p.waitForSelector('.shell');

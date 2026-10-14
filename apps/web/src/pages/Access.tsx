@@ -38,6 +38,7 @@ function UsersTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
+  const [showOff, setShowOff] = useState(false);
   const [managing, setManaging] = useState<UserRow | null>(null);
   const users = useQuery({ queryKey: ['users', q], queryFn: () => api<{ users: UserRow[] }>(`/users?q=${encodeURIComponent(q)}`), placeholderData: (p) => p });
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api<{ roles: RoleSummary[] }>('/roles') });
@@ -50,14 +51,21 @@ function UsersTab() {
   });
 
   const myRank = me!.role.rank;
+  const all = users.data?.users ?? [];
+  const off = all.filter((u) => !u.isActive).length;
+  // People who have left stay on record, but they should not crowd out the people who work here now.
+  const shown = showOff ? all : all.filter((u) => u.isActive);
   return (
     <>
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" aria-label="Search users" /></div>
+        {off > 0 && (
+          <label className="showoff"><Switch checked={showOff} onChange={setShowOff} label="Show deactivated users" /><span>Show deactivated ({off})</span></label>
+        )}
         <button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}><Icon name="plus" size={18} />Add user</button>
       </div>
       <section className="card">
-        {users.data?.users.map((u) => {
+        {shown.map((u) => {
           const self = u.id === me!.id;
           const above = u.role.rank > myRank;
           const locked = u.lockedUntil && new Date(u.lockedUntil) > new Date();
@@ -79,7 +87,7 @@ function UsersTab() {
             </div>
           );
         })}
-        {users.data && !users.data.users.length && <Empty title="No users found">Try a different search.</Empty>}
+        {users.data && !shown.length && <Empty title="No users found">{off > 0 && !showOff ? `Only deactivated users match. Turn on "Show deactivated" to see them.` : 'Try a different search.'}</Empty>}
         {!users.data && <div className="empty">Loading…</div>}
       </section>
       {adding && roles.data && <AddUser roles={roles.data.roles.filter((r) => r.rank <= myRank)} onClose={() => setAdding(false)} onDone={refresh} />}
