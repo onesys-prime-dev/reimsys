@@ -10,6 +10,7 @@ export function LoginPage() {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [why] = useState<EndReason | null>(() => takeEndReason());
@@ -43,7 +44,16 @@ export function LoginPage() {
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus required />
           </Field>
           <Field label="Password">
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+            <div className="pw">
+              <input type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+              <button type="button" className="eye" onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide password' : 'Show password'} aria-pressed={show}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                  <circle cx="12" cy="12" r="3" />
+                  {show && <path d="M3 3l18 18" />}
+                </svg>
+              </button>
+            </div>
           </Field>
           {error && <div className="callout bad" role="alert" style={{ margin: 0 }}><div><span>{error}</span></div></div>}
           <button className="btn pri" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
