@@ -7,7 +7,11 @@ import path from 'node:path';
 const pub = path.resolve('apps/web/public');
 const svg = fs.readFileSync(path.join(pub, 'favicon.svg'), 'utf8');
 // Phone icon masks round the corners themselves, so those icons are full-bleed squares.
-const full = svg.replace('rx="16"', 'rx="0"');
+// (the folded tile is swapped for a plain square, and the fold dropped)
+const full = svg
+  .replace(/<path id="tile"[^>]*\/>/, '<rect width="64" height="64" fill="url(#g)"/>')
+  .replace(/<path id="fold"[^>]*\/>/, '');
+if (full === svg || full.includes('id="fold"')) throw new Error('favicon.svg no longer has the tile and fold the icon script expects');
 
 const b = await chromium.launch({ channel: 'chrome' });
 for (const [file, size, markup] of [

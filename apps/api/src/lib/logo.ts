@@ -7,16 +7,13 @@ export function drawLogo(doc: PDFKit.PDFDocument, x: number, y: number, size: nu
 
   const g = doc.linearGradient(0, 0, LOGO.size, LOGO.size);
   g.stop(0, BRAND.tealLight).stop(1, BRAND.tealDark);
-  doc.roundedRect(0, 0, LOGO.size, LOGO.size, LOGO.radius).fill(g);
+  doc.path(LOGO.tile).fill(g);
 
-  doc.lineCap('round').lineJoin('round');
-  doc.lineWidth(LOGO.ring.width).path(LOGO.ring.d).stroke(BRAND.white);
+  doc.save();
+  doc.opacity(LOGO.fold.opacity).path(LOGO.fold.d).fill(BRAND.white);
+  doc.restore();
 
-  const [a, b, c] = LOGO.head.points;
-  doc.lineWidth(LOGO.head.width).moveTo(a![0], a![1]).lineTo(b![0], b![1]).lineTo(c![0], c![1]).closePath().fillAndStroke(BRAND.white, BRAND.white);
-
-  doc.lineWidth(LOGO.peso.width);
-  doc.path(LOGO.peso.stem).stroke(BRAND.white);
-  doc.path(LOGO.peso.bars).stroke(BRAND.white);
+  doc.lineWidth(LOGO.strokeWidth).lineCap('round').lineJoin('round');
+  for (const s of LOGO.strokes) doc.path(s.d).stroke(s.color);
   doc.restore();
 }

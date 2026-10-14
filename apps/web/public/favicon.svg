@@ -5,11 +5,10 @@
       <stop offset="1" stop-color="#095964"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#g)"/>
-  <path d="M48.44 26.01 A17.5 17.5 0 1 1 35.04 14.77" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
-  <polygon points="41.6,16.5 32.2,21.4 34.4,8.6" fill="#fff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>
-  <g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M29 41 V23.5 H33.6 a5 5 0 0 1 0 10 H29"/>
-    <path d="M25 28.2 H37.5 M25 32 H37.5"/>
+  <path id="tile" d="M16 0 H50 L64 14 V48 Q64 64 48 64 H16 Q0 64 0 48 V16 Q0 0 16 0 Z" fill="url(#g)"/>
+  <path id="fold" d="M50 0 V10 Q50 14 54 14 H64 Z" fill="#fff" fill-opacity="0.28"/>
+  <g fill="none" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 16.5 L30 38" stroke="#9ff0d4"/>
+    <path d="M17 22 L30 38 L30 51" stroke="#ffffff"/>
   </g>
 </svg>

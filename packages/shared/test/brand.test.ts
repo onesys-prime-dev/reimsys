@@ -7,20 +7,26 @@ const favicon = fs.readFileSync(path.resolve(__dirname, '../../../apps/web/publi
 
 describe('the logo', () => {
   it('is the same in the favicon file as in the shared definition', () => {
-    expect(favicon).toContain(`d="${LOGO.ring.d}"`);
-    expect(favicon).toContain(`points="${LOGO.head.points.map(([x, y]) => `${x},${y}`).join(' ')}"`);
-    expect(favicon).toContain(`d="${LOGO.peso.stem}"`);
-    expect(favicon).toContain(`d="${LOGO.peso.bars}"`);
-    expect(favicon).toContain(`stroke-width="${LOGO.ring.width}"`);
+    expect(favicon).toContain(`d="${LOGO.tile}"`);
+    expect(favicon).toContain(`d="${LOGO.fold.d}"`);
+    for (const s of LOGO.strokes) expect(favicon).toContain(`<path d="${s.d}" stroke="${s.color}"/>`);
+    expect(favicon).toContain(`stroke-width="${LOGO.strokeWidth}"`);
     expect(favicon).toContain(BRAND.tealLight);
     expect(favicon).toContain(BRAND.tealDark);
   });
 
-  it('keeps the arrow head and ring inside the square with room to breathe', () => {
-    for (const [x, y] of LOGO.head.points) {
-      expect(Math.min(x, y)).toBeGreaterThanOrEqual(6);
-      expect(Math.max(x, y)).toBeLessThanOrEqual(LOGO.size - 6);
+  it('keeps the Y inside the tile with room to breathe', () => {
+    for (const s of LOGO.strokes) {
+      const nums = [...s.d.matchAll(/-?\d+(\.\d+)?/g)].map((m) => Number(m[0]));
+      expect(Math.min(...nums)).toBeGreaterThanOrEqual(8);
+      expect(Math.max(...nums)).toBeLessThanOrEqual(LOGO.size - 8);
     }
+  });
+
+  it('keeps the ends of the Y clear of the folded corner', () => {
+    // the fold starts at x=50 along the top edge; the right arm must end well to its left and below it
+    const end = LOGO.strokes[0]!.d.match(/M(\d+(?:\.\d+)?) (\d+(?:\.\d+)?)/)!;
+    expect(Number(end[1]) + LOGO.strokeWidth / 2).toBeLessThanOrEqual(50);
   });
 
   it('is called REIMSYS', () => {

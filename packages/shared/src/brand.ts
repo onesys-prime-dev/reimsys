@@ -1,6 +1,6 @@
 /**
- * The REIMSYS mark: a return arrow circling a peso sign, on a rounded teal square.
- * "Money coming back", which is what reimbursement is.
+ * The REIMSYS mark: a "Y" on a tile with a folded paper corner.
+ * The Y is the fork every receipt reaches (approve or send back), and its right arm is shaped like an approval stroke.
  * One definition, so the app, the favicon, the PDFs and the emails always match.
  * All coordinates are on a 64 x 64 grid.
  */
@@ -9,16 +9,20 @@ export const BRAND = {
   teal: '#0c7480',
   tealLight: '#14909d',
   tealDark: '#095964',
+  mint: '#9ff0d4',
   white: '#ffffff',
 } as const;
 
 export const LOGO = {
   size: 64,
-  radius: 16,
-  /** The circular arrow: almost a full turn, with a gap at the top right where the head points. */
-  ring: { d: 'M48.44 26.01 A17.5 17.5 0 1 1 35.04 14.77', width: 5 },
-  /** The arrow head at the end of the ring. */
-  head: { points: [[41.6, 16.5], [32.2, 21.4], [34.4, 8.6]] as [number, number][], width: 1.4 },
-  /** The peso sign in the middle: a stem with a round top, and two bars across it. */
-  peso: { stem: 'M29 41 V23.5 H33.6 a5 5 0 0 1 0 10 H29', bars: 'M25 28.2 H37.5 M25 32 H37.5', width: 2.8 },
+  /** The tile. The top right corner is cut off like a page that has been folded over. */
+  tile: 'M16 0 H50 L64 14 V48 Q64 64 48 64 H16 Q0 64 0 48 V16 Q0 0 16 0 Z',
+  /** The folded-over corner, drawn lighter on top of the tile. */
+  fold: { d: 'M50 0 V10 Q50 14 54 14 H64 Z', opacity: 0.28 },
+  strokeWidth: 7,
+  /** The Y. The right arm is longer and mint, like an approval stroke; the rest is white. Drawn in this order. */
+  strokes: [
+    { d: 'M45 16.5 L30 38', color: BRAND.mint },
+    { d: 'M17 22 L30 38 L30 51', color: BRAND.white },
+  ],
 } as const;
