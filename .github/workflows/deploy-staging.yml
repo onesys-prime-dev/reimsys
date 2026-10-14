@@ -1,0 +1,28 @@
+name: 🚀 Deploy Reimsis to staging
+
+# Every merge to main is built and deployed to the staging environment, but
+# only after the CI workflow (ci.yml) has passed on that exact commit.
+# Production is a separate workflow started by a version tag
+# (deploy-production.yml). The deploy steps live in deploy-reusable.yml.
+on:
+  push:
+    branches:
+      - main
+  # Manual re-run from the Actions tab; CI still has to pass first.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Staging
+    needs: ci
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      environment: staging
+    secrets: inherit

@@ -1,0 +1,265 @@
+name: Deploy (reusable)
+
+# The deploy itself, shared by the staging and production workflows
+# (deploy-staging.yml and deploy-production.yml). It is not started directly:
+# a caller passes the name of a GitHub Environment and this job runs inside it,
+# so it uses that environment's secrets and variables, and its protection rules
+# (for example "required reviewers" on production) pause the job before any
+# step runs.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy to (staging or production)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-24.04
+
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.SITE_URL }}
+
+    # Two deploys must never run at the same time against the same server folder.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+
+    # Settings come from the environment's variables. There are no fallbacks:
+    # a missing value stops the deploy (see "Check this environment is
+    # configured") rather than guessing.
+    env:
+      DEPLOY_ENV: ${{ inputs.environment }}
+      SSH_PORT: ${{ vars.SSH_PORT || '22' }}
+      PM2_APP: ${{ vars.PM2_APP || 'reimsis' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      SITE_URL: ${{ vars.SITE_URL }}
+      # Set TLS_INSECURE=true only for a server with a self-signed certificate.
+      TLS_INSECURE: ${{ vars.TLS_INSECURE || 'false' }}
+      SERVER_HOST: ${{ secrets.VPS_HOST }}
+      REMOTE: ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}
+
+    steps:
+      ########################################################
+      # Is this environment set up?
+      ########################################################
+
+      - name: Check this environment is configured
+        env:
+          HAS_KEY: ${{ secrets.VPS_PRIVATE_KEY != '' }}
+          HAS_USER: ${{ secrets.VPS_USERNAME != '' }}
+          HAS_HOST: ${{ secrets.VPS_HOST != '' }}
+        run: |
+          missing=""
+          [ "$HAS_KEY" = "true" ]  || missing="$missing secret:VPS_PRIVATE_KEY"
+          [ "$HAS_USER" = "true" ] || missing="$missing secret:VPS_USERNAME"
+          [ "$HAS_HOST" = "true" ] || missing="$missing secret:VPS_HOST"
+          [ -n "$DEPLOY_PATH" ]    || missing="$missing variable:DEPLOY_PATH"
+          [ -n "$SITE_URL" ]       || missing="$missing variable:SITE_URL"
+          if [ -n "$missing" ]; then
+            echo "::error::The '$DEPLOY_ENV' environment is missing:$missing. Add them under Settings > Environments > $DEPLOY_ENV. Nothing was deployed."
+            exit 1
+          fi
+          case "$SITE_URL" in
+            https://*) ;;
+            *) echo "::error::SITE_URL must start with https:// (it is '$SITE_URL')."; exit 1 ;;
+          esac
+          if [ "$DEPLOY_ENV" = "production" ] && [ "$TLS_INSECURE" = "true" ]; then
+            echo "::warning::TLS_INSECURE is true on production, so the health check does not verify the certificate."
+          fi
+          echo "Deploying to $DEPLOY_ENV: $SITE_URL"
+
+          if [ "$TLS_INSECURE" = "true" ]; then
+            echo "CURL_TLS=-k" >> "$GITHUB_ENV"
+          fi
+          echo "HEALTH_URL=${SITE_URL%/}/api/health" >> "$GITHUB_ENV"
+
+      ########################################################
+      # Checkout
+      ########################################################
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      ########################################################
+      # Node + pnpm
+      ########################################################
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      ########################################################
+      # Build
+      ########################################################
+
+      - name: Generate Prisma client
+        run: pnpm --filter @reimsis/api db:generate
+
+      - name: Build web app and API
+        run: pnpm build
+
+      - name: Verify build output
+        run: |
+          test -f apps/web/dist/index.html
+          test -f apps/api/dist/server.js
+
+      ########################################################
+      # SSH
+      ########################################################
+
+      - name: Install SSH Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_PRIVATE_KEY }}
+
+      # With the VPS_KNOWN_HOSTS secret set, the server's identity is checked
+      # strictly. Without it the first connection is accepted blindly.
+      - name: Trust the server's SSH host key
+        env:
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          key=$(printf '%s\n' "$KNOWN_HOSTS" | awk '/ssh-ed25519/ { print $(NF-1), $NF; exit }')
+          if [ -n "$key" ]; then
+            printf '%s %s\n' "$SERVER_HOST" "$key" > ~/.ssh/known_hosts
+            echo "SSH_OPTS=-p ${SSH_PORT} -o StrictHostKeyChecking=yes" >> "$GITHUB_ENV"
+          else
+            echo "::warning::VPS_KNOWN_HOSTS is not set for $DEPLOY_ENV, so the server's identity is not verified."
+            echo "SSH_OPTS=-p ${SSH_PORT} -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          fi
+
+      ########################################################
+      # Safety checks on the server (before anything is changed)
+      ########################################################
+
+      - name: Check the deploy folder is the live app
+        run: |
+          ssh $SSH_OPTS "$REMOTE" bash -s -- "$DEPLOY_PATH" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          dir="$1"
+          if [ ! -d "$dir" ] || [ ! -f "$dir/apps/api/.env" ]; then
+            echo "::error::$dir does not look like the live Reimsis folder (it needs apps/api/.env). Refusing to deploy."
+            exit 1
+          fi
+          for tool in node pnpm pm2 mysqldump; do
+            command -v "$tool" > /dev/null || { echo "::error::$tool was not found on the server."; exit 1; }
+          done
+          REMOTE_SCRIPT
+
+      - name: Back up the database
+        run: |
+          ssh $SSH_OPTS "$REMOTE" bash -s -- "$DEPLOY_PATH" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd "$1/apps/api"
+          # Split DATABASE_URL (mysql://user:pass@host:port/db) with node so
+          # special characters in the password are decoded correctly.
+          url=$(grep -E '^DATABASE_URL[[:space:]]*=' .env | head -1 | sed 's/^[^=]*=[[:space:]]*//' | tr -d '"' | tr -d "'")
+          read -r DBH DBPORT DBU DBP DBN < <(DB_URL="$url" node -e '
+            const u = new URL(process.env.DB_URL);
+            const e = (s) => encodeURIComponent(decodeURIComponent(s));
+            console.log([u.hostname, u.port || "3306", e(u.username), e(u.password), u.pathname.slice(1)].join(" "));
+          ')
+          DBU=$(node -e 'console.log(decodeURIComponent(process.argv[1]))' "$DBU")
+          DBP=$(node -e 'console.log(decodeURIComponent(process.argv[1]))' "$DBP")
+          mkdir -p "$HOME/backups"
+          file="$HOME/backups/deploy-$(date +%Y%m%d-%H%M%S).sql.gz"
+          MYSQL_PWD="$DBP" mysqldump --no-tablespaces -h "$DBH" -P "$DBPORT" -u "$DBU" \
+            --single-transaction --routines --triggers "$DBN" | gzip > "$file"
+          # mysqldump writes this line only when the dump finished.
+          if ! zcat "$file" | tail -2 | grep -q "Dump completed"; then
+            rm -f "$file"
+            echo "::error::The database backup did not complete. Nothing was deployed."
+            exit 1
+          fi
+          echo "Backup saved: $file ($(du -h "$file" | cut -f1))"
+          # Keep the 10 most recent deploy backups.
+          ls -1t "$HOME"/backups/deploy-*.sql.gz | tail -n +11 | xargs -r rm -f
+          REMOTE_SCRIPT
+
+      ########################################################
+      # Deploy
+      ########################################################
+
+      # The leading "/" on an exclude limits it to the project root.
+      # apps/api/.env and apps/api/storage (evidence files) live only on the
+      # server and are never touched. node_modules is installed on the server.
+      - name: Deploy application
+        run: |
+          rsync -az --delete \
+            --exclude="/.git" \
+            --exclude="/.github" \
+            --exclude="/.claude" \
+            --exclude="node_modules" \
+            --exclude="/e2e" \
+            --exclude="/docs" \
+            --exclude="/apps/api/.env" \
+            --exclude="/apps/api/storage" \
+            --exclude="/apps/api/test" \
+            --exclude="/package-lock.json" \
+            -e "ssh $SSH_OPTS" \
+            ./ \
+            "$REMOTE:$DEPLOY_PATH"
+
+      ########################################################
+      # Dependencies, migrations, restart
+      ########################################################
+
+      - name: Install dependencies and run database migrations
+        run: |
+          ssh $SSH_OPTS "$REMOTE" bash -s -- "$DEPLOY_PATH" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd "$1"
+          pnpm install --frozen-lockfile
+          cd apps/api
+          pnpm exec prisma generate
+          pnpm exec prisma migrate deploy
+          REMOTE_SCRIPT
+
+      # The API also runs the background worker, so exactly one instance runs.
+      - name: Restart the app
+        run: |
+          ssh $SSH_OPTS "$REMOTE" bash -s -- "$DEPLOY_PATH" "$PM2_APP" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd "$1/apps/api"
+          if pm2 describe "$2" > /dev/null 2>&1; then
+            pm2 restart "$2" --update-env
+          else
+            pm2 start dist/server.js --name "$2"
+          fi
+          pm2 save
+          REMOTE_SCRIPT
+
+      ########################################################
+      # Health check
+      ########################################################
+
+      # /api/health runs SELECT 1, so a pass proves the app is up and reaches
+      # its database. CURL_TLS is "-k" only while TLS_INSECURE is true.
+      - name: Check the site is healthy
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            body=$(curl ${CURL_TLS:-} -fsS --max-time 15 "$HEALTH_URL" || true)
+            echo "Attempt $attempt: $body"
+            if echo "$body" | grep -q '"ok":true'; then
+              echo "Healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::The site did not report healthy at $HEALTH_URL after deploying. The database backup from this deploy is in ~/backups on the server."
+          exit 1
