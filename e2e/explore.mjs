@@ -1,5 +1,6 @@
 // Exploratory pass: acts like each role, tries awkward things, and reports anything suspicious.
 // Needs API (4000) and web (5173) running. Usage: node e2e/explore.mjs [screenshot-dir]
+import { fillQuickForm, toLastStep } from './form-helpers.mjs';
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -82,31 +83,35 @@ await step(ana, 'receipt of someone else', async (p) => {
 
 await step(ana, 'form validation', async (p) => {
   await p.goto('/receipts/new'); await p.waitForSelector('form');
-  await p.fill('input[placeholder="Store or provider name"]', 'A');
-  await p.fill('input[placeholder="0.00"]', '-5');
-  await p.click('button:has-text("Save draft")');
+  await p.waitForSelector('.steps');
+  await p.getByRole('radio', { name: /^No/ }).first().click(); await p.click('button:has-text("Next")');
+  await p.getByLabel(/Why is there no BIR/).fill('Test'); await p.click('button:has-text("Next")');
+  if (!(await p.locator('.err').count()) && (await p.locator('.steph').innerText()) !== 'No BIR-registered invoice') flag('medref', 'form', 'a too-short reason was accepted');
+  await p.getByLabel(/Why is there no BIR/).fill('Test receipt without a BIR invoice'); await p.click('button:has-text("Next")');
+  await p.getByLabel('Vendor complete name').fill('A');
+  await p.getByLabel(/Invoice gross amount/).fill('-5');
+  await p.click('button:has-text("Next")');
   const errs = await p.locator('.err').allInnerTexts();
-  if (errs.length < 2) flag('medref', 'form', 'bad payee and negative amount did not both show errors: ' + JSON.stringify(errs));
-  await p.fill('input[placeholder="0.00"]', '99999999');
-  await p.fill('input[placeholder="Store or provider name"]', 'Big Amount Store');
-  await p.click('button:has-text("Save draft")');
+  if (errs.length < 2) flag('medref', 'form', 'bad vendor and negative amount did not both show errors: ' + JSON.stringify(errs));
+  await p.getByLabel(/Invoice gross amount/).fill('99999999');
+  await p.getByLabel('Vendor complete name').fill('Big Amount Store');
+  await p.click('button:has-text("Next")');
   if (!(await p.locator('.err').allInnerTexts()).join(' ').match(/amount/i)) flag('medref', 'form', 'amount over the limit was accepted by the form');
-  await p.fill('input[placeholder="0.00"]', '12.345');
+  await p.getByLabel(/Invoice gross amount/).fill('12.345');
   await p.evaluate(() => { const d = document.querySelector('input[type=date]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(d, '2999-01-01'); d.dispatchEvent(new Event('input', { bubbles: true })); });
-  await p.click('button:has-text("Save draft")');
+  await p.click('button:has-text("Next")');
   if (!(await p.locator('.err').allInnerTexts()).join(' ').match(/future/i)) flag('medref', 'form', 'future date was accepted by the form');
 });
 
 await step(ana, 'bad uploads', async (p) => {
   await p.goto('/receipts/new'); await p.waitForSelector('form');
+  await fillQuickForm(p, { payee: 'Fake Image Store ' + stamp, amount: '50' });
   await p.setInputFiles('input[type=file]', file('notes.txt', 'hello'));
   await p.waitForSelector('.toast'); if (!/not a photo or PDF/i.test(await p.locator('.toast').last().innerText())) flag('medref', 'upload', 'text file not rejected clearly');
   await p.setInputFiles('input[type=file]', file('huge.png', Buffer.alloc(11 * 1024 * 1024, 1)));
   await p.waitForTimeout(300); if (!/10 MB/i.test(await p.locator('.toast').last().innerText())) flag('medref', 'upload', 'oversize file not rejected clearly');
   const fake = file('fake.png', 'this is not really an image at all');
   await p.setInputFiles('input[type=file]', fake);
-  await p.fill('input[placeholder="Store or provider name"]', 'Fake Image Store ' + stamp);
-  await p.fill('input[placeholder="0.00"]', '50');
   await p.click('button:has-text("Save draft")');
   await p.waitForSelector('.toast:has-text("not a JPG")', { timeout: 5000 }).catch(() => flag('medref', 'upload', 'server-rejected fake image gave no clear message'));
 }, [400]);
@@ -114,15 +119,15 @@ await step(ana, 'bad uploads', async (p) => {
 let draftUrl;
 await step(ana, 'draft, edit, remove evidence, submit', async (p) => {
   await p.goto('/receipts/new'); await p.waitForSelector('form');
-  await p.fill('input[placeholder="Store or provider name"]', 'Explore Pharmacy ' + stamp);
-  await p.fill('input[placeholder="0.00"]', '777.77');
+  await fillQuickForm(p, { payee: 'Explore Pharmacy ' + stamp, amount: '777.77' });
   await p.setInputFiles('input[type=file]', [png('one'), png('two')]);
   await p.click('button:has-text("Save draft")');
   await p.waitForURL(/\/receipts\/\d+$/); draftUrl = p.url();
   if (!(await visible(p, '.pill:has-text("Draft")'))) flag('medref', 'draft', 'no Draft pill after saving');
   await p.click('a:has-text("Edit")'); await p.waitForSelector('h1:has-text("Edit receipt")');
+  await toLastStep(p);
   if ((await p.locator('.file').count()) !== 2) flag('medref', 'edit', 'saved evidence not listed when editing');
-  if ((await p.inputValue('input[placeholder="0.00"]')) !== '777.77') flag('medref', 'edit', 'amount not prefilled');
+  if (!/777\.77/.test(await p.locator('.review').innerText())) flag('medref', 'edit', 'amount not prefilled');
   await p.click('button[aria-label^="Remove img-one"]'); await p.waitForTimeout(500);
   await p.click('button[aria-label^="Remove img-two"]'); await p.waitForTimeout(500);
   await p.click('button:has-text("Submit for checking")');
@@ -153,8 +158,8 @@ await step(ana, 'import with problems', async (p) => {
   await p.goto('/receipts/import'); await p.waitForSelector('.drop');
   await p.setInputFiles('.drop input[type=file]', file('bad.csv', 'payee,receipt_date,amount,category\nOk Store ' + stamp + ',2026-10-10,10.50,Medicine\n,2026-10-10,5,Medicine\nNo Cat,2026-10-10,5,Foo\nBad Date,10/10/2026,5,Medicine\n'));
   await p.waitForSelector('text=rows are ready to import');
-  if (!(await visible(p, 'text=3 rows have problems'))) flag('medref', 'import', 'expected 3 problem rows, got: ' + (await p.locator('.callout').first().innerText()).replace(/\n/g, ' '));
-  await p.click('button:has-text("Import 1 draft")'); await p.waitForURL(/\/receipts$/);
+  if (!(await visible(p, 'text=2 rows have problems'))) flag('medref', 'import', 'expected 2 problem rows, got: ' + (await p.locator('.callout').first().innerText()).replace(/\n/g, ' '));
+  await p.click('button:has-text("Import 2 drafts")'); await p.waitForURL(/\/receipts$/);
   await p.setInputFiles('input[type=file]', []).catch(() => {});
   await p.goto('/receipts/import');
   await p.setInputFiles('.drop input[type=file]', file('wrong.csv', 'a,b\n1,2\n'));
@@ -303,14 +308,10 @@ await step(admin, 'permissions matrix', async (p) => {
   await liza.page.goto('/receipts'); await liza.page.waitForTimeout(1200);
   if (await visible(liza.page, 'a:has-text("Import")')) flag('checker', 'permission change', 'revoked permission is still active');
 });
-await step(admin, 'categories', async (p) => {
-  await p.click('button[role=tab]:has-text("Categories")'); await p.waitForSelector('.cats .urow');
-  await p.fill('input[aria-label="New category name"]', 'QA Category ' + stamp); await p.click('button:has-text("Add category")');
-  await p.waitForSelector(`text=QA Category ${stamp}`);
-  await p.locator(`.cats .urow:has-text("QA Category ${stamp}") label.switch`).click(); await p.waitForTimeout(600);
-  await ana.page.goto('/receipts/new'); await ana.page.waitForSelector('form');
-  const opts = await ana.page.locator('select option').allInnerTexts();
-  if (opts.includes('QA Category ' + stamp)) flag('medref', 'categories', 'deactivated category still offered on the form');
+await step(admin, 'company details', async (p) => {
+  await p.click('button[role=tab]:has-text("Company")'); await p.waitForSelector('text=Company on the invoice');
+  if ((await p.locator('.card-b input').count()) < 3) flag('admin', 'company', 'the company details form is missing fields');
+  if (!(await p.locator('button:has-text("Save")').isDisabled())) flag('admin', 'company', 'Save is enabled before anything was changed');
 });
 await step(admin, 'deactivate user and reset password', async (p) => {
   await p.click('button[role=tab]:has-text("Users")'); await p.waitForSelector('.urow');

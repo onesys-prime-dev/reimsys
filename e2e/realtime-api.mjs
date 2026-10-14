@@ -1,3 +1,5 @@
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 // The live stream itself, without a browser. Usage: node e2e/realtime-api.mjs
 const BASE = process.env.API ?? 'http://localhost:4000/api';
 const ORIGIN = new URL(BASE).origin;
@@ -48,7 +50,7 @@ ok('it greets them so the browser knows it is live', await waitFor(() => sAna.li
 /* ---- a receipt change reaches the other people ---- */
 const cat = (await api(ana, 'GET', '/categories')).data.categories[0].id;
 const stamp = Date.now();
-const made = (await api(ana, 'POST', '/receipts', { payee: 'Live Test ' + stamp, receiptDate: '2026-10-11', amount: 12, categoryId: cat })).data.receipt;
+const made = (await api(ana, 'POST', '/receipts', { payee: 'Live Test ' + stamp, receiptDate: '2026-10-11', amount: 12, ...F })).data.receipt;
 ok('creating a receipt announces a receipts change to others', await waitFor(() => scopesOf(sLiza).includes('receipts')), JSON.stringify(sLiza.live.events));
 ok('and to the person who did it', scopesOf(sAna).includes('receipts'));
 const first = sLiza.live.events.filter((e) => e.ev === 'change')[0];

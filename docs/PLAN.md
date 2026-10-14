@@ -200,3 +200,19 @@ A search found 185 mentions of category / payee across 36 files (schema, shared 
 - When BIR = No: invoice no. and vendor TIN are optional, VAT and withholding steps are skipped.
 - Product / Service is required on every receipt.
 - The Checker cannot finish checking while a company tick is "not seen" without a note.
+
+### Phase 2 status: built
+Built on the branch `feature/client-form`, in this order: database fields and shared rules, API (create / edit / copy / export / check / reports / import), the step-by-step form, the detail page with the Checker's confirmation, list filters, reports and the receipt PDF, company details (Access > Company), and tests.
+
+- Wizard: BIR invoice -> company check (or reason) -> invoice -> VAT -> withholding (only if tax was withheld) -> proof and review. Answers that do not apply are dropped when saving.
+- Warnings (never blocking): vatable + VAT differs from gross, VAT not 12% of the vatable amount, non-vatable with VAT, withholding rate x base differs from the amount, badly formed TIN. Shown to the Med Ref while typing and to the Checker and Approver on the receipt. Duplicate invoices (same vendor TIN + invoice no.) are flagged too.
+- The Checker answers "seen / not seen" for the company name, TIN and address when marking a BIR-invoice receipt checked. A "not seen" answer needs a note. Bulk check skips these on purpose.
+- Receipts made before this change (and rows imported from the old template) keep their data, show "not recorded", and must have the invoice details filled in before they can be submitted.
+- Categories are no longer used on new receipts (the table is kept for old ones); Product / Service replaces them in lists, reports and exports.
+- Tests: 89 unit tests, `e2e/client-form.mjs` (47 checks), `e2e/client-form-ui.mjs` (browser, desktop and phone), plus the older suites updated for the new form.
+
+### Going back (rollback)
+The work lives on its own branch, so `main` is untouched until it is merged.
+1. **Before merging:** just do not merge, or switch back with `git checkout main`. The git tag `before-client-form` marks the exact starting point.
+2. **Database:** the migration only adds columns and makes the category optional. Old code keeps working on the new database as long as every receipt has a category (new receipts do not). `docs/rollback-client-form.sql` removes the new columns and gives category-less receipts a category first.
+3. **Full restore:** a complete backup of the database and the evidence files was taken just before starting (`reimsys-backups/before-client-form-*.sql` and `storage-before-client-form.tgz`, next to the project folder). Restoring it loses anything done since.

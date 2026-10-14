@@ -2,6 +2,8 @@
 // Usage: node e2e/security.mjs   (server on http://localhost:4000; makes a few throwaway receipts and removes them)
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 
 const BASE = process.env.WEB ?? 'http://localhost:4000';
 const API = BASE + '/api';
@@ -27,7 +29,7 @@ const upload = (cookie, rid, name, buf, type) => { const f = new FormData(); f.a
 const [ana, mark, liza, paolo, admin] = (await Promise.all(['ana.reyes', 'mark.dc', 'liza.santos', 'paolo.v', 'admin'].map((u) => login(u + '@' + 'example.com')))).map((r) => r.c);
 const cat = (await raw('GET', '/categories', { cookie: ana })).data.categories[0].id;
 const stamp = Date.now();
-const mk = async (c, payee, extra = {}) => (await raw('POST', '/receipts', { cookie: c, body: { payee, receiptDate: '2026-10-11', amount: 10, categoryId: cat, ...extra } })).data?.receipt;
+const mk = async (c, payee, extra = {}) => (await raw('POST', '/receipts', { cookie: c, body: { payee, receiptDate: '2026-10-11', amount: 10, ...F, ...extra } })).data?.receipt;
 
 /* ================= 1. who can reach what ================= */
 console.log('\n1. Access control');
@@ -59,7 +61,7 @@ for (const p of [`/receipts/${aRec.id}`, `/receipts/${aRec.id}/history`, `/recei
 }
 check('a Med Ref cannot open another Med Ref\'s receipt, history, comments or evidence', !spy.length, spy.join('; '));
 check('nor comment on it', (await raw('POST', `/receipts/${aRec.id}/comments`, { cookie: mark, body: { body: 'hi' } })).status === 404);
-check('nor change it', (await raw('PATCH', `/receipts/${aRec.id}`, { cookie: mark, body: { payee: 'Hijack', receiptDate: '2026-10-11', amount: 1, categoryId: cat } })).status === 404);
+check('nor change it', (await raw('PATCH', `/receipts/${aRec.id}`, { cookie: mark, body: { payee: 'Hijack', receiptDate: '2026-10-11', amount: 1, ...F } })).status === 404);
 check('nor submit, withdraw or delete it', (await Promise.all([raw('POST', `/receipts/${aRec.id}/withdraw`, { cookie: mark, body: { version: 0 } }), raw('DELETE', `/receipts/${aRec.id}`, { cookie: mark })])).every((r) => r.status === 404 || r.status === 403));
 check('nor remove its evidence', [404, 403].includes((await raw('DELETE', `/receipts/${aRec.id}/evidence/${evId}`, { cookie: mark })).status));
 const mine = (await raw('GET', '/receipts?pageSize=100', { cookie: mark })).data.items;
@@ -75,7 +77,7 @@ check('a normal user cannot read another user\'s sessions or details', [403, 404
 
 /* ================= 3. rewriting things you may not ================= */
 console.log('\n3. Changing what you should not (mass assignment and privilege)');
-const sneaky = await raw('POST', '/receipts', { cookie: ana, body: { payee: 'Sec Mass ' + stamp, receiptDate: '2026-10-11', amount: 5, categoryId: cat, status: 'approved', encoderId: 2, version: 99, decidedById: 4, checkedById: 3, refNo: 'RC-HACK' } });
+const sneaky = await raw('POST', '/receipts', { cookie: ana, body: { payee: 'Sec Mass ' + stamp, receiptDate: '2026-10-11', amount: 5, ...F, status: 'approved', encoderId: 2, version: 99, decidedById: 4, checkedById: 3, refNo: 'RC-HACK' } });
 check('extra fields on a new receipt (status, owner, reference) are ignored', sneaky.data.receipt.status === 'draft' && sneaky.data.receipt.encoder.name === 'Ana Reyes' && sneaky.data.receipt.refNo !== 'RC-HACK', JSON.stringify(sneaky.data.receipt).slice(0, 200));
 const me0 = (await raw('GET', '/me', { cookie: ana })).data.user;
 const up = await raw('PATCH', '/me', { cookie: ana, body: { name: 'Ana Reyes', roleId: 4, isActive: true, email: 'evil@example.com', mustChangePassword: false, permissions: ['user.manage'] } });
@@ -93,9 +95,9 @@ check('the last administrator cannot switch themselves off', (await raw('PATCH',
 /* ================= 4. cross-site requests ================= */
 console.log('\n4. Cross-site requests (CSRF)');
 check('a write with no custom header is refused', (await raw('POST', '/receipts', { cookie: ana, csrf: false, body: { payee: 'x' } })).status === 403);
-check('a write from another website is refused', (await raw('POST', '/receipts', { cookie: ana, origin: 'https://evil.example.org', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, categoryId: cat } })).status === 403);
-check('a lookalike address is refused', (await raw('POST', '/receipts', { cookie: ana, origin: BASE + '.evil.org', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, categoryId: cat } })).status === 403);
-check('the "null" origin (sandboxed pages) is refused', (await raw('POST', '/receipts', { cookie: ana, origin: 'null', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, categoryId: cat } })).status === 403);
+check('a write from another website is refused', (await raw('POST', '/receipts', { cookie: ana, origin: 'https://evil.example.org', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, ...F } })).status === 403);
+check('a lookalike address is refused', (await raw('POST', '/receipts', { cookie: ana, origin: BASE + '.evil.org', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, ...F } })).status === 403);
+check('the "null" origin (sandboxed pages) is refused', (await raw('POST', '/receipts', { cookie: ana, origin: 'null', body: { payee: 'Evil', receiptDate: '2026-10-11', amount: 1, ...F } })).status === 403);
 check('signing in from another website is refused', (await raw('POST', '/auth/login', { origin: 'https://evil.example.org', body: { email: 'ana.reyes@example.com', password: PW } })).status === 403);
 check('no cross-site read access is offered (no CORS headers)', !(await raw('GET', '/me', { cookie: ana, origin: 'https://evil.example.org' })).headers.get('access-control-allow-origin'));
 
@@ -113,14 +115,14 @@ check('the database tables are all still there afterwards', Number(sql("SELECT C
 const xss = await mk(ana, `<img src=x onerror=alert(1)>Sec XSS ${stamp}`, { description: '<script>alert(2)</script>' });
 const xr = await raw('GET', `/receipts/${xss.id}`, { cookie: ana });
 check('markup in a receipt is returned as plain data, never as a page', /application\/json/.test(xr.headers.get('content-type')) && xr.headers.get('x-content-type-options') === 'nosniff');
-const longName = await raw('POST', '/receipts', { cookie: ana, body: { payee: 'x'.repeat(5000), receiptDate: '2026-10-11', amount: 1, categoryId: cat } });
+const longName = await raw('POST', '/receipts', { cookie: ana, body: { payee: 'x'.repeat(5000), receiptDate: '2026-10-11', amount: 1, ...F } });
 check('an enormous field is refused politely', longName.status === 400);
 const bigJson = await raw('POST', '/receipts', { cookie: ana, body: JSON.stringify({ payee: 'x', pad: 'y'.repeat(2_000_000) }) });
 check('an enormous request body is refused', bigJson.status === 413 || bigJson.status === 400, String(bigJson.status));
 check('malformed JSON gets a clean error, not a crash', [400, 413].includes((await raw('POST', '/receipts', { cookie: ana, body: '{"payee": ' })).status));
-check('a number where text is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: { $ne: 1 }, receiptDate: '2026-10-11', amount: 1, categoryId: cat } })).status === 400);
-check('an array where a number is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: 'Ok Name', receiptDate: '2026-10-11', amount: [1, 2], categoryId: cat } })).status === 400);
-check('a "__proto__" key does not poison anything', (await raw('POST', '/receipts', { cookie: ana, body: '{"payee":"Proto Test","receiptDate":"2026-10-11","amount":1,"categoryId":' + cat + ',"__proto__":{"isAdmin":true},"constructor":{"prototype":{"x":1}}}' })).status < 500 && (await raw('GET', '/me', { cookie: ana })).data.user.role.code === 'medref');
+check('a number where text is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: { $ne: 1 }, receiptDate: '2026-10-11', amount: 1, ...F } })).status === 400);
+check('an array where a number is expected is refused', (await raw('POST', '/receipts', { cookie: ana, body: { payee: 'Ok Name', receiptDate: '2026-10-11', amount: [1, 2], ...F } })).status === 400);
+check('a "__proto__" key does not poison anything', (await raw('POST', '/receipts', { cookie: ana, body: '{"payee":"Proto Test","receiptDate":"2026-10-11","amount":1,"birInvoice":false,"noBirReason":"no invoice here","transactionType":"product","__proto__":{"isAdmin":true},"constructor":{"prototype":{"x":1}}}' })).status < 500 && (await raw('GET', '/me', { cookie: ana })).data.user.role.code === 'medref');
 const err500 = await raw('GET', '/receipts/abc', { cookie: ana });
 check('a bad id is a clean "not found", with no stack trace', err500.status === 404 && !/at .*\.(ts|js):\d+|node_modules|Prisma/.test(err500.text));
 check('error messages never mention the database or file paths', ![await raw('GET', '/receipts?page=-1', { cookie: ana }), await raw('POST', '/receipts', { cookie: ana, body: 'not json' })].some((r) => /prisma|mysql|C:\\|\/usr\/|stack/i.test(r.text)));

@@ -64,7 +64,7 @@ export const TRANSACTION_LABEL: Record<(typeof TRANSACTION_TYPES)[number], strin
 export const VAT_LABEL: Record<(typeof VAT_TYPES)[number], string> = { vatable: 'Vatable', non_vatable: 'Non-vatable' };
 
 /** The client's reimbursement form. What is required depends on the answers, so it is checked as a whole. */
-export const receiptInputSchema = z.object({
+const receiptShape = z.object({
   birInvoice: flag,
   seenCompany: optional(z.boolean()),
   seenTin: optional(z.boolean()),
@@ -84,10 +84,19 @@ export const receiptInputSchema = z.object({
   whtRate: optional(money('withholding rate').refine((n) => n <= 100, 'The rate cannot be over 100.')),
   whtAmount: optional(money('withholding amount')),
   description: z.string().trim().max(500).nullish(),
-}).superRefine((d, ctx) => {
-  const need = (ok: unknown, path: string, message: string) => { if (!ok) ctx.addIssue({ code: 'custom', path: [path], message }); };
-  const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) ctx.addIssue({ code: 'custom', path: [path], message }); };
-  if (d.birInvoice) {
+});
+
+/** What the "it depends on the answers" rules look at. Every field may be missing. */
+interface Answers {
+  birInvoice?: boolean | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
+  invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
+  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+}
+function conditionalIssues(d: Answers): { path: string; message: string }[] {
+  const out: { path: string; message: string }[] = [];
+  const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };
+  const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) out.push({ path, message }); };
+  if (d.birInvoice === true) {
     need(d.seenCompany, 'seenCompany', 'Tick to confirm the company name can be seen completely on the invoice.');
     need(d.seenTin, 'seenTin', 'Tick to confirm the TIN can be seen completely on the invoice.');
     need(d.seenAddress, 'seenAddress', 'Tick to confirm the complete address can be seen on the invoice.');
@@ -102,10 +111,34 @@ export const receiptInputSchema = z.object({
       missing(d.whtRate, 'whtRate', 'Enter the withholding tax rate.');
       missing(d.whtAmount, 'whtAmount', 'Enter the withholding tax amount.');
     }
-  } else if (!d.noBirReason || d.noBirReason.length < 5) {
-    ctx.addIssue({ code: 'custom', path: ['noBirReason'], message: 'Explain why there is no BIR-registered invoice.' });
+  } else if (d.birInvoice === false && (!d.noBirReason || d.noBirReason.length < 5)) {
+    out.push({ path: 'noBirReason', message: 'Explain why there is no BIR-registered invoice.' });
   }
+  return out;
+}
+
+export const receiptInputSchema = receiptShape.superRefine((d, ctx) => {
+  for (const i of conditionalIssues(d)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
 });
+
+/**
+ * Every problem in the form, by field, even when several things are wrong at once. (A schema stops at the first kind of
+ * mistake, which would hide the "tick this box" messages behind an empty vendor name.)
+ */
+export function receiptProblems(raw: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const r = receiptShape.safeParse(raw);
+  if (!r.success) for (const i of r.error.issues) out[String(i.path[0])] ||= i.message;
+  const n = (v: unknown) => (v === '' || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
+  const b = (v: unknown) => (v === true || v === 'yes' || v === 'true' ? true : v === false || v === 'no' || v === 'false' ? false : null);
+  const t = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  for (const i of conditionalIssues({
+    birInvoice: b(raw.birInvoice), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
+    invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
+    vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
+  })) out[i.path] ||= i.message;
+  return out;
+}
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;
 
 export const actionBodySchema = z.object({

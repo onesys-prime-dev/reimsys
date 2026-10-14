@@ -1,5 +1,6 @@
 // An approver is not satisfied with the proof and asks the Med Ref for more. Browser check from both sides.
 // Usage: WEB=http://localhost:4000 node e2e/more-proof-ui.mjs <screenshot-dir>
+import { fillQuickForm, toLastStep } from './form-helpers.mjs';
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,7 +27,7 @@ try {
   /* Ana sends a receipt with a thin photo */
   const ana = await as('ana.reyes@example.com');
   await ana.goto('/receipts/new'); await ana.waitForSelector('form');
-  await ana.fill('input[placeholder="Store or provider name"]', tag); await ana.fill('input[placeholder="0.00"]', '2480.75');
+  await fillQuickForm(ana, { payee: tag, amount: '2480.75' });
   await ana.setInputFiles('input[type=file]', { name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.concat([PNG, Buffer.from('p1' + stamp)]) });
   await ana.click('button:has-text("Submit for checking")'); await ana.waitForSelector('.pill:has-text("Submitted")');
   const url = ana.url();
@@ -56,7 +57,7 @@ try {
   await ana.waitForSelector('.callout:has-text("prescription")');
   ok('the Med Ref sees the approver\'s request, in plain words, at the top', /Returned for correction/.test(await ana.locator('.callout').first().innerText()));
   await ana.screenshot({ path: path.join(out, '3-medref.png') });
-  await ana.click('a:has-text("Edit")'); await ana.waitForSelector('h1:has-text("Edit receipt")');
+  await ana.click('a:has-text("Edit")'); await ana.waitForSelector('h1:has-text("Edit receipt")'); await toLastStep(ana);
   await ana.setInputFiles('input[type=file]', { name: 'prescription.png', mimeType: 'image/png', buffer: Buffer.concat([PNG, Buffer.from('rx' + stamp)]) });
   await ana.click('button:has-text("Resubmit for checking")'); await ana.waitForSelector('.pill:has-text("Submitted")');
   ok('the Med Ref adds the prescription and sends it again', (await ana.locator('.evtab').count()) === 2);

@@ -1,6 +1,7 @@
 // Drives the real UI in Chrome through the main journey. Needs the API (4000) and web app (5173) running.
 // Usage: node e2e/ui-flow.mjs [screenshot-dir]
 import { chromium } from 'playwright';
+import { fillQuickForm, toLastStep } from './form-helpers.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,11 +39,9 @@ const ana = await open('ana.reyes@example.com');
 await shot(ana.page, '1-medref-dashboard');
 await ana.page.click('text=New receipt >> nth=0');
 await ana.page.waitForSelector('form');
-await ana.page.click('button:has-text("Submit for checking")');
-ok('validation shows errors without saving', (await ana.page.locator('.err').count()) >= 2);
-await ana.page.fill('input[placeholder="Store or provider name"]', payee);
-await ana.page.fill('input[placeholder="0.00"]', '2480.75');
-await ana.page.fill('input[placeholder="What was this for?"]', 'UI flow test');
+await ana.page.click('button:has-text("Next")');
+ok('validation shows errors without moving on', (await ana.page.locator('.err').count()) >= 1);
+await fillQuickForm(ana.page, { payee, amount: '2480.75', description: 'UI flow test' });
 await ana.page.setInputFiles('input[type=file]', png);
 await shot(ana.page, '2-medref-form');
 await ana.page.click('button:has-text("Submit for checking")');
@@ -75,6 +74,7 @@ await ana.page.goto(receiptUrl);
 await ana.page.waitForSelector('.callout:has-text("doctor name")');
 ok('med ref sees the return note', true);
 await ana.page.click('a:has-text("Edit")');
+await toLastStep(ana.page);
 await ana.page.fill('input[placeholder="What was this for?"]', 'UI flow test, Dr. Reyes');
 await ana.page.click('button:has-text("Resubmit for checking")');
 await ana.page.waitForSelector('.pill:has-text("Submitted")');
@@ -139,9 +139,9 @@ await admin.page.waitForSelector('.aud');
 ok('audit log lists the approval', (await admin.page.locator('.aud').count()) > 0);
 await shot(admin.page, '9-admin-audit');
 await admin.page.goto('/access');
-await admin.page.click('button[role=tab]:has-text("Categories")');
-await admin.page.waitForSelector('.cats .urow');
-ok('categories tab lists categories', (await admin.page.locator('.cats .urow').count()) >= 5);
+await admin.page.click('button[role=tab]:has-text("Company")');
+await admin.page.waitForSelector('text=Company on the invoice');
+ok('company tab shows the company details', (await admin.page.locator('.card-b input').count()) >= 3);
 
 console.log('Phone layout');
 const m = await open('ana.reyes@example.com', { width: 390, height: 800 });

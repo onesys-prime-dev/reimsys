@@ -2,6 +2,8 @@
 // Usage: WEB=http://localhost:4000 node e2e/features-ui.mjs <screenshot-dir>
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+// The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
+const F = { birInvoice: false, noBirReason: 'test receipt, no BIR invoice', transactionType: 'product' };
 const WEB = process.env.WEB ?? 'http://localhost:4000';
 const out = process.argv[2] ?? '.';
 fs.mkdirSync(out, { recursive: true });
@@ -14,7 +16,7 @@ const login = async (e) => (await fetch(WEB + '/api/auth/login', { method: 'POST
 async function seed(tag) {
   const c = await login('ana.reyes@example.com');
   const cat = (await (await fetch(WEB + '/api/categories', { headers: H(c) })).json()).categories[0].id;
-  let r = (await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: H(c), body: JSON.stringify({ payee: tag, receiptDate: '2026-10-11', amount: 321.5, categoryId: cat }) })).json()).receipt;
+  let r = (await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: H(c), body: JSON.stringify({ payee: tag, receiptDate: '2026-10-11', amount: 321.5, ...F }) })).json()).receipt;
   const f = new FormData(); f.append('files', new Blob([Buffer.concat([PNG, Buffer.from(tag + Math.random())])], { type: 'image/png' }), 'r.png');
   r = (await (await fetch(`${WEB}/api/receipts/${r.id}/evidence`, { method: 'POST', headers: { cookie: c, 'x-requested-with': 'reimsys', origin: WEB }, body: f })).json()).receipt;
   await fetch(`${WEB}/api/receipts/${r.id}/submit`, { method: 'POST', headers: H(c), body: JSON.stringify({ version: r.version }) });

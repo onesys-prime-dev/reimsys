@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { DEFAULT_COMPANY, EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSACTION_LABEL, VAT_LABEL, peso, receiptInputSchema, receiptWarnings, type Company } from '@reimsys/shared';
+import { DEFAULT_COMPANY, EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSACTION_LABEL, VAT_LABEL, peso, receiptInputSchema, receiptProblems, receiptWarnings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { Field, Icon, useToast } from '../ui';
@@ -130,10 +130,9 @@ export function ReceiptFormPage() {
 
   /** Problems in the whole form, grouped by the field they belong to. */
   const validate = () => {
-    const parsed = receiptInputSchema.safeParse(toCandidate(f));
-    const errs: Record<string, string> = {};
-    if (!parsed.success) for (const i of parsed.error.issues) errs[String(i.path[0])] ||= i.message;
-    return { parsed, errs };
+    const candidate = toCandidate(f);
+    const errs = receiptProblems(candidate);
+    return { parsed: receiptInputSchema.safeParse(candidate), errs };
   };
 
   function next() {
