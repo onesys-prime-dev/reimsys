@@ -1,5 +1,5 @@
 // A pretend mail server for testing. It accepts email on port 1025 and saves each message,
-// so you can check that REIMSIS really sends mail without needing a real account.
+// so you can check that REIMSYS really sends mail without needing a real account.
 //
 //   node e2e/smtp-catcher.mjs [folder]          start it (leave it running)
 //   then start the API with:  SMTP_HOST=localhost SMTP_PORT=1025

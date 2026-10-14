@@ -15,8 +15,8 @@ const env = z
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     SMTP_SECURE: z.enum(['true', 'false']).default('false'),
-    MAIL_FROM: z.string().default('REIMSIS <no-reply@example.com>'),
-    ORG_NAME: z.string().default('REIMSIS'),
+    MAIL_FROM: z.string().default('REIMSYS <no-reply@example.com>'),
+    ORG_NAME: z.string().default('REIMSYS'),
     WEB_DIST: z.string().default('../web/dist'),
   })
   .parse(process.env);

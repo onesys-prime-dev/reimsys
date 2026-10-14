@@ -64,7 +64,7 @@ async function readRows(file: Express.Multer.File): Promise<Record<string, strin
 
 importsRouter.get('/template', (_req, res) => {
   const sample = [['Mercury Drug - Mandaue', '2026-10-12', '1284.50', 'Medicine', 'Clinic supplies', '']];
-  res.type('text/csv').attachment('reimsis-import-template.csv').send(toCsv([TEMPLATE_HEAD, ...sample]));
+  res.type('text/csv').attachment('reimsys-import-template.csv').send(toCsv([TEMPLATE_HEAD, ...sample]));
 });
 
 importsRouter.post('/', upload.single('file'), async (req, res) => {

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>REIMSIS Mock Interface</title>
+<title>REIMSYS Mock Interface</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap">
 <style>
@@ -510,7 +510,7 @@ function login() {
   const roles = Object.keys(ROLES);
   const rl = ROLES[S.loginRole];
   return '<div class="login"><div class="card lcard">'
-    + '<div class="brand"><span class="logo">R</span><b>REIMSIS</b></div>'
+    + '<div class="brand"><span class="logo">R</span><b>REIMSYS</b></div>'
     + '<h1>Sign in</h1><p class="muted" style="margin:6px 0 0">Reimbursement management. Choose a role to explore the mock.</p>'
     + '<form id="loginf" style="margin-top:18px"><div class="seg" role="tablist" aria-label="Demo role">' + roles.map(k => '<button type="button" data-act="lrole" data-v="' + k + '" class="' + (k === S.loginRole ? 'on' : '') + '">' + (k === 'admin' ? 'Admin' : ROLES[k].label) + '</button>').join('') + '</div>'
     + '<label class="f">Email<input type="email" id="l-em" value="' + esc(rl.email) + '" autocomplete="username"></label>'
@@ -536,7 +536,7 @@ function shell(content) {
   const u = unread();
   const notifPanel = S.notif ? '<div class="panel" role="dialog" aria-label="Notifications"><div class="card-h"><h3>Notifications</h3><button class="btn sm ghost" data-act="readall">Mark all read</button></div>'
     + (notes.filter(n => n.to === S.role).slice(0, 8).map(n => '<button class="note ' + (n.un ? 'un' : 'rd') + '" data-act="opennote" data-id="' + (n.id || '') + '"><span class="dotp"></span><span>' + esc(n.text) + '</span></button>').join('') || '<div class="empty">Nothing new.</div>') + '</div>' : '';
-  return '<div class="shell"><aside class="side"><div class="brand"><span class="logo">R</span><b>REIMSIS</b></div><nav class="nav" aria-label="Main">' + side + '</nav>'
+  return '<div class="shell"><aside class="side"><div class="brand"><span class="logo">R</span><b>REIMSYS</b></div><nav class="nav" aria-label="Main">' + side + '</nav>'
     + '<button class="who" data-act="go" data-v="profile"><span class="av">' + me().ini + '</span><span><b>' + esc(me().name) + '</b><small>' + me().title + '</small></span></button></aside>'
     + '<div class="main"><header class="top"><div class="t">' + (S.screen === 'form' ? (S.form && S.form.id ? 'Edit receipt' : 'New receipt') : TITLES[S.screen]) + '</div>'
     + '<button class="iconbtn" data-act="bell" aria-label="Notifications">' + ic('bell') + (u ? '<span class="badge dotn">' + u + '</span>' : '') + '</button>'

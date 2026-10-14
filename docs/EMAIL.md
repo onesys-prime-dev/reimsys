@@ -1,6 +1,6 @@
 # Email
 
-REIMSIS sends email when a receipt is returned, approved, disapproved, put on hold, or released, plus an optional morning summary. Mail goes through a queue and is retried for you if the mail server is down.
+REIMSYS sends email when a receipt is returned, approved, disapproved, put on hold, or released, plus an optional morning summary. Mail goes through a queue and is retried for you if the mail server is down.
 
 ## Try it without a real mail account
 
@@ -79,4 +79,4 @@ Sign in as the Super Admin and open **Access, Email templates**.
 - The **Preview** is built by the server from your unsaved text, so it is exactly what would be sent. Switch between Computer and Phone. **Send a sample** emails it to any address with "[Sample]" in the subject.
 - **Reset to default wording** brings the original text back. Every edit is recorded in the audit log.
 
-Links in emails: the button only appears when REIMSIS has a normal `https://` address. Until then the email says "Sign in to <name> to open it" instead, because mail with links to a bare IP address or plain http is far more likely to be marked as spam.
+Links in emails: the button only appears when REIMSYS has a normal `https://` address. Until then the email says "Sign in to <name> to open it" instead, because mail with links to a bare IP address or plain http is far more likely to be marked as spam.

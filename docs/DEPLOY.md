@@ -1,4 +1,4 @@
-# Deploying REIMSIS
+# Deploying REIMSYS
 
 One Linux server runs everything: Node (API + built web app), MySQL, Nginx for HTTPS. Redis is not needed; the job queue lives in MySQL.
 
@@ -41,7 +41,7 @@ After seeding, sign in as `admin@example.com`, create the real users on the Acce
 NODE_ENV=production
 PORT=4000
 DATABASE_URL="mysql://reimsis_app:<password>@localhost:3306/reimsis"
-WEB_ORIGIN=https://reimsis.example.com
+WEB_ORIGIN=https://reimsys.example.com
 SESSION_DAYS=7
 STORAGE_DIR=/var/lib/reimsis/storage
 SMTP_HOST=smtp.example.com
@@ -72,7 +72,7 @@ The API process also serves the built web app and runs the background worker (em
 
 ```nginx
 server {
-  server_name reimsis.example.com;
+  server_name reimsys.example.com;
   client_max_body_size 12m;            # evidence files are up to 10 MB
   location / {
     proxy_pass http://127.0.0.1:4000;

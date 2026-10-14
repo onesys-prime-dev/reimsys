@@ -22,7 +22,7 @@ function titleFor(path: string) {
   if (path === '/receipts/import') return 'Import receipts';
   if (path.startsWith('/reports/')) return 'Report';
   if (path.startsWith('/receipts/')) return path.endsWith('/edit') ? 'Edit receipt' : 'Receipt';
-  return ({ '/receipts': 'Receipts', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSIS';
+  return ({ '/receipts': 'Receipts', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSYS';
 }
 
 function Shell() {

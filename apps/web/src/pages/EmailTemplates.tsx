@@ -178,7 +178,7 @@ export function EmailTemplatesTab() {
                 <>
                   <div className="muted" style={{ fontSize: '.86rem', marginBottom: 8 }}>Subject: <b style={{ color: 'var(--ink)' }}>{preview.subject}</b></div>
                   <div className="tpl-frame"><iframe title="Email preview" sandbox="" srcDoc={preview.html} style={{ width: phone ? 375 : '100%', height: 560 }} /></div>
-                  {preview.buttonHiddenForNow && draft.buttonLabel && <p className="muted" style={{ fontSize: '.84rem', margin: '10px 0 0' }}>The button is shown here as it will look once REIMSIS has a secure web address. Until then the emails say "Sign in to {brand.orgName} to open it." instead, because links to a plain address make mail look like spam.</p>}
+                  {preview.buttonHiddenForNow && draft.buttonLabel && <p className="muted" style={{ fontSize: '.84rem', margin: '10px 0 0' }}>The button is shown here as it will look once REIMSYS has a secure web address. Until then the emails say "Sign in to {brand.orgName} to open it." instead, because links to a plain address make mail look like spam.</p>}
                 </>
               ) : <div className="empty">Loading preview…</div>}
               <form className="tools" style={{ marginTop: 16, marginBottom: 0 }} onSubmit={(e) => { e.preventDefault(); if (sampleTo && !unknown.length) sendSample.mutate(); }}>

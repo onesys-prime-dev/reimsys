@@ -1,8 +1,8 @@
-# REIMSIS
+# REIMSYS
 
 Reimbursement Management System. Med Refs encode receipts with evidence, a Checker verifies, an Approver decides. Every step is audited and emailed, and ends in a reimbursement document and liquidation reports.
 
-Plan: [docs/PLAN.md](docs/PLAN.md) · Diagrams: `docs/REIMSIS BUILD PLAN.html` · Clickable mock: `docs/REIMSIS UI MOCK.html` · Deploying: [docs/DEPLOY.md](docs/DEPLOY.md)
+Plan: [docs/PLAN.md](docs/PLAN.md) · Diagrams: `docs/REIMSYS BUILD PLAN.html` · Clickable mock: `docs/REIMSYS UI MOCK.html` · Deploying: [docs/DEPLOY.md](docs/DEPLOY.md)
 
 ## Requirements
 

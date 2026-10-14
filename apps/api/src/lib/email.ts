@@ -3,6 +3,7 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { enqueue, registerJob } from './jobs.js';
+import { EMAIL_LOGO_PNG_BASE64 } from './emailLogo.js';
 import { resolveMail } from './mailSettings.js';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -45,6 +46,9 @@ export function buildMessage(m: { id: number; from: string; to: string; subject:
     from: m.from, to: m.to, subject: m.subject, html: m.html, text: htmlToText(m.html),
     messageId: `<${randomUUID()}@${domain}>`,
     headers: { 'Auto-Submitted': 'auto-generated', 'X-Auto-Response-Suppress': 'All', 'X-Entity-Ref-ID': String(m.id) },
+    attachments: m.html.includes('cid:logo@reimsys')
+      ? [{ filename: 'logo.png', content: Buffer.from(EMAIL_LOGO_PNG_BASE64, 'base64'), cid: 'logo@reimsys', contentDisposition: 'inline' as const }]
+      : [],
   };
 }
 

@@ -82,6 +82,6 @@ if (fs.existsSync(indexHtml)) {
 }
 app.use(errorHandler);
 
-app.listen(config.port, () => console.log(`REIMSIS API listening on http://localhost:${config.port}`));
+app.listen(config.port, () => console.log(`REIMSYS API listening on http://localhost:${config.port}`));
 void startWorker();
 startDigest();

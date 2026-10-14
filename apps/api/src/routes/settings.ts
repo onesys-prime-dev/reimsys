@@ -7,7 +7,8 @@ import {
 import { audit } from '../lib/audit.js';
 import { config } from '../config.js';
 import { explainMailError, isPublicLink, queueEmail } from '../lib/email.js';
-import { getBranding, getTemplate, renderEmail, resetTemplate, saveBranding, saveTemplate, templateViews } from '../lib/emailTemplates.js';
+import { EMAIL_LOGO_PNG_BASE64 } from '../lib/emailLogo.js';
+import { LOGO_CID, getBranding, getTemplate, renderEmail, resetTemplate, saveBranding, saveTemplate, templateViews } from '../lib/emailTemplates.js';
 import { badRequest, notFound } from '../lib/errors.js';
 import { clearMail, mailView, resolveMail, saveMail, savedPassword } from '../lib/mailSettings.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -113,8 +114,9 @@ settingsRouter.post('/email-templates/:key/preview', async (req, res) => {
   const key = keyParam(req.params.key);
   const template = req.body?.template ? checkTemplate(key, req.body.template) : undefined;
   const branding = req.body?.branding ? emailBrandingSchema.parse(req.body.branding) : undefined;
-  const mail = await renderEmail({ key, data: sampleFor(key), link: 'https://reimsis.example.com/receipts/123', template, branding });
-  res.json({ ...mail, buttonHiddenForNow: !isPublicLink(config.webOrigin) });
+  const mail = await renderEmail({ key, data: sampleFor(key), link: 'https://reimsys.example.com/receipts/123', template, branding });
+  const html = mail.html.split(`cid:${LOGO_CID}`).join(`data:image/png;base64,${EMAIL_LOGO_PNG_BASE64}`);
+  res.json({ ...mail, html, buttonHiddenForNow: !isPublicLink(config.webOrigin) });
 });
 
 /** Sends a sample of this email to an address so it can be checked in a real inbox. */

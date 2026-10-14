@@ -7,17 +7,23 @@ const favicon = fs.readFileSync(path.resolve(__dirname, '../../../apps/web/publi
 
 describe('the logo', () => {
   it('is the same in the favicon file as in the shared definition', () => {
-    expect(favicon).toContain(`d="${LOGO.receipt}"`);
-    const pts = LOGO.check.points.map(([x, y]) => `${x},${y}`).join(' ');
-    expect(favicon).toContain(`points="${pts}"`);
-    for (const [x1, y1, x2, y2] of LOGO.lines.segments) expect(favicon).toContain(`x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"`);
+    expect(favicon).toContain(`d="${LOGO.ring.d}"`);
+    expect(favicon).toContain(`points="${LOGO.head.points.map(([x, y]) => `${x},${y}`).join(' ')}"`);
+    expect(favicon).toContain(`d="${LOGO.peso.stem}"`);
+    expect(favicon).toContain(`d="${LOGO.peso.bars}"`);
+    expect(favicon).toContain(`stroke-width="${LOGO.ring.width}"`);
     expect(favicon).toContain(BRAND.tealLight);
     expect(favicon).toContain(BRAND.tealDark);
   });
 
-  it('keeps everything inside the square with room to breathe', () => {
-    const nums = [...LOGO.receipt.matchAll(/-?\d+(\.\d+)?/g)].map((m) => Number(m[0]));
-    expect(Math.min(...nums)).toBeGreaterThanOrEqual(6);
-    expect(Math.max(...nums)).toBeLessThanOrEqual(LOGO.size - 6);
+  it('keeps the arrow head and ring inside the square with room to breathe', () => {
+    for (const [x, y] of LOGO.head.points) {
+      expect(Math.min(x, y)).toBeGreaterThanOrEqual(6);
+      expect(Math.max(x, y)).toBeLessThanOrEqual(LOGO.size - 6);
+    }
+  });
+
+  it('is called REIMSYS', () => {
+    expect(BRAND.name).toBe('REIMSYS');
   });
 });

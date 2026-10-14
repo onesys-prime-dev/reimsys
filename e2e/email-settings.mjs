@@ -36,10 +36,10 @@ ok('empty form shows plain-language errors', (await p.locator('.err').allInnerTe
 await p.click('.seg button:has-text("Other")');
 await p.fill('input[placeholder="smtp.gmail.com"]', 'localhost');
 await p.fill('input[type=number]', '1025');
-await p.fill('input[placeholder="you@gmail.com"] >> nth=0', 'reimsis-mail');
+await p.fill('input[placeholder="you@gmail.com"] >> nth=0', 'reimsys-mail');
 await p.fill('input[type=password]', 'wrong');
-await p.fill('input[placeholder="Your Organisation"]', 'REIMSIS');
-await p.fill('input[type=email] >> nth=0', 'no-reply@reimsis.test');
+await p.fill('input[placeholder="Your Organisation"]', 'REIMSYS');
+await p.fill('input[type=email] >> nth=0', 'no-reply@reimsys.test');
 await p.click('button:has-text("Test connection")');
 await p.waitForSelector('.callout.bad');
 const bad = await p.locator('.callout.bad').innerText();
@@ -56,7 +56,7 @@ await p.waitForSelector('.toast:has-text("Email account saved")');
 await p.waitForSelector('text=Sending through localhost');
 ok('banner shows the saved account', true);
 await p.waitForTimeout(800); // give any late refresh a chance to wipe the form, which used to happen
-ok('the form keeps its values after saving', (await p.inputValue('input[placeholder="smtp.gmail.com"]')) === 'localhost' && (await p.inputValue('input[placeholder="you@gmail.com"] >> nth=0')) === 'reimsis-mail' && (await p.inputValue('input[type=email] >> nth=0')) === 'no-reply@reimsis.test');
+ok('the form keeps its values after saving', (await p.inputValue('input[placeholder="smtp.gmail.com"]')) === 'localhost' && (await p.inputValue('input[placeholder="you@gmail.com"] >> nth=0')) === 'reimsys-mail' && (await p.inputValue('input[type=email] >> nth=0')) === 'no-reply@reimsys.test');
 ok('password box is cleared and says it is saved', (await p.inputValue('input[type=password]')) === '' && await p.locator('text=Saved. Leave blank to keep it').isVisible());
 await p.screenshot({ path: path.join(OUT, 'mail-saved.png'), fullPage: true });
 
@@ -79,16 +79,16 @@ await p.waitForSelector('.toast:has-text("Test email queued")');
 let delivered = null;
 for (let i = 0; i < 20 && !delivered; i++) {
   await new Promise((r) => setTimeout(r, 500));
-  delivered = fs.readdirSync(BOX).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(BOX, f), 'utf8'))).find((m) => /onesysprimedev/.test(m.to ?? '') && m.authUser === 'reimsis-mail');
+  delivered = fs.readdirSync(BOX).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(BOX, f), 'utf8'))).find((m) => /onesysprimedev/.test(m.to ?? '') && m.authUser === 'reimsys-mail');
 }
 ok('the test email arrived, signed in with the saved username', !!delivered, JSON.stringify(delivered));
-ok('it was sent from the address you set', !!delivered && /REIMSIS/.test(delivered.from) && /no-reply@reimsis.test/.test(delivered.from), delivered?.from);
+ok('it was sent from the address you set', !!delivered && /REIMSYS/.test(delivered.from) && /no-reply@reimsys.test/.test(delivered.from), delivered?.from);
 
 // leaving the password blank keeps it
-await p.fill('input[placeholder="Your Organisation"]', 'REIMSIS Cebu');
+await p.fill('input[placeholder="Your Organisation"]', 'REIMSYS Cebu');
 await p.click('button[type=submit]:has-text("Save")'); await p.waitForSelector('.toast:has-text("Email account saved")');
 const again = sql("SELECT value FROM Setting WHERE `key`='mail'");
-ok('saving with a blank password keeps the saved one', again.includes('"passEnc":"v1:') && again.includes('REIMSIS Cebu'));
+ok('saving with a blank password keeps the saved one', again.includes('"passEnc":"v1:') && again.includes('REIMSYS Cebu'));
 
 // Emails tab shows it
 await p.goto('/audit'); await p.click('button[role=tab]:has-text("Emails")');

@@ -1,6 +1,6 @@
 {
-  "name": "REIMSIS",
-  "short_name": "REIMSIS",
+  "name": "REIMSYS",
+  "short_name": "REIMSYS",
   "description": "Reimbursement management",
   "start_url": "/",
   "display": "standalone",

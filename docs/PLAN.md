@@ -1,7 +1,7 @@
-# REIMSIS: Final Build Plan (v1)
+# REIMSYS: Final Build Plan (v1)
 
 Reimbursement Management System. First client: a pharmacy.
-Visual references: `docs/REIMSIS BUILD PLAN.html` (diagrams) and `docs/REIMSIS UI MOCK.html` (clickable mock, white theme).
+Visual references: `docs/REIMSYS BUILD PLAN.html` (diagrams) and `docs/REIMSYS UI MOCK.html` (clickable mock, white theme).
 
 ## 1. Scope
 
@@ -29,7 +29,7 @@ Visual references: `docs/REIMSIS BUILD PLAN.html` (diagrams) and `docs/REIMSIS U
 | Files | Storage adapter: local disk now, S3-compatible later |
 | Jobs | Email and document/report generation through a queue and worker. DB-backed queue in dev, Redis + BullMQ in production |
 | Documents | Reimbursement doc `REIM-YYYY-NNNNNN`, one per approved receipt. Layouts are placeholders until the client's manual forms arrive |
-| UI | White, clean, teal accent, light default with optional dark. Matches `docs/REIMSIS UI MOCK.html` |
+| UI | White, clean, teal accent, light default with optional dark. Matches `docs/REIMSYS UI MOCK.html` |
 | Audit | Append-only table. App DB user has no UPDATE/DELETE on it |
 
 ## 3. Status rules

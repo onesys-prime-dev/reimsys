@@ -1,4 +1,4 @@
-# Runs REIMSIS so a phone on the same Wi-Fi can open it.
+# Runs REIMSYS so a phone on the same Wi-Fi can open it.
 # Usage:  powershell -ExecutionPolicy Bypass -File .\start-lan.ps1
 # Then open  http://<this PC's Wi-Fi address>:4000  on the phone.
 

@@ -6,14 +6,14 @@ import { buildMessage, htmlToText, isPublicLink } from '../src/lib/email';
 import { renderEmail } from '../src/lib/emailTemplates';
 
 const branding: EmailBranding = { orgName: 'Test Pharmacy', footer: 'Cebu City', accent: '#0c7480' };
-const HTTPS = 'https://reimsis.example.com/receipts/9';
+const HTTPS = 'https://reimsys.example.com/receipts/9';
 const render = (key: keyof typeof DEFAULT_TEMPLATES, data: Record<string, string>, link?: string, template = DEFAULT_TEMPLATES[key]) =>
   renderEmail({ key, data, link, template, branding });
 
 describe('links in emails', () => {
   it('only allows normal https addresses', () => {
     expect(isPublicLink(HTTPS)).toBe(true);
-    expect(isPublicLink('http://reimsis.example.com')).toBe(false);
+    expect(isPublicLink('http://reimsys.example.com')).toBe(false);
     expect(isPublicLink('http://192.168.1.39:4000/receipts/4')).toBe(false);
     expect(isPublicLink('https://192.168.1.39')).toBe(false);
     expect(isPublicLink('http://localhost:4000')).toBe(false);
@@ -115,7 +115,7 @@ describe('plain-text version', () => {
 describe('the message a receiving mail server sees', () => {
   it('has html and plain text, honest automated-mail headers, and an id on the sender domain', async () => {
     const mail = await render('test', { actorName: 'Admin' }, 'http://192.168.1.39:4000');
-    const msg = buildMessage({ id: 7, from: '"REIMSIS" <you@gmail.com>', to: 'someone@example.com', subject: mail.subject, html: mail.html });
+    const msg = buildMessage({ id: 7, from: '"REIMSYS" <you@gmail.com>', to: 'someone@example.com', subject: mail.subject, html: mail.html });
     const sent = await nodemailer.createTransport({ streamTransport: true, buffer: true }).sendMail(msg);
     const parsed = await simpleParser(sent.message as Buffer);
     expect(parsed.html).toBeTruthy();
@@ -123,6 +123,18 @@ describe('the message a receiving mail server sees', () => {
     expect(parsed.messageId).toMatch(/^<[0-9a-f-]+@gmail\.com>$/);
     expect(parsed.headers.get('auto-submitted')).toBe('auto-generated');
     expect(String(parsed.html)).not.toContain('192.168');
+  });
+
+  it('carries the logo as an inline image so it shows without allowing remote images', async () => {
+    const mail = await render('test', { actorName: 'Admin' }, HTTPS);
+    expect(mail.html).toContain('src="cid:logo@reimsys"');
+    const msg = buildMessage({ id: 8, from: 'REIMSYS <you@gmail.com>', to: 'someone@example.com', subject: mail.subject, html: mail.html });
+    const sent = await nodemailer.createTransport({ streamTransport: true, buffer: true }).sendMail(msg);
+    const parsed = await simpleParser(sent.message as Buffer);
+    expect(parsed.attachments).toHaveLength(1);
+    expect(parsed.attachments[0]!.cid).toBe('logo@reimsys');
+    expect(parsed.attachments[0]!.contentType).toBe('image/png');
+    expect(parsed.attachments[0]!.size).toBeGreaterThan(500);
   });
 });
 
