@@ -1,5 +1,5 @@
 import type { Role, User } from '@prisma/client';
-import type { MeResponse, RoleSummary } from '@reimsis/shared';
+import type { MeResponse, RoleSummary } from '@reimsys/shared';
 
 export const roleSummary = (r: Role, userCount?: number): RoleSummary => ({
   id: r.id,

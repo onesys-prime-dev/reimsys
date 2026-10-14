@@ -37,7 +37,7 @@ jobs:
     env:
       DEPLOY_ENV: ${{ inputs.environment }}
       SSH_PORT: ${{ vars.SSH_PORT || '22' }}
-      PM2_APP: ${{ vars.PM2_APP || 'reimsis' }}
+      PM2_APP: ${{ vars.PM2_APP || 'reimsys' }}
       DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       SITE_URL: ${{ vars.SITE_URL }}
       # Set TLS_INSECURE=true only for a server with a self-signed certificate.
@@ -108,7 +108,7 @@ jobs:
       ########################################################
 
       - name: Generate Prisma client
-        run: pnpm --filter @reimsis/api db:generate
+        run: pnpm --filter @reimsys/api db:generate
 
       - name: Build web app and API
         run: pnpm build
@@ -153,7 +153,7 @@ jobs:
           set -euo pipefail
           dir="$1"
           if [ ! -d "$dir" ] || [ ! -f "$dir/apps/api/.env" ]; then
-            echo "::error::$dir does not look like the live Reimsis folder (it needs apps/api/.env). Refusing to deploy."
+            echo "::error::$dir does not look like the live Reimsys folder (it needs apps/api/.env). Refusing to deploy."
             exit 1
           fi
           for tool in node pnpm pm2 mysqldump; do

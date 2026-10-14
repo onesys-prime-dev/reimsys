@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' });
+const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 const hex = (s) => Buffer.from(s, 'utf8').toString('hex');
 const put = (key, value) => sql(`INSERT INTO Setting (\`key\`, value, updatedAt) VALUES ('${key}', CONVERT(UNHEX('${hex(value)}') USING utf8mb4), NOW()) ON DUPLICATE KEY UPDATE value=VALUES(value)`);
 

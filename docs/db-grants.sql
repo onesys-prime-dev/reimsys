@@ -1,33 +1,33 @@
 -- Run once as a MySQL administrator AFTER migrations. Replace the password.
--- The running app connects as reimsis_app. It can read and write every table except the audit trail,
+-- The running app connects as reimsys_app. It can read and write every table except the audit trail,
 -- which it can only read and append to. Changing or deleting audit rows needs a person with database access.
 --
 -- MySQL cannot take one privilege away from a database-wide grant, so the grants are per table.
 -- If a later migration adds a table, grant it here too (SELECT, INSERT, UPDATE, DELETE).
 
-CREATE USER IF NOT EXISTS 'reimsis_app'@'localhost' IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
+CREATE USER IF NOT EXISTS 'reimsys_app'@'localhost' IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Role                  TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Permission            TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.RolePermission        TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.User                  TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Session               TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Category              TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Receipt               TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.ReceiptEvidence       TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.ReimbursementDocument TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Notification          TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.EmailLog              TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Job                   TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.LiquidationReport     TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.ImportJob             TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Comment               TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.PasswordToken          TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Setting               TO 'reimsis_app'@'localhost';
-GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Sequence              TO 'reimsis_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Role                  TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Permission            TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.RolePermission        TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.User                  TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Session               TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Category              TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Receipt               TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.ReceiptEvidence       TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.ReimbursementDocument TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Notification          TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.EmailLog              TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Job                   TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.LiquidationReport     TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.ImportJob             TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Comment               TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.PasswordToken          TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Setting               TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.Sequence              TO 'reimsys_app'@'localhost';
 
 -- Audit log: read and append only.
-GRANT SELECT, INSERT ON reimsis.AuditLog TO 'reimsis_app'@'localhost';
+GRANT SELECT, INSERT ON reimsys.AuditLog TO 'reimsys_app'@'localhost';
 
 FLUSH PRIVILEGES;
 

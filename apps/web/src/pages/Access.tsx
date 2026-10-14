@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { PERMISSIONS, isLockedGrant, type RoleSummary } from '@reimsis/shared';
+import { PERMISSIONS, isLockedGrant, type RoleSummary } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';

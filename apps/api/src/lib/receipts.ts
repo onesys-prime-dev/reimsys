@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, type ReceiptStatus } from '@reimsis/shared';
+import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import type { AuthContext } from '../types.js';

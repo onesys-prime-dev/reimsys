@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changePasswordSchema } from '@reimsis/shared';
+import { changePasswordSchema } from '@reimsys/shared';
 import { temporaryPassword } from '../src/lib/password';
 import { toCsv } from '../src/lib/reports';
 import { formatNumber } from '../src/lib/sequence';

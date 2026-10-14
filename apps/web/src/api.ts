@@ -11,7 +11,7 @@ interface Options {
 }
 
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
-  const headers: Record<string, string> = { 'x-requested-with': 'reimsis' };
+  const headers: Record<string, string> = { 'x-requested-with': 'reimsys' };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   const res = await fetch('/api' + path, {
     method: opts.method ?? 'GET',

@@ -22,7 +22,7 @@ async function as(email, size = { width: 1280, height: 860 }) {
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errs.push(String(e)));
   p.on('console', (m) => m.type() === 'error' && !/40[0-9]|413/.test(m.text()) && errs.push(m.text()));
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
   return p;
 }
 
@@ -116,9 +116,9 @@ ok('an over-10-MB file is refused in the form with a clear message', /10 MB/.tes
 const cookies = await ana.context().cookies();
 const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
 const big = new FormData(); big.append('files', new Blob([Buffer.concat([photo, Buffer.alloc(11 * 1048576, 1)])], { type: 'image/jpeg' }), 'huge.jpg');
-const me = await (await fetch(WEB + '/api/receipts?pageSize=1', { headers: { cookie, 'x-requested-with': 'reimsis' } })).json();
-const draft = await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsis', origin: WEB, 'content-type': 'application/json' }, body: JSON.stringify({ payee: 'Too Big ' + stamp, receiptDate: '2026-10-11', amount: 5, categoryId: (await (await fetch(WEB + '/api/categories', { headers: { cookie, 'x-requested-with': 'reimsis' } })).json()).categories[0].id }) })).json();
-const rBig = await fetch(`${WEB}/api/receipts/${draft.receipt.id}/evidence`, { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsis', origin: WEB }, body: big });
+const me = await (await fetch(WEB + '/api/receipts?pageSize=1', { headers: { cookie, 'x-requested-with': 'reimsys' } })).json();
+const draft = await (await fetch(WEB + '/api/receipts', { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' }, body: JSON.stringify({ payee: 'Too Big ' + stamp, receiptDate: '2026-10-11', amount: 5, categoryId: (await (await fetch(WEB + '/api/categories', { headers: { cookie, 'x-requested-with': 'reimsys' } })).json()).categories[0].id }) })).json();
+const rBig = await fetch(`${WEB}/api/receipts/${draft.receipt.id}/evidence`, { method: 'POST', headers: { cookie, 'x-requested-with': 'reimsys', origin: WEB }, body: big });
 const jBig = await rBig.json().catch(() => null);
 ok('the server refuses it too, with a plain message instead of a crash', rBig.status >= 400 && rBig.status < 500 && !!jBig?.error?.message, `${rBig.status} ${JSON.stringify(jBig)}`);
 void me;
@@ -137,5 +137,5 @@ process.exit(bad ? 1 : 0);
 
 function sql_cleanup() {
   // remove only what this run created
-  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-e', `DELETE FROM Receipt WHERE payee IN ('Real Files ${stamp}','Too Big ${stamp}')`]);
+  execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM Receipt WHERE payee IN ('Real Files ${stamp}','Too Big ${stamp}')`]);
 }

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { BRAND, LOGO } from '@reimsis/shared';
+import { BRAND, LOGO } from '@reimsys/shared';
 
 /** The REIMSYS mark. Size is in pixels. It carries its own background, so it looks right on light and dark pages. */
 export function LogoMark({ size = 32 }: { size?: number }) {

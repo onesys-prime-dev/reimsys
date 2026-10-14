@@ -10,16 +10,16 @@ fs.mkdirSync(OUT, { recursive: true });
 const SECRET = 'S3cret-App-Pass-9';
 let failed = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) failed++; };
-const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' });
+const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' });
 
 const b = await chromium.launch({ channel: 'chrome' });
 async function login(email, size = { width: 1280, height: 900 }) {
   const p = await (await b.newContext({ viewport: size, baseURL: 'http://localhost:4000' })).newPage();
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
   await p.waitForSelector('.shell');
   return p;
 }
-const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsis', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
+const api = (p, url, opts = {}) => p.evaluate(async ([u, o]) => { const r = await fetch(u, { ...o, headers: { 'x-requested-with': 'reimsys', 'content-type': 'application/json' } }); return { s: r.status, t: await r.text() }; }, [url, opts]);
 
 sql("DELETE FROM Setting WHERE `key`='mail'");
 const p = await login('admin@example.com');

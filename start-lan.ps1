@@ -22,7 +22,7 @@ $env:WEB_ORIGIN = "http://${ip}:4000,http://localhost:4000"
 Write-Host ""
 Write-Host "Phone (same Wi-Fi):  http://${ip}:4000" -ForegroundColor Green
 Write-Host "This PC:             http://localhost:4000" -ForegroundColor Green
-Write-Host "Sign in with admin@example.com / Reimsis#2026   (Ctrl+C to stop)" -ForegroundColor Green
+Write-Host "Sign in with admin@example.com / Reimsys#2026   (Ctrl+C to stop)" -ForegroundColor Green
 Write-Host ""
 Set-Location apps\api
 node dist\server.js

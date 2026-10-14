@@ -1,4 +1,4 @@
-import type { TemplateKey } from '@reimsis/shared';
+import type { TemplateKey } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { queueEmail } from './email.js';

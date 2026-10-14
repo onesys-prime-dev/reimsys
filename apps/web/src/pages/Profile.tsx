@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type FormEvent } from 'react';
-import { PERMISSIONS, type MeResponse } from '@reimsis/shared';
+import { PERMISSIONS, type MeResponse } from '@reimsys/shared';
 import { api, deviceName, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { PasswordForm } from '../components/PasswordForm';

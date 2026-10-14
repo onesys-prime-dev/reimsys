@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { parse } from 'csv-parse/sync';
-import { receiptInputSchema } from '@reimsis/shared';
+import { receiptInputSchema } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';

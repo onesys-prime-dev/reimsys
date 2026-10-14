@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const OUT = process.argv[2] ?? path.join(os.tmpdir(), 'reimsis-shots');
+const OUT = process.argv[2] ?? path.join(os.tmpdir(), 'reimsys-shots');
 fs.mkdirSync(OUT, { recursive: true });
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 const png = path.join(OUT, `receipt-${Date.now()}.png`);
@@ -23,7 +23,7 @@ async function open(email, size = { width: 1280, height: 820 }) {
   page.on('console', (m) => m.type() === 'error' && !/401|403|409/.test(m.text()) && page.errors.push(m.text()));
   await page.goto('/');
   await page.fill('input[type=email]', email);
-  await page.fill('input[type=password]', 'Reimsis#2026');
+  await page.fill('input[type=password]', 'Reimsys#2026');
   await page.click('button[type=submit]');
   await page.waitForSelector('.shell');
   return { ctx, page };

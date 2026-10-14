@@ -21,7 +21,27 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @reimsis/api db:generate
+      - run: pnpm --filter @reimsys/api db:generate
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # One stable check to require in branch protection. It stays green only when
+  # every job above succeeded, so jobs can be added or renamed above without
+  # touching the repository settings.
+  ci-passed:
+    name: CI Passed
+    needs: [ci]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail unless every CI job succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "Job results: $RESULTS"
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled|skipped)"'; then
+            echo "::error::CI did not pass."
+            exit 1
+          fi
+          echo "CI passed."

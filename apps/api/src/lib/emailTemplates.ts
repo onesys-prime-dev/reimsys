@@ -1,7 +1,7 @@
 import {
   DEFAULT_BRANDING_ACCENT, DEFAULT_TEMPLATES, TEMPLATE_KEYS, TEMPLATE_META, fillPlaceholders,
   type EmailBranding, type EmailTemplate, type TemplateKey, type TemplateView,
-} from '@reimsis/shared';
+} from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { isPublicLink } from './email.js';

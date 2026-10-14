@@ -99,6 +99,6 @@ describe('validation', () => {
     expect(t('short1')).toBe(false);
     expect(t('nonumbersatall')).toBe(false);
     expect(t('12345678')).toBe(false);
-    expect(t('Reimsis2026')).toBe(true);
+    expect(t('Reimsys2026')).toBe(true);
   });
 });

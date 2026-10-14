@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { LOCKED_GRANTS, createRoleSchema, rolePermissionsSchema, updateRoleSchema } from '@reimsis/shared';
+import { LOCKED_GRANTS, createRoleSchema, rolePermissionsSchema, updateRoleSchema } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';

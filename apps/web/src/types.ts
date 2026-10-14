@@ -1,4 +1,4 @@
-import type { ReceiptAction, ReceiptStatus } from '@reimsis/shared';
+import type { ReceiptAction, ReceiptStatus } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;

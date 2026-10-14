@@ -14,7 +14,7 @@ Plan: [docs/PLAN.md](docs/PLAN.md) Â· Diagrams: `docs/REIMSYS BUILD PLAN.html` Â
 ```powershell
 pnpm install
 copy apps\api\.env.example apps\api\.env      # then check DATABASE_URL
-C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS reimsis CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS reimsys CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
@@ -25,7 +25,7 @@ pnpm dev
 
 ## Dev accounts
 
-Password for every seeded account: `Reimsis#2026`. Development only. Deactivate them before going live.
+Password for every seeded account: `Reimsys#2026`. Development only. Deactivate them before going live.
 
 | Role | Email |
 |---|---|

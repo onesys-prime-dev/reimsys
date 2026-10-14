@@ -121,6 +121,6 @@ export function CopyBox({ value }: { value: string }) {
 }
 
 /* ---------- status pill ---------- */
-import { STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+import { STATUS_LABEL, type ReceiptStatus } from '@reimsys/shared';
 const PILL: Record<ReceiptStatus, string> = { draft: 's-draft', submitted: 's-sub', returned: 's-ret', checked: 's-chk', approved: 's-app', disapproved: 's-dis', reserved: 's-res' };
 export const StatusPill = ({ status }: { status: ReceiptStatus }) => <span className={`pill ${PILL[status]}`}>{STATUS_LABEL[status]}</span>;

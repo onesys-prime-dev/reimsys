@@ -1,4 +1,4 @@
-name: 🚀 Deploy Reimsis to production
+name: 🚀 Deploy Reimsys to production
 
 # Production is deployed by pushing a version tag (v1.2.3) on a commit that is
 # already on main, never by a merge. Order: the tag is checked, CI runs on the

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { forgotSchema, loginSchema, resetSchema } from '@reimsis/shared';
+import { forgotSchema, loginSchema, resetSchema } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';

@@ -1,5 +1,5 @@
 {
-  "name": "@reimsis/web",
+  "name": "@reimsys/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@reimsis/shared": "workspace:*",
+    "@reimsys/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

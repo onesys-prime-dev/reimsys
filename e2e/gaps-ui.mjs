@@ -17,7 +17,7 @@ async function login(email, size = { width: 1280, height: 900 }) {
   p.errors = [];
   p.on('pageerror', (e) => p.errors.push(String(e)));
   p.on('console', (m) => m.type() === 'error' && !/40[0-9]/.test(m.text()) && p.errors.push(m.text()));
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
   await p.waitForSelector('.shell');
   return p;
 }
@@ -63,7 +63,7 @@ const liza = await login('liza.santos@example.com');
 await liza.goto(subUrl); await liza.waitForTimeout(900);
 ok('the checker can no longer open the withdrawn receipt', /not found/i.test(await liza.locator('body').innerText()));
 await liza.goto('/'); await liza.waitForSelector('.tiles');
-ok('the checker was told it was withdrawn', (await liza.evaluate(async () => (await (await fetch('/api/notifications', { headers: { 'x-requested-with': 'reimsis' } })).json()).items.some((n) => /was withdrawn by/.test(n.text)))));
+ok('the checker was told it was withdrawn', (await liza.evaluate(async () => (await (await fetch('/api/notifications', { headers: { 'x-requested-with': 'reimsys' } })).json()).items.some((n) => /was withdrawn by/.test(n.text)))));
 
 console.log('Duplicate warning');
 await newReceipt(ana, tag + ' C', { amount: '123.45' });
@@ -83,8 +83,8 @@ await m.screenshot({ path: path.join(OUT, 'dup-phone.png') });
 
 // tidy up the throwaway drafts and submitted receipts this test made
 for (const p of [ana]) {
-  const items = await p.evaluate(async (t) => (await (await fetch('/api/receipts?pageSize=100&q=' + encodeURIComponent(t), { headers: { 'x-requested-with': 'reimsis' } })).json()).items, tag);
-  for (const it of items.filter((x) => x.status === 'draft')) await p.evaluate((id) => fetch('/api/receipts/' + id, { method: 'DELETE', headers: { 'x-requested-with': 'reimsis' } }), it.id);
+  const items = await p.evaluate(async (t) => (await (await fetch('/api/receipts?pageSize=100&q=' + encodeURIComponent(t), { headers: { 'x-requested-with': 'reimsys' } })).json()).items, tag);
+  for (const it of items.filter((x) => x.status === 'draft')) await p.evaluate((id) => fetch('/api/receipts/' + id, { method: 'DELETE', headers: { 'x-requested-with': 'reimsys' } }), it.id);
 }
 ok('no browser errors', ana.errors.length === 0, JSON.stringify(ana.errors.slice(0, 3)));
 await b.close();

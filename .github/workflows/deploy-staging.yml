@@ -1,4 +1,4 @@
-name: 🚀 Deploy Reimsis to staging
+name: 🚀 Deploy Reimsys to staging
 
 # Every merge to main is built and deployed to the staging environment, but
 # only after the CI workflow (ci.yml) has passed on that exact commit.

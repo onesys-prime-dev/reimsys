@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { unknownPlaceholders, type EmailBranding, type EmailTemplate, type PlaceholderDef, type TemplateKey, type TemplateView } from '@reimsis/shared';
+import { unknownPlaceholders, type EmailBranding, type EmailTemplate, type PlaceholderDef, type TemplateKey, type TemplateView } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { useAuth } from '../auth';
 import { Field, Icon, Switch, useToast } from '../ui';

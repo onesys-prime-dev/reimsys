@@ -1,4 +1,4 @@
-import { BRAND, LOGO } from '@reimsis/shared';
+import { BRAND, LOGO } from '@reimsys/shared';
 
 /** Draws the REIMSYS mark into a PDF as vector shapes, at the given top-left corner and size (in points). */
 export function drawLogo(doc: PDFKit.PDFDocument, x: number, y: number, size: number) {

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { passwordSchema } from '@reimsis/shared';
+import { passwordSchema } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { Logo } from '../components/Logo';
 import { Field } from '../ui';

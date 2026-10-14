@@ -11,7 +11,7 @@ const dir = path.resolve(process.argv[2] ?? 'storage/pw-test');
 const box = path.join(dir, 'mailbox');
 fs.rmSync(dir, { recursive: true, force: true });
 fs.mkdirSync(box, { recursive: true });
-const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' }).trim();
+const sql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-N', '-B', '-e', q], { encoding: 'utf8' }).trim();
 let bad = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) bad++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,7 +33,7 @@ const linkIn = (m) => {
   return found && found.replace(/^https?:\/\/[^/]+/, WEB);
 };
 
-const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsis', origin: WEB, 'content-type': 'application/json' });
+const H = (c) => ({ cookie: c, 'x-requested-with': 'reimsys', origin: WEB, 'content-type': 'application/json' });
 const api = async (c, m, p, b) => { const r = await fetch(WEB + '/api' + p, { method: m, headers: H(c), body: b ? JSON.stringify(b) : undefined }); return { status: r.status, data: await r.json().catch(() => null), cookie: r.headers.get('set-cookie')?.split(';')[0] }; };
 const loginApi = async (email, password) => api('', 'POST', '/auth/login', { email, password });
 
@@ -46,7 +46,7 @@ try {
   const email = `reset.${stamp}@example.com`;
 
   /* ---- an administrator invites someone ---- */
-  const admin = (await loginApi('admin@example.com', 'Reimsis#2026')).cookie;
+  const admin = (await loginApi('admin@example.com', 'Reimsys#2026')).cookie;
   const roles = (await api(admin, 'GET', '/roles')).data.roles;
   const created = await api(admin, 'POST', '/users', { name: 'Reset Tester', email, roleId: roles.find((r) => r.code === 'medref').id });
   ok('the new user is created and still gets a temporary password', created.status === 201 && !!created.data.temporaryPassword);

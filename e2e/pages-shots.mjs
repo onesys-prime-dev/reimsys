@@ -20,11 +20,11 @@ const ROLES = {
 for (const [role, [email, pages]] of Object.entries(ROLES)) {
   const ctx = await browser.newContext({ viewport: size, baseURL: process.env.WEB ?? 'http://localhost:5173' });
   const p = await ctx.newPage();
-  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsis#2026'); await p.click('button[type=submit]');
+  await p.goto('/'); await p.fill('input[type=email]', email); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]');
   await p.waitForSelector('.shell');
   const list = [...pages];
   // one receipt detail and one report view
-  const api = async (u) => p.evaluate(async (x) => (await fetch(x, { headers: { 'x-requested-with': 'reimsis' } })).json(), u);
+  const api = async (u) => p.evaluate(async (x) => (await fetch(x, { headers: { 'x-requested-with': 'reimsys' } })).json(), u);
   const rs = await api('/api/receipts?pageSize=100');
   const pick = (st) => rs.items.find((r) => r.status === st);
   for (const st of ['approved', 'checked', 'submitted', 'returned']) { const r = pick(st); if (r) { list.push('/receipts/' + r.id); break; } }

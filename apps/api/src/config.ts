@@ -28,7 +28,7 @@ export const config = {
   webOrigins: env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean),
   sessionMs: env.SESSION_DAYS * 24 * 60 * 60 * 1000,
   storageDir: path.resolve(env.STORAGE_DIR),
-  cookieName: 'reimsis_sid',
+  cookieName: 'reimsys_sid',
   orgName: env.ORG_NAME,
   webDist: path.resolve(env.WEB_DIST),
   mailFrom: env.MAIL_FROM,

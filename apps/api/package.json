@@ -1,5 +1,5 @@
 {
-  "name": "@reimsis/api",
+  "name": "@reimsys/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^6.0.0",
-    "@reimsis/shared": "workspace:*",
+    "@reimsys/shared": "workspace:*",
     "cookie-parser": "^1.4.7",
     "csv-parse": "^7.0.3",
     "dotenv": "^16.4.7",
