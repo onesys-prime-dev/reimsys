@@ -28,6 +28,7 @@ export interface ReceiptDetail extends ReceiptBrief {
   canEdit: boolean;
   canCopy: boolean;
   canDelete: boolean;
+  undoUntil: string | null;
   possibleDuplicates: { id: number; refNo: string; status: ReceiptStatus; encoder: string }[];
   actions: { action: ReceiptAction; note: 'none' | 'optional' | 'required' }[];
   evidence: EvidenceFile[];
@@ -36,3 +37,5 @@ export interface ReceiptDetail extends ReceiptBrief {
 
 export interface Category { id: number; name: string; isActive: boolean; receiptCount?: number }
 export interface HistoryItem { id: number; actor: string; action: string; summary: string | null; note: string | null; createdAt: string }
+
+export interface CommentItem { id: number; body: string; createdAt: string; author: { id: number; name: string }; mine: boolean }

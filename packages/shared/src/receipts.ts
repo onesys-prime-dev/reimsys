@@ -7,7 +7,7 @@ export const STATUS_LABEL: Record<ReceiptStatus, string> = {
   approved: 'Approved', disapproved: 'Disapproved', reserved: 'Reserved',
 };
 
-export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release';
+export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release' | 'undo';
 export type NoteRule = 'none' | 'optional' | 'required';
 
 export interface Transition {
@@ -31,8 +31,13 @@ export const TRANSITIONS: Transition[] = [
   { action: 'approve', from: ['checked'], to: 'approved', permission: 'review.decide', note: 'optional', notOwner: true },
   { action: 'disapprove', from: ['checked'], to: 'disapproved', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'reserve', from: ['checked'], to: 'reserved', permission: 'review.decide', note: 'required', notOwner: true },
+  { action: 'undo', from: ['approved', 'disapproved'], to: 'checked', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'release', from: ['reserved'], to: 'checked', permission: 'review.decide', note: 'optional', notOwner: true },
 ];
+
+/** How long the person who decided has to take a decision back. */
+export const UNDO_WINDOW_MINUTES = 10;
+export const BULK_MAX = 25;
 
 export const transitionFor = (action: string) => TRANSITIONS.find((t) => t.action === action);
 
@@ -93,3 +98,11 @@ export const EVIDENCE_MAX_BYTES = 10 * 1024 * 1024;
 export const EVIDENCE_MAX_FILES = 10;
 
 export const peso = (n: number | string) => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const bulkSchema = z.object({
+  action: z.enum(['check', 'approve']),
+  ids: z.array(z.number().int().positive()).min(1, 'Select at least one receipt.').max(BULK_MAX, `Select up to ${BULK_MAX} receipts at a time.`),
+  note: z.string().trim().max(1000).optional(),
+});
+
+export const commentSchema = z.object({ body: z.string().trim().min(1, 'Write a comment first.').max(1000, 'Keep it under 1,000 characters.') });

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { STATUS_LABEL, type ReceiptAction } from '@reimsis/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
+import { Comments } from '../components/Comments';
 import { EvidenceViewer } from '../components/EvidenceViewer';
 import type { HistoryItem, ReceiptDetail } from '../types';
 import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
@@ -16,9 +17,10 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   approve: { label: 'Approve', icon: 'check', cls: 'ok', title: 'Approve this record', desc: 'A reimbursement document will be created and the Med Ref will be emailed.', field: 'Remark', ok: 'Approved. The reimbursement document is being prepared.' },
   disapprove: { label: 'Disapprove', icon: 'x', cls: 'bad', title: 'Disapprove this record', desc: 'A reason is required. The Med Ref will see it in the email.', field: 'Reason for disapproval', ok: 'Disapproved. The Med Ref has been emailed.' },
   reserve: { label: 'Reserve', icon: 'pause', cls: 'hold', title: 'Put this record on hold', desc: 'A note is required. You can release it back to your queue later.', field: 'Why is it on hold', ok: 'Put on hold. The Med Ref has been emailed.' },
+  undo: { label: 'Take back decision', icon: 'undo', cls: '', title: 'Take back this decision', desc: 'The receipt goes back to Checked and the Med Ref is told to disregard the earlier decision. Any reimbursement document is removed.', field: 'Why are you taking it back', ok: 'Decision taken back. The receipt is back in your queue.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
-const ORDER: ReceiptAction[] = ['withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
+const ORDER: ReceiptAction[] = ['undo', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
 
 export function ReceiptDetailPage() {
   const id = Number(useParams().id);
@@ -143,6 +145,7 @@ export function ReceiptDetailPage() {
               </dl>
             </div>
           </section>
+          <Comments receiptId={r.id} />
           <section className="card">
             <div className="card-h"><h3>History</h3><small>Every action is recorded</small></div>
             <div className="card-b">

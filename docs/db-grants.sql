@@ -21,6 +21,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.EmailLog              TO 'reimsi
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Job                   TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.LiquidationReport     TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.ImportJob             TO 'reimsis_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Comment               TO 'reimsis_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Setting               TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Sequence              TO 'reimsis_app'@'localhost';
 
 -- Audit log: read and append only.

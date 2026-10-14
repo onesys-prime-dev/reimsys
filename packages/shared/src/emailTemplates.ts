@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'digest', 'test'] as const;
+export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'digest', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -53,6 +53,7 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
   disapproved: { label: 'Receipt disapproved', when: 'An approver disapproves a receipt', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   reserved: { label: 'Receipt put on hold', when: 'An approver puts a receipt on hold', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   released: { label: 'Hold released', when: 'An approver releases a hold', to: 'The Med Ref, if they turned this on in their profile', allowed: RECEIPT_VARS, hasReceipt: true },
+  reversed: { label: 'Decision reversed', when: 'An approver undoes an approval or disapproval within ten minutes', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   digest: { label: 'Daily summary', when: 'About 8am, only if something is waiting', to: 'Anyone who has the summary turned on', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
   test: { label: 'Test email', when: 'An administrator presses "Send test email"', to: 'The address the administrator typed', allowed: ['actorName', 'orgName'], hasReceipt: false },
 };
@@ -93,6 +94,13 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     buttonLabel: 'Open the receipt',
     showDetails: true,
   },
+  reversed: {
+    subject: 'Correction: the decision on {{refNo}} was reversed',
+    heading: 'Please disregard the earlier decision',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} reversed the earlier decision on {{refNo}} ({{payee}}). It is back with the approver and a new decision is coming.\n\nReason:\n> {{note}}',
+    buttonLabel: 'Open the receipt',
+    showDetails: true,
+  },
   digest: {
     subject: '{{orgName}}: your daily summary',
     heading: 'Good morning, {{recipientName}}',
@@ -119,6 +127,7 @@ const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
   disapproved: { actorName: 'Paolo Villanueva', status: 'Disapproved', note: 'Snacks are not reimbursable under the current policy.', docNo: '' },
   reserved: { actorName: 'Paolo Villanueva', status: 'Reserved', note: 'Waiting for the regional office to confirm the room rate.', docNo: '' },
   released: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Rate confirmed.', docNo: '' },
+  reversed: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Approved by mistake. Re-checking the amount.', docNo: '' },
   digest: { summary: '• 2 receipts waiting to be checked.\n• 1 draft not submitted yet.' },
   test: { actorName: 'Admin User' },
 };

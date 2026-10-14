@@ -88,3 +88,12 @@ Required on the dev machine: Node.js LTS (20+), npm or pnpm, XAMPP MySQL/MariaDB
 - **Delete draft:** a draft can be deleted by its owner, files included. Anything submitted must be withdrawn first.
 - **Possible duplicate warning:** a receipt with the same payee, amount and date as another receipt the viewer can see gets a warning with a link.
 - **Per-person liquidation reports**, **editable email templates and look**, **email account set up in the app**, **test mode for email**, and the **REIMSYS** name and logo.
+
+## Added after the first release
+
+- **Taking a decision back.** The same approver can undo an approval or disapproval within 10 minutes, with a reason. The receipt returns to Checked, any reimbursement document is removed, and the Med Ref and checker receive a correction email (editable under Access, Email templates).
+- **Approvers open the evidence too.** Approve, disapprove and reserve need the approver to have opened the evidence since the receipt was checked, the same rule the checker has.
+- **Comments.** Anyone who can see a receipt can post a short comment. People already involved get a bell notice. Comments are in the audit log.
+- **Bulk actions.** Checkers can mark up to 25 receipts checked, and approvers can approve up to 25, from the receipt list. Each goes through the normal rules, so receipts whose evidence was not opened are skipped and explained.
+- **Receipt list.** Sorting, clear-filters, and an amber "Waiting" flag after two days with the next person.
+- **Not yet built (needs a public https address):** forgot-password and invitation emails, because email links are left out until the app has a proper address.

@@ -38,10 +38,12 @@ describe('receipt state machine', () => {
     expect(availableActions('checked', perms('review.decide'), true)).toEqual([]);
   });
 
-  it('treats approved and disapproved as final', () => {
+  it('only lets a decision be taken back, nothing else, and it needs a reason', () => {
     const all = perms(...PERMISSIONS.map((p) => p.code));
-    expect(availableActions('approved', all, false)).toEqual([]);
-    expect(availableActions('disapproved', all, false)).toEqual([]);
+    expect(names(availableActions('approved', all, false))).toEqual(['undo']);
+    expect(names(availableActions('disapproved', all, false))).toEqual(['undo']);
+    expect(transitionFor('undo')!.note).toBe('required');
+    expect(transitionFor('undo')!.to).toBe('checked');
   });
 
   it('requires a reason or note exactly where the plan says', () => {
@@ -55,8 +57,9 @@ describe('receipt state machine', () => {
     expect(RECEIPT_STATUSES.filter(canEditReceipt)).toEqual(['draft', 'returned']);
   });
 
-  it('never has a transition out of a final status', () => {
-    expect(TRANSITIONS.some((t) => t.from.includes('approved') || t.from.includes('disapproved'))).toBe(false);
+  it('only allows leaving a final status through undo', () => {
+    const out = TRANSITIONS.filter((t) => t.from.includes('approved') || t.from.includes('disapproved'));
+    expect(out.map((t) => t.action)).toEqual(['undo']);
   });
 });
 

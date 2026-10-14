@@ -5,11 +5,11 @@ import ExcelJS from 'exceljs';
 import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, receiptInputSchema,
-  type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor,
+  type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, UNDO_WINDOW_MINUTES, bulkSchema, commentSchema,
 } from '@reimsis/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
-import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
+import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { enqueue } from '../lib/jobs.js';
 import { receiptData } from '../lib/emailTemplates.js';
 import { notify, usersWithPermission } from '../lib/notify.js';
@@ -247,14 +247,14 @@ receiptsRouter.get('/:id/history', async (req, res) => {
 
 const SUMMARY: Record<ReceiptAction, string> = {
   submit: 'submitted for checking', withdraw: 'withdrew the receipt', check: 'marked as checked', return: 'returned the record',
-  approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
+  undo: 'took back the decision', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
-async function runAction(req: import('express').Request, action: ReceiptAction) {
+async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body) {
   const auth = req.auth!;
   const t = transitionFor(action)!;
-  const body = actionBodySchema.parse(req.body);
-  const r = await loadVisible(auth, idParam(req.params.id));
+  const body = actionBodySchema.parse(rawBody);
+  const r = await loadVisible(auth, receiptId);
   if (!auth.permissions.has(t.permission)) throw forbidden();
   const isOwner = r.encoderId === auth.user.id;
   if (t.owner && !isOwner) throw forbidden('Only the person who encoded this receipt can do that.');
@@ -279,6 +279,12 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
     });
     if (!seen) throw badRequest('Open the evidence before deciding on this receipt.', 'EVIDENCE_NOT_VIEWED');
   }
+  if (action === 'undo') {
+    if (r.decidedById !== auth.user.id) throw forbidden('Only the person who made the decision can take it back.', 'NOT_DECIDER');
+    if (!r.decidedAt || now.getTime() - r.decidedAt.getTime() > UNDO_WINDOW_MINUTES * 60_000) {
+      throw conflict(`A decision can only be taken back within ${UNDO_WINDOW_MINUTES} minutes.`, 'UNDO_EXPIRED');
+    }
+  }
   if (action === 'check') {
     const viewed = await prisma.auditLog.count({
       where: { actorId: auth.user.id, entityType: 'receipt', entityId: String(r.id), action: 'evidence.viewed', createdAt: { gte: r.submittedAt ?? new Date(0) } },
@@ -292,18 +298,21 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note });
   if (action === 'return' || action === 'reserve') data.lastNote = note;
   if (action === 'release') data.lastNote = null;
+  if (action === 'undo') Object.assign(data, { decidedById: null, decidedAt: null, decisionNote: null, lastNote: null });
   if (action === 'approve' || action === 'disapprove') Object.assign(data, { decidedById: auth.user.id, decidedAt: now, decisionNote: note, lastNote: action === 'disapprove' ? note : null });
 
   let docNo: string | null = null;
   await prisma.$transaction(async (tx) => {
     const res = await tx.receipt.updateMany({ where: { id: r.id, version: r.version, status: r.status }, data });
     if (!res.count) throw conflict('Someone else changed this receipt. Reload and try again.', 'RECORD_CHANGED');
+    if (action === 'undo' && r.status === 'approved') await tx.reimbursementDocument.deleteMany({ where: { receiptId: r.id } });
     if (action === 'approve') {
       docNo = await nextDocNo(tx);
       await tx.reimbursementDocument.create({ data: { receiptId: r.id, docNo } });
     }
   });
   if (action === 'approve') await enqueue('document', { receiptId: r.id });
+  if (action === 'undo' && r.document?.filePath) await removeFile(r.document.filePath).catch(() => undefined);
 
   await audit(req, {
     action: `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
@@ -322,10 +331,54 @@ async function runAction(req: import('express').Request, action: ReceiptAction) 
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
   if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
   if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });
+  if (action === 'undo') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reversed', receiptId: r.id, text: `The decision on ${ref} was reversed. ${note}`, email: { template: 'reversed', data: mail } });
   if (action === 'release') await notify({ userIds: [r.encoderId], type: 'receipt.released', receiptId: r.id, text: `The hold on ${ref} was released.`, email: { template: 'released', data: mail, respectPref: 'reservationReleased' } });
 
   return receiptDetail(auth, await loadVisible(auth, r.id));
 }
+
+/* ---------- bulk: check or approve several at once ---------- */
+
+/** Each receipt goes through exactly the same rules as one done by hand, so a bulk action can never skip the evidence or the "checked first" rule. */
+receiptsRouter.post('/bulk', async (req, res) => {
+  const b = bulkSchema.parse(req.body);
+  const results: { id: number; refNo: string | null; ok: boolean; message: string }[] = [];
+  for (const id of [...new Set(b.ids)]) {
+    const rec = await prisma.receipt.findFirst({ where: { AND: [{ id }, visibleWhere(req.auth!)] }, select: { id: true, refNo: true, version: true } });
+    if (!rec) { results.push({ id, refNo: null, ok: false, message: 'Not found.' }); continue; }
+    try {
+      await runAction(req, b.action, id, { note: b.note, version: rec.version });
+      results.push({ id, refNo: rec.refNo, ok: true, message: 'Done.' });
+    } catch (e) {
+      results.push({ id, refNo: rec.refNo, ok: false, message: e instanceof HttpError ? e.message : 'Something went wrong.' });
+    }
+  }
+  await audit(req, { action: 'receipt.bulk', entityType: 'receipt', summary: `ran "${b.action}" on ${results.length} receipts (${results.filter((x) => x.ok).length} done)` });
+  res.json({ results, done: results.filter((x) => x.ok).length, skipped: results.filter((x) => !x.ok).length });
+});
+
+/* ---------- comments ---------- */
+
+receiptsRouter.get('/:id/comments', async (req, res) => {
+  const r = await loadVisible(req.auth!, idParam(req.params.id));
+  const rows = await prisma.comment.findMany({ where: { receiptId: r.id }, include: { author: { select: { id: true, name: true } } }, orderBy: { id: 'asc' }, take: 300 });
+  res.json({ comments: rows.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt, author: c.author, mine: c.authorId === req.auth!.user.id })) });
+});
+
+const commentLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { error: { code: 'RATE_LIMIT', message: 'You are commenting very fast. Wait a moment.' } } });
+
+receiptsRouter.post('/:id/comments', commentLimiter, async (req, res) => {
+  const r = await loadVisible(req.auth!, idParam(req.params.id));
+  const { body } = commentSchema.parse(req.body);
+  const me = req.auth!.user;
+  const c = await prisma.comment.create({ data: { receiptId: r.id, authorId: me.id, body } });
+  await audit(req, { action: 'receipt.commented', entityType: 'receipt', entityId: r.id, summary: 'added a comment', after: { note: body } });
+  // Everyone who has touched this receipt hears about it, except the person who wrote it.
+  const earlier = await prisma.comment.findMany({ where: { receiptId: r.id }, select: { authorId: true }, distinct: ['authorId'] });
+  const people = [r.encoderId, r.checkedById, r.decidedById, ...earlier.map((x) => x.authorId)].filter((x): x is number => !!x && x !== me.id);
+  await notify({ userIds: people, type: 'receipt.commented', receiptId: r.id, text: `${me.name} commented on ${r.refNo}: ${body.slice(0, 120)}` });
+  res.status(201).json({ comment: { id: c.id, body: c.body, createdAt: c.createdAt, author: { id: me.id, name: me.name }, mine: true } });
+});
 
 for (const t of TRANSITIONS) {
   receiptsRouter.post(`/:id/${t.action}`, async (req, res) => {

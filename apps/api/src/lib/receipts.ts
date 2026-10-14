@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, type ReceiptStatus } from '@reimsis/shared';
+import { UNDO_WINDOW_MINUTES, availableActions, canEditReceipt, type ReceiptStatus } from '@reimsis/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import type { AuthContext } from '../types.js';
@@ -71,10 +71,11 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     createdAt: r.createdAt,
     isOwner,
     canEdit: isOwner && auth.permissions.has('receipt.create') && canEditReceipt(status),
-    actions: availableActions(status, auth.permissions, isOwner).map((t) => ({ action: t.action, note: t.note })),
+    actions: availableActions(status, auth.permissions, isOwner).filter((t) => t.action !== 'undo' || (r.decidedById === auth.user.id && !!r.decidedAt && Date.now() - r.decidedAt.getTime() <= UNDO_WINDOW_MINUTES * 60_000)).map((t) => ({ action: t.action, note: t.note })),
     evidence: evidence.map((e) => ({ id: e.id, fileName: e.fileName, mime: e.mime, size: e.size, createdAt: e.createdAt })),
     document: r.document ? { id: r.document.id, docNo: r.document.docNo, status: r.document.status } : null,
     canCopy: isOwner && status === 'disapproved',
+    undoUntil: r.decidedById === auth.user.id && r.decidedAt && (status === 'approved' || status === 'disapproved') ? new Date(r.decidedAt.getTime() + UNDO_WINDOW_MINUTES * 60_000).toISOString() : null,
     canDelete: isOwner && auth.permissions.has('receipt.create') && status === 'draft',
     possibleDuplicates: dupes.map((d) => ({ id: d.id, refNo: d.refNo, status: d.status as ReceiptStatus, encoder: d.encoder.name })),
   };

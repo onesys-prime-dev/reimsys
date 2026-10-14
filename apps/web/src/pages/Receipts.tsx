@@ -1,21 +1,24 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
-import { ago, api, fmtDate, money } from '../api';
+import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsis/shared';
+import { ago, api, errMsg, fmtDate, money } from '../api';
 import { useAuth } from '../auth';
 import type { Category, ReceiptBrief } from '../types';
-import { Empty, Icon, StatusPill } from '../ui';
+import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
 
 interface ListData { total: number; page: number; pageSize: number; counts: Record<string, number>; items: ReceiptBrief[] }
 
 /** More than two days waiting for the next person. */
 const late = (iso: string) => Date.now() - new Date(iso).getTime() > 2 * 86_400_000;
 
-export function ReceiptRow({ r, showEncoder }: { r: ReceiptBrief; showEncoder: boolean }) {
+export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEncoder: boolean; pick?: { on: boolean; toggle: () => void } }) {
   return (
-    <Link className="row" to={`/receipts/${r.id}`}>
-      <span className="c-main"><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
+    <Link className={`row ${pick?.on ? 'picked' : ''}`} to={`/receipts/${r.id}`}>
+      <span className={`c-main ${pick ? 'withbox' : ''}`}>
+        {pick && <input type="checkbox" checked={pick.on} aria-label={`Select ${r.refNo}`} onClick={(e) => { e.stopPropagation(); }} onChange={pick.toggle} />}
+        <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
+      </span>
       <span className="c-cat">{r.category.name}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
@@ -25,7 +28,13 @@ export function ReceiptRow({ r, showEncoder }: { r: ReceiptBrief; showEncoder: b
 }
 
 export function ReceiptsPage() {
-  const { can } = useAuth();
+  const { can, me } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [picked, setPicked] = useState<number[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkResult, setBulkResult] = useState<{ done: number; results: { id: number; refNo: string | null; ok: boolean; message: string }[] } | null>(null);
   const [status, setStatus] = useState<ReceiptStatus | ''>('');
   const [q, setQ] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -48,7 +57,22 @@ export function ReceiptsPage() {
   const pages = data.data ? Math.max(1, Math.ceil(data.data.total / data.data.pageSize)) : 1;
   const counts = data.data?.counts ?? {};
   const all = Object.values(counts).reduce((s, n) => s + n, 0);
-  const reset = () => setPage(1);
+  const reset = () => { setPage(1); setPicked([]); };
+
+  // Check or approve many at once. The server applies the same rules as one at a time, so anything not ready is skipped and explained.
+  const bulkKind: 'check' | 'approve' | null = can('review.check') ? 'check' : can('review.decide') ? 'approve' : null;
+  const readyStatus = bulkKind === 'check' ? 'submitted' : 'checked';
+  const canPick = (r: ReceiptBrief) => !!bulkKind && r.status === readyStatus && r.encoder.id !== me?.id;
+  const toggle = (id: number) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= BULK_MAX ? (toast(`Select up to ${BULK_MAX} at a time.`, 'bad'), p) : [...p, id]));
+  const pickable = data.data?.items.filter(canPick) ?? [];
+  const bulk = useMutation({
+    mutationFn: () => api<{ done: number; skipped: number; results: { id: number; refNo: string | null; ok: boolean; message: string }[] }>('/receipts/bulk', { method: 'POST', body: { action: bulkKind, ids: picked, note: bulkNote || undefined } }),
+    onSuccess: (d) => {
+      setBulkOpen(false); setBulkNote(''); setPicked([]); setBulkResult(d);
+      qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
   const exportQs = new URLSearchParams(params); exportQs.delete('page'); exportQs.delete('pageSize');
 
   return (
@@ -84,10 +108,36 @@ export function ReceiptsPage() {
 
       <section className="card">
         <div className="thead"><span>Receipt</span><span>Category</span><span>Date</span><span className="c-amt">Amount</span><span>Status</span></div>
-        {data.data?.items.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={!own} />)}
+        {pickable.length > 1 && (
+          <label className="selall"><input type="checkbox" checked={pickable.every((r) => picked.includes(r.id))} onChange={(e) => setPicked(e.target.checked ? pickable.slice(0, BULK_MAX).map((r) => r.id) : [])} />Select all {pickable.length} ready to {bulkKind === 'check' ? 'check' : 'decide'}</label>
+        )}
+        {data.data?.items.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={!own} pick={canPick(r) ? { on: picked.includes(r.id), toggle: () => toggle(r.id) } : undefined} />)}
         {data.data && !data.data.items.length && <Empty title="No receipts here">{own ? 'Create your first receipt to get started.' : 'Try another filter or search.'}</Empty>}
         {!data.data && <div className="empty">Loading…</div>}
       </section>
+      {picked.length > 0 && (
+        <div className="savebar" role="region" aria-label="Selected receipts">
+          <span>{picked.length} selected</span>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={() => setPicked([])}>Clear</button>
+            <button className="btn pri" onClick={() => setBulkOpen(true)}>{bulkKind === 'check' ? `Mark ${picked.length} checked` : `Approve ${picked.length}`}</button>
+          </span>
+        </div>
+      )}
+      {bulkOpen && (
+        <Modal title={bulkKind === 'check' ? `Mark ${picked.length} receipts checked` : `Approve ${picked.length} receipts`} onClose={() => setBulkOpen(false)}>
+          <p>Each receipt follows the usual rules. You must already have opened its evidence. Any that are not ready are skipped, and you will see which and why.</p>
+          <label className="f"><span>Remark for all <span className="hint">Optional</span></span><textarea value={bulkNote} onChange={(e) => setBulkNote(e.target.value)} maxLength={1000} /></label>
+          <div className="btns"><button className="btn" onClick={() => setBulkOpen(false)}>Cancel</button><button className="btn pri" disabled={bulk.isPending} onClick={() => bulk.mutate()}>{bulk.isPending ? 'Working…' : bulkKind === 'check' ? 'Mark checked' : 'Approve'}</button></div>
+        </Modal>
+      )}
+      {bulkResult && (
+        <Modal title={`${bulkResult.done} of ${bulkResult.results.length} done`} onClose={() => setBulkResult(null)}>
+          {bulkResult.results.some((x) => !x.ok) && <p>These were skipped. Open each one, view its evidence, then try again.</p>}
+          {bulkResult.results.filter((x) => !x.ok).map((x) => <div key={x.id} className="pref" style={{ padding: '8px 0' }}><div><b>{x.refNo ?? `#${x.id}`}</b><br /><small className="muted">{x.message}</small></div></div>)}
+          <div className="btns"><button className="btn pri" onClick={() => setBulkResult(null)}>Close</button></div>
+        </Modal>
+      )}
       <div className="pager">
         <span className="muted">{data.data ? `${data.data.total} receipt${data.data.total === 1 ? '' : 's'}` : ''}</span>
         <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -1,6 +1,7 @@
 // End-to-end check of the full workflow against a running API (http://localhost:4000).
 // Usage: node e2e/api-flow.mjs
 const BASE = process.env.API ?? 'http://localhost:4000/api';
+import { execFileSync } from 'node:child_process';
 const PASSWORD = 'Reimsis#2026';
 let failed = 0, passed = 0;
 
@@ -202,6 +203,85 @@ check('import cannot be confirmed twice', (await ana.post(`/imports/${pv.data.id
 check('checker cannot import', (await liza.post('/imports')).status === 403);
 const ex = await ana.req('GET', '/receipts/export?format=csv', undefined, { raw: true });
 check('export contains imported row', (await ex.text()).includes('Import Store A ' + stamp));
+
+console.log('\nUndo a decision, comments, bulk actions');
+{
+  const mk = async (who, tag, amount = 100) => {
+    let x = (await who.post('/receipts', { payee: `${tag} ${stamp}`, receiptDate: '2026-10-11', amount, categoryId: med })).data.receipt;
+    x = (await who.req('POST', `/receipts/${x.id}/evidence`, form('n.png', png(tag + stamp + Math.random())))).data.receipt;
+    return (await who.post(`/receipts/${x.id}/submit`, { version: x.version })).data.receipt;
+  };
+  const view = (who, x) => who.req('GET', `/receipts/${x.id}/evidence/${x.evidence[0].id}/file?mode=view`, undefined, { raw: true });
+  const mysql = (q) => execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', q], { encoding: 'utf8' });
+
+  /* ---- undo ---- */
+  let u = await mk(ana, 'Undo Me');
+  await view(liza, u); u = (await liza.post(`/receipts/${u.id}/check`, { version: u.version })).data.receipt;
+  await view(paolo, u); u = (await paolo.post(`/receipts/${u.id}/approve`, { version: u.version, note: 'ok' })).data.receipt;
+  check('the decider is offered undo right after approving', u.actions.some((a) => a.action === 'undo') && !!u.undoUntil);
+  check('nobody else is offered undo', !(await liza.get(`/receipts/${u.id}`)).data.receipt.actions.some((a) => a.action === 'undo') && (await ana.get(`/receipts/${u.id}`)).data.receipt.undoUntil === null);
+  check('undo needs a reason', (await paolo.post(`/receipts/${u.id}/undo`, { version: u.version })).data?.error?.code === 'NOTE_REQUIRED');
+  check('the Med Ref cannot undo', (await ana.post(`/receipts/${u.id}/undo`, { version: u.version, note: 'please' })).status === 403);
+  check('a checker cannot undo', (await liza.post(`/receipts/${u.id}/undo`, { version: u.version, note: 'please' })).status === 403);
+  await until(async () => (await ana.get(`/receipts/${u.id}`)).data.receipt.document?.status === 'ready');
+  const docs = mysql(`SELECT COUNT(*) FROM ReimbursementDocument WHERE receiptId=${u.id}`).trim();
+  const undone = await paolo.post(`/receipts/${u.id}/undo`, { version: u.version, note: 'Approved by mistake.' });
+  check('the decider can take an approval back', undone.data.receipt?.status === 'checked', JSON.stringify(undone.data));
+  check('the reimbursement document is removed with it', docs === '1' && mysql(`SELECT COUNT(*) FROM ReimbursementDocument WHERE receiptId=${u.id}`).trim() === '0');
+  check('the decision details are cleared', undone.data.receipt.decidedBy === null && undone.data.receipt.lastNote === null);
+  u = undone.data.receipt;
+  check('it can be decided again, and gets a new document', (await paolo.post(`/receipts/${u.id}/approve`, { version: u.version })).data.receipt?.document?.docNo !== undefined);
+
+  let w = await mk(ana, 'Undo Late');
+  await view(liza, w); w = (await liza.post(`/receipts/${w.id}/check`, { version: w.version })).data.receipt;
+  await view(paolo, w); w = (await paolo.post(`/receipts/${w.id}/disapprove`, { version: w.version, note: 'No.' })).data.receipt;
+  mysql(`UPDATE Receipt SET decidedAt = UTC_TIMESTAMP() - INTERVAL 11 MINUTE WHERE id=${w.id}`);
+  const late = await paolo.post(`/receipts/${w.id}/undo`, { version: w.version, note: 'Too slow.' });
+  check('undo is refused after ten minutes', late.data?.error?.code === 'UNDO_EXPIRED', JSON.stringify(late.data));
+  check('and the button is gone', !(await paolo.get(`/receipts/${w.id}`)).data.receipt.actions.some((a) => a.action === 'undo'));
+  mysql(`UPDATE Receipt SET decidedAt = UTC_TIMESTAMP() WHERE id=${w.id}`);
+  const fresh = (await paolo.get(`/receipts/${w.id}`)).data.receipt;
+  const dis = await paolo.post(`/receipts/${w.id}/undo`, { version: fresh.version, note: 'Wrong receipt.' });
+  check('a disapproval can be taken back too', dis.data.receipt?.status === 'checked', JSON.stringify(dis.data));
+  const mails = mysql(`SELECT COUNT(*) FROM EmailLog WHERE subject LIKE 'Correction:%' AND createdAt > UTC_TIMESTAMP() - INTERVAL 5 MINUTE`).trim();
+  check('the Med Ref and checker were sent a correction email', Number(mails) >= 2, mails);
+
+  /* ---- comments ---- */
+  let c = await mk(ana, 'Comment On');
+  check('a comment needs some text', (await ana.post(`/receipts/${c.id}/comments`, { body: '   ' })).status === 400);
+  check('a comment cannot be huge', (await ana.post(`/receipts/${c.id}/comments`, { body: 'x'.repeat(1001) })).status === 400);
+  const posted = await liza.post(`/receipts/${c.id}/comments`, { body: 'Is this the full receipt?' });
+  check('a checker can comment', posted.status === 201 && posted.data.comment.mine === true);
+  const list = (await ana.get(`/receipts/${c.id}/comments`)).data.comments;
+  check('the Med Ref sees it, and it is not marked as theirs', list.length === 1 && list[0].mine === false && list[0].author.name === 'Liza Santos');
+  const heard = (await ana.get('/notifications')).data.items.find((n) => n.receiptId === c.id && /commented/.test(n.text));
+  check('the Med Ref gets a bell notice', !!heard, JSON.stringify(heard));
+  check('the writer does not notify themselves', !(await liza.get('/notifications')).data.items.some((n) => n.receiptId === c.id && /commented/.test(n.text)));
+  await ana.post(`/receipts/${c.id}/comments`, { body: 'Yes, both pages are attached.' });
+  check('a reply reaches the checker', (await liza.get('/notifications')).data.items.some((n) => n.receiptId === c.id && /commented/.test(n.text)));
+  check('markup in a comment is stored as plain text', (await ana.post(`/receipts/${c.id}/comments`, { body: '<img src=x onerror=alert(1)>' })).data.comment.body === '<img src=x onerror=alert(1)>');
+  check('someone who cannot see the receipt cannot read or write comments', (await mark.get(`/receipts/${c.id}/comments`)).status === 404 && (await mark.post(`/receipts/${c.id}/comments`, { body: 'hi' })).status === 404);
+  check('comments appear in the audit log', (await admin.get(`/audit?q=commented&pageSize=5`)).data.items.some((a) => a.entityId === String(c.id)));
+
+  /* ---- bulk ---- */
+  const b1 = await mk(ana, 'Bulk One'), b2 = await mk(ana, 'Bulk Two'), b3 = await mk(ana, 'Bulk Three');
+  await view(liza, b1); await view(liza, b2); // b3 deliberately not opened
+  const bulk = await liza.post('/receipts/bulk', { action: 'check', ids: [b1.id, b2.id, b3.id], note: 'Bulk checked.' });
+  check('bulk check does the ones whose evidence was opened', bulk.data.done === 2 && bulk.data.skipped === 1, JSON.stringify(bulk.data));
+  check('and explains the one it skipped', /evidence/i.test(bulk.data.results.find((x) => x.id === b3.id)?.message ?? ''));
+  check('the checked ones are really checked', (await liza.get(`/receipts/${b1.id}`)).data.receipt.status === 'checked' && (await liza.get(`/receipts/${b3.id}`)).data.receipt.status === 'submitted');
+  check('the remark was applied to each', (await liza.get(`/receipts/${b2.id}`)).data.receipt.checkNote === 'Bulk checked.');
+  check('an approver cannot bulk check', (await paolo.post('/receipts/bulk', { action: 'check', ids: [b3.id] })).data.results?.[0]?.ok !== true);
+  check('bulk needs at least one receipt', (await liza.post('/receipts/bulk', { action: 'check', ids: [] })).status === 400);
+  check('bulk is limited to 25 at a time', (await liza.post('/receipts/bulk', { action: 'check', ids: Array.from({ length: 26 }, (_, i) => i + 1) })).status === 400);
+  check('only check and approve are allowed in bulk', (await liza.post('/receipts/bulk', { action: 'disapprove', ids: [b1.id] })).status === 400);
+  await view(paolo, b1);
+  const ap = await paolo.post('/receipts/bulk', { action: 'approve', ids: [b1.id, b2.id, b3.id] });
+  check('bulk approve approves only what the approver opened and what was checked', ap.data.done === 1 && ap.data.skipped === 2, JSON.stringify(ap.data));
+  check('an unchecked receipt cannot be approved in bulk', ap.data.results.find((x) => x.id === b3.id)?.ok === false);
+  check('a Med Ref cannot bulk anything', (await ana.post('/receipts/bulk', { action: 'check', ids: [b3.id] })).data.results?.every((x) => !x.ok));
+  check('bulk runs are in the audit log', (await admin.get('/audit?q=receipt.bulk&pageSize=3')).data.items.length > 0);
+}
 
 { const get = async (q) => (await liza.get('/receipts?pageSize=50&' + q)).data.items;
   const hi = await get('sort=amount_high'), lo = await get('sort=amount_low'), nw = await get('sort=newest'), old = await get('sort=oldest');

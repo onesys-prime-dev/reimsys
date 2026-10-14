@@ -1,6 +1,7 @@
 // Exploratory pass: acts like each role, tries awkward things, and reports anything suspicious.
 // Needs API (4000) and web (5173) running. Usage: node e2e/explore.mjs [screenshot-dir]
 import { chromium } from 'playwright';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -73,10 +74,8 @@ await step(ana, 'receipt of someone else', async (p) => {
   await p.goto('/receipts/1'); await p.waitForTimeout(800);
   const t = await text(p);
   // Receipt 1 may be hers; find one of Mark's through the API instead
-  const r = await p.evaluate(async () => (await fetch('/api/receipts?pageSize=100', { headers: { 'x-requested-with': 'reimsis' } })).json());
-  const mine = new Set(r.items.map((x) => x.id));
-  let other = null;
-  for (let id = 1; id < 60 && !other; id++) if (!mine.has(id)) other = id;
+  // A receipt that really belongs to someone else, straight from the database.
+  const other = Number(execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsis', '-N', '-B', '-e', "SELECT id FROM Receipt WHERE encoderId <> (SELECT id FROM User WHERE email='ana.reyes@example.com') ORDER BY id DESC LIMIT 1"], { encoding: 'utf8' }).trim());
   await p.goto('/receipts/' + other); await p.waitForTimeout(800);
   if (!/not found/i.test(await text(p))) flag('medref', '/receipts/' + other, 'another user\'s receipt did not show "not found"');
 }, [404]);

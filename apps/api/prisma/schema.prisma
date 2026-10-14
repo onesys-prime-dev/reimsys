@@ -58,6 +58,7 @@ model User {
   auditLogs          AuditLog[]
   receipts           Receipt[]          @relation("Encoder")
   notifications      Notification[]
+  comments           Comment[]          @relation("CommentAuthor")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -132,6 +133,7 @@ model Receipt {
   lastNote     String?                  @db.VarChar(1000)
   evidence     ReceiptEvidence[]
   document     ReimbursementDocument?
+  comments     Comment[]
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
 
@@ -254,4 +256,16 @@ model Setting {
   value       String   @db.Text
   updatedAt   DateTime @updatedAt
   updatedById Int?
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  receiptId Int
+  receipt   Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation("CommentAuthor", fields: [authorId], references: [id])
+  body      String   @db.VarChar(1000)
+  createdAt DateTime @default(now())
+
+  @@index([receiptId, id])
 }

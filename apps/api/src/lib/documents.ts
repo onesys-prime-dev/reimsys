@@ -82,7 +82,7 @@ export async function buildReimbursementPdf(receiptId: number) {
 
 registerJob('document', async ({ receiptId }: { receiptId: number }) => {
   const d = await prisma.reimbursementDocument.findUnique({ where: { receiptId } });
-  if (!d) throw new Error('Document row missing');
+  if (!d) return; // the approval was taken back before the document was made
   try {
     const pdf = await buildReimbursementPdf(receiptId);
     const filePath = await saveFile('documents', 'pdf', pdf);
