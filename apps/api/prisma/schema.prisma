@@ -59,6 +59,7 @@ model User {
   receipts           Receipt[]          @relation("Encoder")
   notifications      Notification[]
   comments           Comment[]          @relation("CommentAuthor")
+  passwordTokens     PasswordToken[]    @relation("PasswordTokens")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -268,4 +269,18 @@ model Comment {
   createdAt DateTime @default(now())
 
   @@index([receiptId, id])
+}
+
+/// One-time links for choosing a password: "forgot password" (short life) and the invitation for a new user (longer).
+model PasswordToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation("PasswordTokens", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @db.VarChar(64)
+  purpose   String    @db.VarChar(10)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }

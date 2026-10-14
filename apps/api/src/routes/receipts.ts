@@ -247,7 +247,7 @@ receiptsRouter.get('/:id/history', async (req, res) => {
 
 const SUMMARY: Record<ReceiptAction, string> = {
   submit: 'submitted for checking', withdraw: 'withdrew the receipt', check: 'marked as checked', return: 'returned the record',
-  undo: 'took back the decision', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
+  undo: 'took back the decision', request: 'asked for more proof', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
 async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body) {
@@ -296,7 +296,9 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null });
   if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null });
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note });
-  if (action === 'return' || action === 'reserve') data.lastNote = note;
+  if (action === 'return' || action === 'reserve' || action === 'request') data.lastNote = note;
+  // Asking for more proof sends it back to be checked again from the start.
+  if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null });
   if (action === 'release') data.lastNote = null;
   if (action === 'undo') Object.assign(data, { decidedById: null, decidedAt: null, decisionNote: null, lastNote: null });
   if (action === 'approve' || action === 'disapprove') Object.assign(data, { decidedById: auth.user.id, decidedAt: now, decisionNote: note, lastNote: action === 'disapprove' ? note : null });
@@ -328,13 +330,17 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
   if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });
   if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${note}`, email: { template: 'returned', data: mail } });
+  if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${note}`, email: { template: 'returned', data: mail } });
+  if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
   if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
   if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });
   if (action === 'undo') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reversed', receiptId: r.id, text: `The decision on ${ref} was reversed. ${note}`, email: { template: 'reversed', data: mail } });
   if (action === 'release') await notify({ userIds: [r.encoderId], type: 'receipt.released', receiptId: r.id, text: `The hold on ${ref} was released.`, email: { template: 'released', data: mail, respectPref: 'reservationReleased' } });
 
-  return receiptDetail(auth, await loadVisible(auth, r.id));
+  // Reload without the visibility filter: the action may have moved the receipt out of this person's view (an approver sending one back), and they should still get a proper reply.
+  const fresh = await prisma.receipt.findUniqueOrThrow({ where: { id: r.id }, include: receiptInclude });
+  return receiptDetail(auth, fresh);
 }
 
 /* ---------- bulk: check or approve several at once ---------- */

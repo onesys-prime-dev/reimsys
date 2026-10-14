@@ -7,7 +7,7 @@ export const STATUS_LABEL: Record<ReceiptStatus, string> = {
   approved: 'Approved', disapproved: 'Disapproved', reserved: 'Reserved',
 };
 
-export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release' | 'undo';
+export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release' | 'undo' | 'request';
 export type NoteRule = 'none' | 'optional' | 'required';
 
 export interface Transition {
@@ -31,6 +31,7 @@ export const TRANSITIONS: Transition[] = [
   { action: 'approve', from: ['checked'], to: 'approved', permission: 'review.decide', note: 'optional', notOwner: true },
   { action: 'disapprove', from: ['checked'], to: 'disapproved', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'reserve', from: ['checked'], to: 'reserved', permission: 'review.decide', note: 'required', notOwner: true },
+  { action: 'request', from: ['checked'], to: 'returned', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'undo', from: ['approved', 'disapproved'], to: 'checked', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'release', from: ['reserved'], to: 'checked', permission: 'review.decide', note: 'optional', notOwner: true },
 ];

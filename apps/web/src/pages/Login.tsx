@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { errMsg } from '../api';
 import { useAuth } from '../auth';
+import { Link } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 import { Field } from '../ui';
 
@@ -39,6 +40,7 @@ export function LoginPage() {
           </Field>
           {error && <div className="callout bad" role="alert" style={{ margin: 0 }}><div><span>{error}</span></div></div>}
           <button className="btn pri" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+          <Link to="/forgot" className="forgot">Forgot your password?</Link>
         </form>
       </div>
     </div>

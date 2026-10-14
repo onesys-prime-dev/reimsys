@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/Dashboard';
 import { ForcePasswordPage } from './pages/ForcePassword';
 import { ImportPage } from './pages/Import';
 import { LoginPage } from './pages/Login';
+import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordLink';
 import { ProfilePage } from './pages/Profile';
 import { ReceiptDetailPage } from './pages/ReceiptDetail';
 import { ReceiptFormPage } from './pages/ReceiptForm';
@@ -88,8 +89,19 @@ function Shell() {
 
 export function App() {
   const { me, loading } = useAuth();
+  const { pathname } = useLocation();
+  // The password link pages work whether or not someone is signed in on this browser.
+  if (pathname === '/reset' || pathname === '/forgot') return <Routes><Route path="/forgot" element={<ForgotPasswordPage />} /><Route path="/reset" element={<ResetPasswordPage />} /></Routes>;
   if (loading) return <div className="login"><span className="muted">Loading…</span></div>;
-  if (!me) return <LoginPage />;
+  if (!me) {
+    return (
+      <Routes>
+        <Route path="/forgot" element={<ForgotPasswordPage />} />
+        <Route path="/reset" element={<ResetPasswordPage />} />
+        <Route path="*" element={<LoginPage />} />
+      </Routes>
+    );
+  }
   if (me.mustChangePassword) return <ForcePasswordPage />;
   return <Shell />;
 }

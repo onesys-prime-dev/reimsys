@@ -246,6 +246,26 @@ console.log('\nUndo a decision, comments, bulk actions');
   const mails = mysql(`SELECT COUNT(*) FROM EmailLog WHERE subject LIKE 'Correction:%' AND createdAt > UTC_TIMESTAMP() - INTERVAL 5 MINUTE`).trim();
   check('the Med Ref and checker were sent a correction email', Number(mails) >= 2, mails);
 
+  /* ---- ask for more proof ---- */
+  let q = await mk(ana, 'Need Proof');
+  await view(liza, q); q = (await liza.post(`/receipts/${q.id}/check`, { version: q.version })).data.receipt;
+  check('the approver is offered "ask for more proof"', (await paolo.get(`/receipts/${q.id}`)).data.receipt.actions.some((a) => a.action === 'request'));
+  check('asking for proof needs a note', (await paolo.post(`/receipts/${q.id}/request`, { version: q.version })).data?.error?.code === 'NOTE_REQUIRED');
+  check('a Med Ref cannot ask for proof', (await ana.post(`/receipts/${q.id}/request`, { version: q.version, note: 'x'.repeat(8) })).status === 403);
+  const asked = await paolo.post(`/receipts/${q.id}/request`, { version: q.version, note: 'Please attach the prescription too.' });
+  q = asked.data.receipt;
+  check('it goes back to the Med Ref as returned', q?.status === 'returned' && q.lastNote === 'Please attach the prescription too.', JSON.stringify(asked.data));
+  check('the earlier check is cleared so it is checked again', q.checkedBy === null);
+  const ret = (await ana.get(`/receipts/${q.id}`)).data.receipt;
+  check('the Med Ref can now add more evidence', ret.canEdit === true);
+  const more = await ana.req('POST', `/receipts/${q.id}/evidence`, form('rx.png', png('rx' + stamp)));
+  check('and the extra file is accepted', more.data.receipt?.evidence.length === 2, JSON.stringify(more.data).slice(0, 120));
+  check('the Med Ref was told, in the app', (await ana.get('/notifications')).data.items.some((n) => n.receiptId === q.id && /more proof/.test(n.text)));
+  check('the checker was told, in the app', (await liza.get('/notifications')).data.items.some((n) => n.receiptId === q.id && /more proof/.test(n.text)));
+  q = (await ana.post(`/receipts/${q.id}/submit`, { version: more.data.receipt.version })).data.receipt;
+  check('it can be sent again and waits for the checker', q.status === 'submitted');
+  check('the checker has to open the evidence again before checking', (await liza.post(`/receipts/${q.id}/check`, { version: q.version })).data?.error?.code === 'EVIDENCE_NOT_VIEWED');
+
   /* ---- comments ---- */
   let c = await mk(ana, 'Comment On');
   check('a comment needs some text', (await ana.post(`/receipts/${c.id}/comments`, { body: '   ' })).status === 400);

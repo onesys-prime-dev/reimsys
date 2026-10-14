@@ -120,3 +120,15 @@ pm2 restart reimsis
 - Report and document layouts are placeholders until the organisation's own forms are supplied. They live in `apps/api/src/lib/documents.ts` and `reports.ts`.
 - Evidence files are served only through the API and every view, download and print is audited. Do not expose the storage folder through Nginx.
 - Passwords are argon2 hashed. Accounts lock for 15 minutes after 5 wrong attempts; an administrator can unlock sooner.
+
+## Before real people use it
+
+1. Sign in as `admin@example.com` and add yourself under Access as a Super Admin (use your real email).
+2. Sign in as yourself and change your password.
+3. Switch off the demo accounts, which share a public password:
+   ```
+   pnpm --filter @reimsis/api demo:off
+   ```
+   It stops with an explanation if no real Super Admin exists yet, so it cannot lock everyone out.
+4. Set `WEB_ORIGIN` to the real `https://` address. Emails then include the "Open the receipt" button, and forgot-password and invitation links point at it.
+5. Apply `docs/db-grants.sql` so the app cannot change or delete audit entries.

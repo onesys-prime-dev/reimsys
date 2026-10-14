@@ -70,6 +70,9 @@ export const passwordSchema = z
   .regex(/[A-Za-z]/, 'Include a letter.')
   .regex(/\d/, 'Include a number.');
 
+export const forgotSchema = z.object({ email: z.string().trim().toLowerCase().email() });
+export const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
+
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1).max(128),

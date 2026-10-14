@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'digest', 'test'] as const;
+export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'digest', 'reset', 'invite', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -31,6 +31,8 @@ export const PLACEHOLDERS: PlaceholderDef[] = [
   { key: 'docNo', label: 'Reimbursement document number', example: 'REIM-2026-000045' },
   { key: 'summary', label: 'List of what is waiting (daily summary only)', example: '2 receipts waiting to be checked.' },
   { key: 'orgName', label: 'Your organisation name', example: 'Your Organisation' },
+  { key: 'minutes', label: 'How long a reset link works, in minutes', example: '60' },
+  { key: 'hours', label: 'How long an invitation link works, in hours', example: '72' },
 ];
 
 const RECEIPT_VARS = ['recipientName', 'actorName', 'refNo', 'payee', 'amount', 'category', 'date', 'status', 'note', 'orgName'];
@@ -55,6 +57,8 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
   released: { label: 'Hold released', when: 'An approver releases a hold', to: 'The Med Ref, if they turned this on in their profile', allowed: RECEIPT_VARS, hasReceipt: true },
   reversed: { label: 'Decision reversed', when: 'An approver undoes an approval or disapproval within ten minutes', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   digest: { label: 'Daily summary', when: 'About 8am, only if something is waiting', to: 'Anyone who has the summary turned on', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
+  reset: { label: 'Forgot password', when: 'Someone asks to reset their password on the sign-in page', to: 'The person who asked', allowed: ['recipientName', 'orgName', 'minutes'], hasReceipt: false },
+  invite: { label: 'Invitation to a new user', when: 'An administrator creates a new user', to: 'The new user', allowed: ['recipientName', 'actorName', 'orgName', 'hours'], hasReceipt: false },
   test: { label: 'Test email', when: 'An administrator presses "Send test email"', to: 'The address the administrator typed', allowed: ['actorName', 'orgName'], hasReceipt: false },
 };
 
@@ -108,6 +112,20 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     buttonLabel: 'Open {{orgName}}',
     showDetails: false,
   },
+  reset: {
+    subject: '{{orgName}}: choose a new password',
+    heading: 'Choose a new password',
+    body: 'Hi {{recipientName}},\n\nWe received a request to reset your {{orgName}} password. Use the button below within {{minutes}} minutes.\n\nIf you did not ask for this, ignore this email. Your password stays the same.',
+    buttonLabel: 'Choose a new password',
+    showDetails: false,
+  },
+  invite: {
+    subject: 'Welcome to {{orgName}}',
+    heading: 'Your {{orgName}} account is ready',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} created an account for you. Use the button below to choose your password and sign in. The link works for {{hours}} hours.',
+    buttonLabel: 'Choose my password',
+    showDetails: false,
+  },
   test: {
     subject: '{{orgName}}: test email',
     heading: 'Email is working',
@@ -128,6 +146,8 @@ const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
   reserved: { actorName: 'Paolo Villanueva', status: 'Reserved', note: 'Waiting for the regional office to confirm the room rate.', docNo: '' },
   released: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Rate confirmed.', docNo: '' },
   reversed: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Approved by mistake. Re-checking the amount.', docNo: '' },
+  reset: { recipientName: 'Ana', minutes: '60' },
+  invite: { recipientName: 'Ana', actorName: 'Admin User', hours: '72' },
   digest: { summary: '• 2 receipts waiting to be checked.\n• 1 draft not submitted yet.' },
   test: { actorName: 'Admin User' },
 };

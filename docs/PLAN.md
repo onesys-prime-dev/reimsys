@@ -97,3 +97,11 @@ Required on the dev machine: Node.js LTS (20+), npm or pnpm, XAMPP MySQL/MariaDB
 - **Bulk actions.** Checkers can mark up to 25 receipts checked, and approvers can approve up to 25, from the receipt list. Each goes through the normal rules, so receipts whose evidence was not opened are skipped and explained.
 - **Receipt list.** Sorting, clear-filters, and an amber "Waiting" flag after two days with the next person.
 - **Not yet built (needs a public https address):** forgot-password and invitation emails, because email links are left out until the app has a proper address.
+
+### Added later still
+
+- **Ask for more proof.** An approver who is not satisfied can send a checked receipt back to the Med Ref with a required note. The Med Ref can add photos or correct details and resubmit, and the receipt is checked again from the start. (A checker can already do the same with Return.)
+- **Forgot password and invitations.** The sign-in page has "Forgot your password?". It emails a one-hour link, always answers the same way (so it cannot be used to find out who has an account), and ends every older sign-in once the new password is saved. A new user also receives an invitation email with a 72-hour link, in addition to the temporary password shown to the administrator.
+- **Zoom fixed.** Zooming a large photo no longer hides its top and left edges.
+- **Clear upload errors.** A file over the limit now says so, instead of a generic failure.
+- **Retiring the demo accounts.** `pnpm --filter @reimsis/api demo:off` switches off the five shared-password demo accounts. It refuses to run until a real Super Admin exists.

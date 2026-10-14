@@ -104,6 +104,8 @@ export interface RenderInput {
   data: Record<string, string | undefined>;
   /** Where the button goes. It is dropped (with a sentence instead) when the address would look like spam. */
   link?: string;
+  /** Keep the button even for an address that would look like spam. Only for emails where the link is the whole point. */
+  forceLink?: boolean;
   /** Render this instead of the saved template, for previews of unsaved edits. */
   template?: EmailTemplate;
   branding?: EmailBranding;
@@ -121,7 +123,7 @@ export async function renderEmail(input: RenderInput): Promise<Rendered> {
   const heading = fill(t.heading).replace(/\s+/g, ' ').trim();
   const blocks = toBlocks(fill(t.body));
   const buttonLabel = fill(t.buttonLabel).trim();
-  const linkOk = !!input.link && isPublicLink(input.link);
+  const linkOk = !!input.link && (input.forceLink || isPublicLink(input.link));
   const showButton = !!buttonLabel && linkOk;
   const needsSignInLine = !!buttonLabel && !!input.link && !linkOk;
   if (needsSignInLine) blocks.push({ kind: 'p', lines: [`Sign in to ${data.orgName} to open it.`] });

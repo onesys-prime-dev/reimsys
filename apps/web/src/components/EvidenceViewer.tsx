@@ -56,7 +56,7 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
       <div className="stage" style={isPdf ? { padding: 0, display: 'block', height: 440 } : undefined}>
         {isPdf ? <iframe className="evframe" style={{ height: 440, borderRadius: 10 }} src={url} title={file!.fileName} />
           : isHeic ? <div className="muted" style={{ textAlign: 'center' }}>This photo format cannot be shown in the browser.<br />Download it to view.</div>
-          : <img className="evimg" style={{ transform: `scale(${zoom})` }} src={url} alt={`Evidence: ${file!.fileName}`} />}
+          : <img className="evimg" style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: zoom > 1 ? 'none' : '100%', maxHeight: zoom > 1 ? 'none' : undefined }} src={url} alt={`Evidence: ${file!.fileName}`} />}
       </div>
       <div className="evtool">
         {!isPdf && !isHeic && (

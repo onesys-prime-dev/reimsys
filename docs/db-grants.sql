@@ -22,6 +22,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Job                   TO 'reimsi
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.LiquidationReport     TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.ImportJob             TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Comment               TO 'reimsis_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.PasswordToken          TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Setting               TO 'reimsis_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsis.Sequence              TO 'reimsis_app'@'localhost';
 

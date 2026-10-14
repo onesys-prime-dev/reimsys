@@ -17,10 +17,11 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   approve: { label: 'Approve', icon: 'check', cls: 'ok', title: 'Approve this record', desc: 'A reimbursement document will be created and the Med Ref will be emailed.', field: 'Remark', ok: 'Approved. The reimbursement document is being prepared.' },
   disapprove: { label: 'Disapprove', icon: 'x', cls: 'bad', title: 'Disapprove this record', desc: 'A reason is required. The Med Ref will see it in the email.', field: 'Reason for disapproval', ok: 'Disapproved. The Med Ref has been emailed.' },
   reserve: { label: 'Reserve', icon: 'pause', cls: 'hold', title: 'Put this record on hold', desc: 'A note is required. You can release it back to your queue later.', field: 'Why is it on hold', ok: 'Put on hold. The Med Ref has been emailed.' },
+  request: { label: 'Ask for more proof', icon: 'camera', cls: '', title: 'Ask for more proof', desc: 'The receipt goes back to the Med Ref, who can add photos or fix details and send it again. It will be checked again from the start.', field: 'What proof or correction do you need', ok: 'Sent back to the Med Ref. They have been emailed.' },
   undo: { label: 'Take back decision', icon: 'undo', cls: '', title: 'Take back this decision', desc: 'The receipt goes back to Checked and the Med Ref is told to disregard the earlier decision. Any reimbursement document is removed.', field: 'Why are you taking it back', ok: 'Decision taken back. The receipt is back in your queue.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
-const ORDER: ReceiptAction[] = ['undo', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
+const ORDER: ReceiptAction[] = ['undo', 'request', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
 
 export function ReceiptDetailPage() {
   const id = Number(useParams().id);
@@ -52,7 +53,12 @@ export function ReceiptDetailPage() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ['receipt', id] }); qc.invalidateQueries({ queryKey: ['history', id] }); qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); };
   const act = useMutation({
     mutationFn: ({ action, note }: { action: ReceiptAction; note?: string }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, version: r!.version } }),
-    onSuccess: (d, v) => { qc.setQueryData(['receipt', id], d); toast(COPY[v.action].ok); setModal(null); refresh(); },
+    onSuccess: (d, v) => {
+      toast(COPY[v.action].ok); setModal(null);
+      // Sending it back takes the receipt out of the approver's view, so go to the list instead of showing "not found".
+      if (v.action === 'request') { qc.removeQueries({ queryKey: ['receipt', id] }); refresh(); nav('/receipts'); return; }
+      qc.setQueryData(['receipt', id], d); refresh();
+    },
     onError: (e) => { toast(errMsg(e), 'bad'); setModal(null); refresh(); },
   });
   const del = useMutation({

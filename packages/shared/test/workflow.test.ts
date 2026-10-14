@@ -28,7 +28,7 @@ describe('receipt state machine', () => {
   });
 
   it('gives the approver decisions only on checked receipts', () => {
-    expect(names(availableActions('checked', perms('review.decide'), false))).toEqual(['approve', 'disapprove', 'reserve']);
+    expect(names(availableActions('checked', perms('review.decide'), false))).toEqual(['approve', 'disapprove', 'request', 'reserve']);
     expect(names(availableActions('submitted', perms('review.decide'), false))).toEqual([]);
     expect(names(availableActions('reserved', perms('review.decide'), false))).toEqual(['release']);
   });

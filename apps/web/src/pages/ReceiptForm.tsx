@@ -24,6 +24,8 @@ export function ReceiptFormPage() {
   const [queued, setQueued] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // When editing, the form stays hidden until the saved values are in it, so nothing flashes empty and nothing typed early gets overwritten.
+  const [ready, setReady] = useState(id === null);
 
   const cats = useQuery({ queryKey: ['categories'], queryFn: () => api<{ categories: Category[] }>('/categories') });
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
@@ -31,7 +33,7 @@ export function ReceiptFormPage() {
 
   useEffect(() => {
     if (!rec) return;
-    setPayee(rec.payee); setDate(rec.receiptDate); setAmount(String(rec.amount)); setCategoryId(String(rec.category.id)); setDescription(rec.description ?? '');
+    setPayee(rec.payee); setDate(rec.receiptDate); setAmount(String(rec.amount)); setCategoryId(String(rec.category.id)); setDescription(rec.description ?? ''); setReady(true);
   }, [rec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!id && !categoryId && cats.data?.categories[0]) setCategoryId(String(cats.data.categories[0].id)); }, [cats.data, id, categoryId]);
 
@@ -95,6 +97,7 @@ export function ReceiptFormPage() {
   }
 
   if (id && existing.isError) return <div className="empty"><b>Receipt not found</b></div>;
+  if (id && !ready && !(rec && !rec.canEdit)) return <div className="empty">Loading…</div>;
   if (id && rec && !rec.canEdit) return <div className="empty"><b>This receipt can no longer be edited</b><Link to={`/receipts/${id}`} style={{ color: 'var(--accent)' }}>Open it</Link></div>;
 
   return (

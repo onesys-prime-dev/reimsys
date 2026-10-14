@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "build": "tsup",
-    "start:dev": "tsx src/server.ts"
+    "start:dev": "tsx src/server.ts",
+    "demo:off": "tsx prisma/retire-demo.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

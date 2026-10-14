@@ -5,6 +5,7 @@ import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';
 import { hashPassword, temporaryPassword } from '../lib/password.js';
+import { sendPasswordLink } from '../lib/passwordLinks.js';
 import { userRow } from '../lib/serialize.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
 import { sendAvatar } from './me.js';
@@ -69,6 +70,8 @@ usersRouter.post('/', async (req, res) => {
     action: 'user.created', entityType: 'user', entityId: user.id,
     summary: `Created user ${user.name} as ${role.name}`, after: { name: user.name, email: user.email, role: role.code },
   });
+  // The invitation is a courtesy. If email is not set up or fails, the temporary password above still works.
+  await sendPasswordLink(user, 'invite', actor.name).catch((e) => console.error('invite email', e));
   res.status(201).json({ user: userRow(user), temporaryPassword: temp });
 });
 

@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { loginSchema } from '@reimsis/shared';
+import { forgotSchema, loginSchema, resetSchema } from '@reimsis/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { HttpError, unauthorized } from '../lib/errors.js';
-import { newToken, sha256, verifyPassword } from '../lib/password.js';
+import { hashPassword, newToken, sha256, verifyPassword } from '../lib/password.js';
+import { checkToken, sendPasswordLink } from '../lib/passwordLinks.js';
 import { meResponse } from '../lib/serialize.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -24,6 +25,54 @@ const cookieOptions = () => ({
   sameSite: 'lax' as const,
   secure: config.isProd,
   path: '/',
+});
+
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMIT', message: 'Too many requests. Please wait a few minutes and try again.' } },
+});
+
+/** Opening and using a link: looser, since a real person may mistype a new password a few times. */
+const linkLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please wait a few minutes and try again.' } },
+});
+
+/** Always answers the same way, so nobody can use this page to find out who has an account. */
+authRouter.post('/forgot', forgotLimiter, async (req, res) => {
+  const { email } = forgotSchema.parse(req.body);
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (user?.isActive) {
+    await sendPasswordLink(user, 'reset');
+    await audit(req, { action: 'auth.reset_requested', entityType: 'user', entityId: user.id, summary: 'asked for a password reset link', actor: { id: user.id, name: user.name } });
+  } else {
+    await audit(req, { action: 'auth.reset_requested', entityType: 'user', summary: `asked for a reset link for an unknown or inactive address`, actor: { id: null, name: email } });
+  }
+  res.json({ ok: true });
+});
+
+authRouter.get('/reset/check', linkLimiter, async (req, res) => {
+  const row = await checkToken(String(req.query.token ?? ''));
+  res.json(row ? { valid: true, name: row.user.name, invite: row.purpose === 'invite' } : { valid: false });
+});
+
+authRouter.post('/reset', linkLimiter, async (req, res) => {
+  const { token, password } = resetSchema.parse(req.body);
+  const row = await checkToken(token);
+  if (!row) throw new HttpError(400, 'LINK_INVALID', 'This link has expired or was already used. Ask for a new one.');
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: row.userId }, data: { passwordHash: await hashPassword(password), mustChangePassword: false, failedAttempts: 0, lockedUntil: null } }),
+    prisma.passwordToken.updateMany({ where: { userId: row.userId, usedAt: null }, data: { usedAt: new Date() } }),
+    prisma.session.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+  ]);
+  await audit(req, { action: 'auth.password_reset', entityType: 'user', entityId: row.userId, summary: row.purpose === 'invite' ? 'chose a password from the invitation link' : 'reset their password from an emailed link', actor: { id: row.userId, name: row.user.name } });
+  res.json({ ok: true });
 });
 
 authRouter.post('/login', loginLimiter, async (req, res) => {
