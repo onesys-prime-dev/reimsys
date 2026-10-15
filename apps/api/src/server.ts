@@ -23,6 +23,7 @@ import { categoriesRouter, dashboardRouter, emailLogRouter, notificationsRouter 
 import { importsRouter } from './routes/imports.js';
 import { receiptsRouter } from './routes/receipts.js';
 import { documentsRouter, reportsRouter } from './routes/reports.js';
+import { paymentsRouter } from './routes/payments.js';
 import './lib/documents.js';
 import './lib/reports.js';
 import { startDigest } from './lib/digest.js';
@@ -77,6 +78,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/documents', documentsRouter);
+app.use('/api/payments', paymentsRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/email-log', emailLogRouter);
 app.use('/api/settings', settingsRouter);

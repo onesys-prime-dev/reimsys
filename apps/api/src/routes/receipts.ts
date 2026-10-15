@@ -258,6 +258,7 @@ const SUMMARY: Record<ReceiptAction, string> = {
 async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body) {
   const auth = req.auth!;
   const t = transitionFor(action)!;
+  if (action === 'pay') throw badRequest('Use the payment form to mark receipts as paid.', 'USE_PAYMENT_FORM');
   const body = actionBodySchema.parse(rawBody);
   const r = await loadVisible(auth, receiptId);
   if (!auth.permissions.has(t.permission)) throw forbidden();
@@ -404,6 +405,7 @@ receiptsRouter.post('/:id/comments', commentLimiter, async (req, res) => {
 });
 
 for (const t of TRANSITIONS) {
+  if (t.action === 'pay') continue; // paying needs the proof and amounts: POST /api/payments
   receiptsRouter.post(`/:id/${t.action}`, async (req, res) => {
     res.json({ receipt: await runAction(req, t.action) });
   });
