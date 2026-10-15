@@ -53,6 +53,33 @@ await acc.page.goto(`/receipts/${paidBefore.id}`);
 await acc.page.waitForSelector('.dh');
 ok('a paid receipt shows the Paid pill', await acc.page.locator('.dh .pill.s-paid').isVisible());
 
+console.log('Selecting and paying');
+await acc.page.goto('/pay');
+await acc.page.waitForSelector(`text=${r1.refNo}`);
+await acc.page.getByLabel(`Select ${r1.refNo}`).check({ timeout: 5000 });
+await acc.page.getByLabel(`Select ${r3.refNo}`).check();
+ok('ticking another person starts a new selection', !(await acc.page.getByLabel(`Select ${r1.refNo}`).isChecked()) && (await acc.page.locator('.savebar').innerText()).includes('1 selected'));
+await acc.page.getByLabel(`Select ${r1.refNo}`).check();
+await acc.page.getByLabel(`Select ${r2.refNo}`).check();
+ok('the bar shows how many and how much', /2 selected/.test(await acc.page.locator('.savebar').innerText()) && (await acc.page.locator('.savebar').innerText()).includes('820.75'));
+await acc.page.click('.savebar >> text=Mark as paid');
+const dlg = acc.page.locator('.modal');
+await dlg.waitFor();
+ok('the dialog lists both receipts with their amounts filled in', (await dlg.getByLabel(`Amount paid for ${r1.refNo}`).inputValue()) === '500' && (await dlg.getByLabel(`Amount paid for ${r2.refNo}`).inputValue()) === '320.75');
+const payBtn = dlg.locator('button.ok', { hasText: 'Mark as paid' });
+ok('it cannot be sent without a proof', await payBtn.isDisabled());
+await dlg.getByLabel('Proof of payment').setInputFiles(proofFile);
+await dlg.getByLabel(`Amount paid for ${r2.refNo}`).fill('300');
+ok('paying less asks for a reason', await dlg.getByLabel(`Why less was paid for ${r2.refNo}`).isVisible() && await payBtn.isDisabled());
+await dlg.getByLabel(`Why less was paid for ${r2.refNo}`).fill('Parking fee not covered');
+ok('the total updates', (await dlg.innerText()).includes('800.00'));
+await shot(acc.page, 'pay-2-dialog');
+await payBtn.click();
+await acc.page.waitForSelector('.toast');
+ok('it confirms with the payment number', /PAY-\d{4}-\d{6}/.test(await toastText(acc.page)));
+await acc.page.waitForSelector(`text=${r1.refNo}`, { state: 'detached' });
+ok('the paid receipts leave the queue, the other person stays', (await acc.page.locator(`text=${r2.refNo}`).count()) === 0 && (await acc.page.locator(`text=${r3.refNo}`).count()) === 1);
+
 // END OF CHECKS
 for (const s of sessions) ok(`no errors on the page for ${s.email}`, s.page.errors.length === 0 || (console.log(s.page.errors), false));
 await browser.close();
