@@ -117,5 +117,25 @@ ok('accounting got no email about approvals', !mails.some((e) => e.to === 'accou
 const dash2 = (await call(U.rica, 'GET', '/dashboard')).d;
 ok('paid this month went up', dash2.paidThisMonth.count >= 4 && dash2.paidThisMonth.total >= 2050.5);
 
+console.log('\nReversing a payment');
+let rv = (await call(U.rica, 'GET', `/receipts/${a2.id}`)).d.receipt;
+const oldPaymentId = rv.payment?.id;
+ok('a reversal needs a reason', code(await call(U.rica, 'POST', `/receipts/${a2.id}/reverse_payment`, { version: rv.version })) === 'NOTE_REQUIRED');
+ok('the Med Ref cannot reverse a payment', (await call(U.ana, 'POST', `/receipts/${a2.id}/reverse_payment`, { version: rv.version, note: 'No' })).s === 403);
+ok('the approver cannot reverse a payment', (await call(U.paolo, 'POST', `/receipts/${a2.id}/reverse_payment`, { version: rv.version, note: 'No' })).s === 403);
+const rev = await call(U.rica, 'POST', `/receipts/${a2.id}/reverse_payment`, { version: rv.version, note: 'Paid the wrong amount' });
+ok('accounting reverses it with a reason', rev.s === 200 && rev.d.receipt.status === 'approved' && rev.d.receipt.payment === null);
+const sibling = (await call(U.rica, 'GET', `/receipts/${a3.id}`)).d.receipt;
+ok('the other receipt in the same payment stays paid', sibling.status === 'paid');
+ok('the old proof is still there for accounting', (await get(U.rica, proofUrl(oldPaymentId, 'view'))).status === 200);
+const again = rev.s === 200 ? await pay(U.rica, [rev.d.receipt]) : { s: 0 };
+ok('the reversed receipt can be paid again', again.s === 201 && again.d.payment.id !== oldPaymentId);
+const hist = (await call(U.rica, 'GET', `/receipts/${a2.id}/history`)).d.items.map((h) => h.action);
+ok('the history shows paid, reversed and paid again', hist.filter((a) => a === 'payment.marked').length === 2 && hist.includes('payment.reversed'));
+const anaNotes2 = (await call(U.ana, 'GET', '/notifications')).d.items;
+ok('the Med Ref was told about the reversal', anaNotes2.some((n) => n.text.includes('was reversed') && n.text.includes('Paid the wrong amount')));
+const mails2 = (await call(U.admin, 'GET', '/email-log')).d.items;
+ok('a "payment reversed" email was sent', mails2.some((e) => e.template === 'payment_reversed' && e.to === 'ana.reyes@example.com'));
+
 // END OF CHECKS
 done();

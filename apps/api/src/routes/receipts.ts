@@ -252,6 +252,7 @@ receiptsRouter.get('/:id/history', async (req, res) => {
 
 const SUMMARY: Record<ReceiptAction, string> = {
   submit: 'submitted for checking', withdraw: 'withdrew the receipt', check: 'marked as checked', return: 'returned the record',
+  pay: 'marked as paid', reverse_payment: 'reversed the payment',
   undo: 'took back the decision', request: 'asked for more proof', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
@@ -319,6 +320,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'release') data.lastNote = null;
   if (action === 'undo') Object.assign(data, { decidedById: null, decidedAt: null, decisionNote: null, lastNote: null });
+  // The payment row stays (it is the record of what happened); only the receipt's link to it is cleared.
+  if (action === 'reverse_payment') Object.assign(data, { paymentId: null, paidAmount: null, paidShortReason: null, paidAt: null });
   if (action === 'approve' || action === 'disapprove') Object.assign(data, { decidedById: auth.user.id, decidedAt: now, decisionNote: note, lastNote: action === 'disapprove' ? note : null });
 
   let docNo: string | null = null;
@@ -335,8 +338,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'undo' && r.document?.filePath) await removeFile(r.document.filePath).catch(() => undefined);
 
   await audit(req, {
-    action: `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
-    before: { status: r.status }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
+    action: action === 'reverse_payment' ? 'payment.reversed' : `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
+    before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
 
   /* notifications */
@@ -351,6 +354,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${note}`, email: { template: 'returned', data: mail } });
   if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
+  if (action === 'approve') await notify({ userIds: others(await usersWithPermission('payment.mark')).filter((id) => id !== r.encoderId), type: 'receipt.ready_to_pay', receiptId: r.id, text: `${ref} was approved and is ready to pay.` });
+  if (action === 'reverse_payment') await notify({ userIds: [r.encoderId], type: 'payment.reversed', receiptId: r.id, text: `The payment for ${ref} was reversed. ${note}`, email: { template: 'payment_reversed', data: { ...mail, paymentNo: r.payment?.paymentNo ?? '' } } });
   if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
   if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });
   if (action === 'undo') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reversed', receiptId: r.id, text: `The decision on ${ref} was reversed. ${note}`, email: { template: 'reversed', data: mail } });
