@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_GRANTS, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
+  DEFAULT_GRANTS, DEFAULT_ROLES, LOCKED_GRANTS, PERMISSIONS, RECEIPT_STATUSES, TRANSITIONS, availableActions, canEditReceipt,
   CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_SETTINGS, appSettingsSchema, changePasswordSchema, cleanFormData, makeReceiptSchema, isLockedGrant, receiptInputSchema, receiptWarnings, transitionFor,
 } from '../src/index';
 
@@ -39,9 +39,9 @@ describe('receipt state machine', () => {
   });
 
   it('only lets a decision be taken back, nothing else, and it needs a reason', () => {
-    const all = perms(...PERMISSIONS.map((p) => p.code));
-    expect(names(availableActions('approved', all, false))).toEqual(['undo']);
-    expect(names(availableActions('disapproved', all, false))).toEqual(['undo']);
+    const decider = perms('review.decide');
+    expect(names(availableActions('approved', decider, false))).toEqual(['undo']);
+    expect(names(availableActions('disapproved', decider, false))).toEqual(['undo']);
     expect(transitionFor('undo')!.note).toBe('required');
     expect(transitionFor('undo')!.to).toBe('checked');
   });
@@ -57,9 +57,10 @@ describe('receipt state machine', () => {
     expect(RECEIPT_STATUSES.filter(canEditReceipt)).toEqual(['draft', 'returned']);
   });
 
-  it('only allows leaving a final status through undo', () => {
+  it('only allows leaving a final status through undo, or through payment', () => {
     const out = TRANSITIONS.filter((t) => t.from.includes('approved') || t.from.includes('disapproved'));
-    expect(out.map((t) => t.action)).toEqual(['undo']);
+    expect(out.map((t) => t.action)).toEqual(['undo', 'pay']);
+    expect(TRANSITIONS.filter((t) => t.from.includes('disapproved')).map((t) => t.action)).toEqual(['undo']);
   });
 });
 
@@ -201,5 +202,42 @@ describe('validation', () => {
     const t = (p: string) => changePasswordSchema.safeParse({ currentPassword: 'x', newPassword: p }).success;
     expect(t('Purple-Welcome-Mat-88')).toBe(true);
     expect(t('Dragonfruit-Smoothie5')).toBe(true);
+  });
+});
+
+describe('payment step', () => {
+  it('gives Accounting pay on approved receipts and reverse on paid ones, never on their own', () => {
+    expect(names(availableActions('approved', perms('payment.mark'), false))).toEqual(['pay']);
+    expect(names(availableActions('paid', perms('payment.mark'), false))).toEqual(['reverse_payment']);
+    expect(availableActions('approved', perms('payment.mark'), true)).toEqual([]);
+    expect(availableActions('paid', perms('payment.mark'), true)).toEqual([]);
+    for (const s of ['draft', 'submitted', 'returned', 'checked', 'disapproved', 'reserved'] as const) {
+      expect(availableActions(s, perms('payment.mark'), false), s).toEqual([]);
+    }
+  });
+
+  it('moves approved to paid and back, and a reversal needs a reason', () => {
+    expect(transitionFor('pay')).toMatchObject({ from: ['approved'], to: 'paid', permission: 'payment.mark', note: 'none' });
+    expect(transitionFor('reverse_payment')).toMatchObject({ from: ['paid'], to: 'approved', permission: 'payment.mark', note: 'required' });
+  });
+
+  it('keeps the approver from taking a decision back once it is paid', () => {
+    const decider = perms('review.decide');
+    expect(names(availableActions('paid', decider, false))).toEqual([]);
+    expect(names(availableActions('approved', decider, false))).toEqual(['undo']);
+  });
+
+  it('makes Paid final: it cannot be edited and has no way out except a reversal', () => {
+    expect(canEditReceipt('paid')).toBe(false);
+    expect(TRANSITIONS.filter((t) => t.from.includes('paid')).map((t) => t.action)).toEqual(['reverse_payment']);
+  });
+
+  it('has an Accounting role that alone can mark paid, and the Super Admin cannot by default', () => {
+    expect(DEFAULT_ROLES.find((r) => r.code === 'accounting')).toEqual({ code: 'accounting', name: 'Accounting', rank: 25 });
+    expect(DEFAULT_GRANTS['payment.mark']).toEqual(['accounting']);
+    expect(isLockedGrant('accounting', 'payment.mark')).toBe(true);
+    expect(DEFAULT_GRANTS['payment.mark']).not.toContain('admin');
+    for (const p of ['evidence.view', 'evidence.download', 'evidence.print', 'report.generate']) expect(DEFAULT_GRANTS[p], p).toContain('accounting');
+    expect(PERMISSIONS.find((p) => p.code === 'payment.mark')).toMatchObject({ group: 'Payments' });
   });
 });
