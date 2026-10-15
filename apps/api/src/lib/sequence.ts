@@ -19,3 +19,8 @@ export async function nextDocNo(tx?: Tx) {
   const y = new Date().getFullYear();
   return formatNumber('REIM', await nextSequence(`document-${y}`, tx), y);
 }
+
+export async function nextPaymentNo(tx?: Tx) {
+  const y = new Date().getFullYear();
+  return formatNumber('PAY', await nextSequence(`payment-${y}`, tx), y);
+}

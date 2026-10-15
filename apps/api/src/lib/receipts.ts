@@ -12,7 +12,9 @@ export function visibleWhere(auth: AuthContext): Prisma.ReceiptWhereInput {
   if (p.has('receipt.view_all')) return { OR: [{ status: { not: 'draft' } }, { encoderId: auth.user.id }] };
   const ors: Prisma.ReceiptWhereInput[] = [];
   if (p.has('receipt.create')) ors.push({ encoderId: auth.user.id });
-  if (p.has('review.decide')) ors.push({ status: { in: ['checked', 'reserved', 'approved', 'disapproved'] } });
+  if (p.has('review.decide')) ors.push({ status: { in: ['checked', 'reserved', 'approved', 'disapproved', 'paid'] } });
+  // Accounting sees what is waiting to be paid and what was paid, nothing earlier in the workflow.
+  if (p.has('payment.mark')) ors.push({ status: { in: ['approved', 'paid'] } });
   return ors.length ? { OR: ors } : { id: -1 };
 }
 
@@ -20,6 +22,7 @@ export const receiptInclude = {
   category: true,
   encoder: { select: { id: true, name: true } },
   document: true,
+  payment: { include: { recordedBy: { select: { id: true, name: true } } } },
 } satisfies Prisma.ReceiptInclude;
 
 type ReceiptRow = Prisma.ReceiptGetPayload<{ include: typeof receiptInclude }>;
@@ -98,6 +101,11 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     actions: availableActions(status, auth.permissions, isOwner).filter((t) => t.action !== 'undo' || (r.decidedById === auth.user.id && !!r.decidedAt && Date.now() - r.decidedAt.getTime() <= getSettings().undoMinutes * 60_000)).map((t) => ({ action: t.action, note: t.note })),
     evidence: evidence.map((e) => ({ id: e.id, fileName: e.fileName, mime: e.mime, size: e.size, createdAt: e.createdAt })),
     document: r.document ? { id: r.document.id, docNo: r.document.docNo, status: r.document.status } : null,
+    payment: r.payment ? {
+      id: r.payment.id, paymentNo: r.payment.paymentNo, method: r.payment.method, paidOn: dateOnly(r.payment.paidOn),
+      amount: dec(r.paidAmount) ?? 0, shortReason: r.paidShortReason, recordedBy: r.payment.recordedBy.name, recordedAt: r.paidAt,
+      proof: { mime: r.payment.proofMime, size: r.payment.proofSize },
+    } : null,
     canCopy: isOwner && status === 'disapproved',
     undoUntil: r.decidedById === auth.user.id && r.decidedAt && (status === 'approved' || status === 'disapproved') ? new Date(r.decidedAt.getTime() + getSettings().undoMinutes * 60_000).toISOString() : null,
     canDelete: isOwner && auth.permissions.has('receipt.create') && status === 'draft',
