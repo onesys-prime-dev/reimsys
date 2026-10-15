@@ -348,6 +348,7 @@ a.btn.sm{text-decoration:none}
 .cmt-form textarea{min-height:44px;flex:1}
 
 .c-main.withbox{display:flex;gap:12px;align-items:center}
+.c-main.withbox>span{min-width:0}
 .c-main.withbox input{width:18px;height:18px;accent-color:var(--accent);flex:none}
 .row.picked{background:var(--accent-soft)}
 .selall{display:flex;gap:10px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);font-size:.86rem;color:var(--muted);font-weight:600}

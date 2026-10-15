@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { PAYMENT_FILTER_LABEL } from '@reimsys/shared';
 import { api, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { Empty, Icon } from '../ui';
 
 interface Data {
-  report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; createdAt: string; requestedBy: string };
-  rows: { docNo: string; refNo: string; date: string; invoiceNo: string; payee: string; category: string; vatType: string; vat: number; wht: number; encoder: string; approvedAt: string; amount: number }[];
+  report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; payment: 'all' | 'paid' | 'unpaid'; createdAt: string; requestedBy: string };
+  rows: { docNo: string; refNo: string; date: string; invoiceNo: string; payee: string; category: string; vatType: string; vat: number; wht: number; encoder: string; approvedAt: string; amount: number; paid: boolean; paidAmount: number; paidOn: string; method: string }[];
   total: number;
-  totals: { gross: number; vatable: number; vat: number; wht: number };
+  totals: { gross: number; vatable: number; vat: number; wht: number; paid: number; unpaid: number };
   byCategory: { category: string; count: number; total: number }[];
   byPerson: { person: string; count: number; total: number }[];
 }
@@ -26,7 +27,7 @@ export function ReportViewPage() {
       <div className="dh">
         <div className="ttl">
           <h1>Liquidation report{r.person ? ` · ${r.person}` : ''}</h1>
-          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}{r.category ? ` · ${r.category}` : ''}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
+          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}{r.category ? ` · ${r.category}` : ''}{r.payment !== 'all' ? ` · ${PAYMENT_FILTER_LABEL[r.payment]}` : ''}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
         </div>
         <div className="actionbar">
           {ready && <a className="btn" href={`/api/reports/${r.id}/file`}><Icon name="download" size={18} />Download {r.format.toUpperCase()}</a>}
@@ -36,8 +37,9 @@ export function ReportViewPage() {
 
       <div className="tiles">
         <div className="tile alert"><small>Approved total</small><b>{money(total)}</b></div>
+        <div className="tile"><small>Paid</small><b>{money(totals.paid)}</b></div>
+        <div className="tile"><small>Not yet paid</small><b>{money(totals.unpaid)}</b></div>
         <div className="tile"><small>Records</small><b>{rows.length}</b></div>
-        <div className="tile"><small>Average</small><b>{money(rows.length ? total / rows.length : 0)}</b></div>
       </div>
 
       {byPerson.length > 1 && (
@@ -76,7 +78,7 @@ export function ReportViewPage() {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Document</th><th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Gross</th>
+                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Gross</th>
               </tr>
             </thead>
             <tbody>
@@ -89,16 +91,17 @@ export function ReportViewPage() {
                   <td style={{ textAlign: 'left' }}>{x.category}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.vat)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(x.wht)}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{x.paid ? <>{money(x.paidAmount)}<br /><small className="muted">{fmtDate(x.paidOn)} · {x.method}</small></> : <span className="muted">Not yet</span>}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{money(x.amount)}</td>
                 </tr>
               ))}
-              {!rows.length && <tr><td colSpan={8}><Empty title="No approved records in this range" /></td></tr>}
+              {!rows.length && <tr><td colSpan={9}><Empty title="No approved records in this range" /></td></tr>}
             </tbody>
-            {rows.length > 0 && <tfoot><tr><td colSpan={5} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.vat)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.wht)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
+            {rows.length > 0 && <tfoot><tr><td colSpan={5} style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.vat)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.wht)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(totals.paid)}</td><td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(total)}</td></tr></tfoot>}
           </table>
         </div>
       </section>
-      <p className="muted" style={{ fontSize: '.84rem' }}>Only approved records appear in a liquidation report.</p>
+      <p className="muted" style={{ fontSize: '.84rem' }}>Only approved records appear in a liquidation report, paid or not yet paid.</p>
     </>
   );
 }

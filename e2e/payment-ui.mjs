@@ -117,6 +117,56 @@ ok('the Med Ref has no payment buttons', (await ana.page.locator('.actionbar >> 
 await ana.page.goto('/receipts');
 ok('the receipts list has a Paid filter', await ana.page.locator('.chip', { hasText: 'Paid' }).first().waitFor({ timeout: 8000 }).then(() => true, () => false));
 
+console.log('Dashboards, reports, settings');
+await acc.page.goto('/');
+await acc.page.waitForSelector('.tiles');
+await acc.page.waitForFunction(() => !document.querySelector('.tiles')?.textContent?.includes('–'), null, { timeout: 8000 }).catch(() => undefined);
+const tiles = await acc.page.locator('.tiles').innerText();
+ok('the accounting dashboard shows what is left to pay and what was paid this month', tiles.includes('To pay') && tiles.includes('Paid this month'));
+ok('its queue is "Ready to pay"', await acc.page.locator('h2', { hasText: 'Ready to pay' }).isVisible());
+const appr = await open('paolo.v@example.com');
+await appr.page.waitForSelector('.tiles');
+const apTiles = await appr.page.locator('.tiles').innerText();
+ok('the approver sees approved-not-paid and paid', apTiles.includes('Approved, not paid') && apTiles.includes('Paid'));
+await acc.page.goto('/reports');
+const payField = acc.page.getByLabel('Payment');
+const hasPayField = await payField.waitFor({ timeout: 5000 }).then(() => true, () => false);
+if (hasPayField) await payField.selectOption('paid');
+const previewOk = hasPayField && await acc.page.locator('.callout', { hasText: /\d+ paid record/ }).waitFor({ timeout: 8000 }).then(() => true, () => false);
+ok('the report preview counts paid records', previewOk);
+if (previewOk) {
+  await acc.page.click('button:has-text("Generate")');
+  await acc.page.waitForURL(/\/reports\/\d+/);
+  await acc.page.waitForSelector('th:has-text("Paid")');
+  const view = await acc.page.locator('.tiles').innerText();
+  ok('the report view shows paid and not yet paid totals', view.includes('Paid') && view.includes('Not yet paid'));
+  await shot(acc.page, 'pay-6-report');
+}
+const admin = await open('admin@example.com');
+await admin.page.goto('/access');
+await admin.page.click('[role=tab] >> text=Settings');
+ok('the Super Admin can edit the payment methods', await admin.page.locator('h2:has-text("Payment methods")').waitFor({ timeout: 8000 }).then(() => true, () => false) && await admin.page.getByLabel('Payment method 1', { exact: true }).waitFor({ timeout: 8000 }).then(() => true, () => false));
+await shot(admin.page, 'pay-7-settings');
+
+console.log('Phone screen');
+const phone = await open('accounting@example.com', { width: 390, height: 800 });
+await phone.page.goto('/pay');
+await phone.page.waitForSelector(`text=${r3.refNo}`);
+await phone.page.getByLabel(`Select ${r3.refNo}`).check();
+const bar = await phone.page.locator('.savebar').boundingBox();
+ok('on a phone the "Mark as paid" bar sits at the bottom, above the menu', !!bar && bar.y > 500);
+ok('on a phone nothing scrolls sideways', await noSideScroll(phone.page));
+ok('on a phone a long vendor name does not run into the amount', await phone.page.evaluate(() => [...document.querySelectorAll('.row')].slice(0, 20).every((row) => {
+  const b = row.querySelector('.c-main b')?.getBoundingClientRect();
+  const amt = row.querySelector('.c-amt')?.getBoundingClientRect();
+  return !b || !amt || b.right <= amt.left + 1;
+})));
+await phone.page.screenshot({ path: path.join(OUT, 'pay-4-phone.png') });
+await phone.page.click('.savebar >> text=Mark as paid');
+await phone.page.locator('.modal').waitFor();
+ok('on a phone the dialog fits the width', await noSideScroll(phone.page));
+await phone.page.screenshot({ path: path.join(OUT, 'pay-5-phone-dialog.png') });
+
 // END OF CHECKS
 for (const s of sessions) ok(`no errors on the page for ${s.email}`, s.page.errors.length === 0 || (console.log(s.page.errors), false));
 await browser.close();
