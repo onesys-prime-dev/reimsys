@@ -30,15 +30,16 @@ reportsRouter.get('/preview', requirePerm('report.generate'), async (req, res) =
     categoryId: req.query.categoryId ? Number(req.query.categoryId) : null,
     transactionType: req.query.transactionType || null,
     encoderId: req.query.encoderId ? Number(req.query.encoderId) : null,
+    payment: req.query.payment || undefined,
   });
-  const { rows, total } = await reportRows({ ...q, scope: scopeFor(req) });
-  res.json({ count: rows.length, total });
+  const { rows, total, totals } = await reportRows({ ...q, scope: scopeFor(req) });
+  res.json({ count: rows.length, total, paid: totals.paid, unpaid: totals.unpaid });
 });
 
 reportsRouter.post('/', requirePerm('report.generate'), async (req, res) => {
   const body = reportRequestSchema.parse(req.body);
   if (body.from > body.to) throw conflict('The start date must be before the end date.', 'BAD_RANGE');
-  const filters = { from: body.from, to: body.to, categoryId: body.categoryId ?? null, transactionType: body.transactionType ?? null, encoderId: body.encoderId ?? null, scope: scopeFor(req) };
+  const filters = { from: body.from, to: body.to, categoryId: body.categoryId ?? null, transactionType: body.transactionType ?? null, encoderId: body.encoderId ?? null, payment: body.payment, scope: scopeFor(req) };
   const rep = await prisma.liquidationReport.create({ data: { requestedById: req.auth!.user.id, format: body.format, filters: JSON.stringify(filters) } });
   await enqueue('report', { reportId: rep.id });
   await audit(req, { action: 'report.requested', entityType: 'report', entityId: rep.id, summary: `requested a ${body.format.toUpperCase()} liquidation report for ${body.from} to ${body.to}` });
@@ -88,7 +89,7 @@ reportsRouter.get('/:id/data', async (req, res) => {
   const category = f.transactionType ? (TRANSACTION_LABEL[f.transactionType as keyof typeof TRANSACTION_LABEL] ?? f.transactionType) : f.categoryId ? (await prisma.category.findUnique({ where: { id: f.categoryId }, select: { name: true } }))?.name ?? null : null;
   const rank = (m: Map<string, { count: number; total: number }>, key: string) => [...m.entries()].map(([k, v]) => ({ [key]: k, ...v })).sort((a, b) => b.total - a.total);
   res.json({
-    report: { id: rep.id, format: rep.format, status: rep.status, from: f.from, to: f.to, person, category, createdAt: rep.createdAt, requestedBy: requester?.name ?? '' },
+    report: { id: rep.id, format: rep.format, status: rep.status, from: f.from, to: f.to, person, category, payment: f.payment ?? 'all', createdAt: rep.createdAt, requestedBy: requester?.name ?? '' },
     rows, total, totals,
     byCategory: rank(byCategory, 'category'),
     byPerson: rank(byPerson, 'person'),
@@ -103,7 +104,7 @@ reportsRouter.get('/:id/file', async (req, res) => {
   const mode = req.query.mode === 'print' ? 'print' : 'download';
   await audit(req, { action: `report.${mode === 'print' ? 'printed' : 'downloaded'}`, entityType: 'report', entityId: rep.id, summary: `${mode === 'print' ? 'printed' : 'downloaded'} liquidation report #${rep.id}` });
   const label = await filterLabel(JSON.parse(rep.filters));
-  const slug = label.replace(/(Person|Category): /g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+  const slug = label.replace(/(Person|Category|Payment): /g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
   const name = `liquidation-${rep.id}${slug ? '-' + slug : ''}.${rep.format}`;
   res.setHeader('Content-Type', MIME[rep.format]!);
   res.setHeader('Content-Disposition', `${mode === 'print' && rep.format === 'pdf' ? 'inline' : 'attachment'}; filename="${name}"`);

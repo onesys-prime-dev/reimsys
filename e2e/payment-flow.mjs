@@ -137,5 +137,23 @@ ok('the Med Ref was told about the reversal', anaNotes2.some((n) => n.text.inclu
 const mails2 = (await call(U.admin, 'GET', '/email-log')).d.items;
 ok('a "payment reversed" email was sent', mails2.some((e) => e.template === 'payment_reversed' && e.to === 'ana.reyes@example.com'));
 
+console.log('\nReports');
+const first = today().slice(0, 8) + '01';
+const range = `from=${first}&to=${today()}`;
+const pv = async (payment) => (await call(U.rica, 'GET', `/reports/preview?${range}&payment=${payment}`)).d;
+const [pAll, pPaid, pUnpaid] = [await pv('all'), await pv('paid'), await pv('unpaid')];
+ok('paid + not yet paid = all', pAll.count === pPaid.count + pUnpaid.count && Math.abs(pAll.total - (pPaid.total + pUnpaid.total)) < 0.005);
+ok('the preview gives the paid and unpaid totals', pAll.paid === pPaid.paid && pUnpaid.paid === 0 && Math.abs(pAll.unpaid - pUnpaid.total) < 0.005);
+const made = await call(U.rica, 'POST', '/reports', { from: first, to: today(), format: 'csv', payment: 'paid' });
+let rep;
+for (let i = 0; i < 40; i++) { rep = (await call(U.rica, 'GET', `/reports/${made.d.report.id}/data`)).d; if (rep.report.status !== 'pending') break; await new Promise((r) => setTimeout(r, 500)); }
+ok('a "paid only" report has only paid rows', rep.report.status === 'ready' && rep.report.payment === 'paid' && rep.rows.length > 0 && rep.rows.every((r) => r.paid));
+ok('it includes the short payment with its real amount', rep.rows.some((r) => r.refNo === a3.refNo && r.paidAmount === 700 && r.shortReason));
+ok('it leaves out the unpaid receipt of the other person', !rep.rows.some((r) => r.refNo === m1.refNo));
+const csv = await (await fetch(`${B}/reports/${made.d.report.id}/file`, { headers: H(U.rica, false) })).text();
+ok('the CSV has the payment columns and the payment numbers', csv.includes('Amount paid (PHP)') && csv.includes(p1.d.payment.paymentNo));
+const ex = await (await fetch(`${B}/receipts/export?format=csv&status=paid`, { headers: H(U.rica, false) })).text();
+ok('the receipt export has the payment columns', ex.includes('Payment no.') && ex.includes(p1.d.payment.paymentNo));
+
 // END OF CHECKS
 done();

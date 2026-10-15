@@ -77,8 +77,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '']);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount)]);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -89,8 +89,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const ws = wb.addWorksheet('Receipts');
   ws.addRow(head).font = { bold: true };
   data.forEach((d) => ws.addRow(d));
-  for (const c of [10, 12, 13, 15, 16]) ws.getColumn(c).numFmt = '#,##0.00';
-  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 22, 30, 30, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  for (const c of [10, 12, 13, 15, 16, 24]) ws.getColumn(c).numFmt = '#,##0.00';
+  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 22, 30, 30, 20, 16, 18, 12, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`receipts-${stamp}.xlsx`).send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
