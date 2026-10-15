@@ -100,6 +100,7 @@ small,.muted{color:var(--muted)}
 .row:hover{background:var(--soft)}
 .row .c-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row small{display:block}
+.row .c-cat{min-width:0;overflow-wrap:anywhere}
 .c-amt{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .thead .c-amt{text-align:right}
 .mdate{display:none}
