@@ -22,14 +22,16 @@ export const paymentLineSchema = z.object({
     .coerce.number({ invalid_type_error: 'Enter the amount paid.' })
     .positive('The amount paid must be more than zero.')
     .max(9_999_999.99, 'That amount is too large.')
-    .transform((n) => Math.round(n * 100) / 100),
+    .transform((n) => Math.round(n * 100) / 100)
+    .refine((n) => n > 0, 'The amount paid must be at least 0.01.'),
   shortReason: z.string().trim().max(300, 'Keep the reason under 300 characters.').nullish().transform((v) => v || null),
 });
 export type PaymentLine = z.infer<typeof paymentLineSchema>;
 
 export const paymentRequestSchema = z.object({
   method: z.string().trim().min(1, 'Choose how it was paid.').max(40),
-  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the date format YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(s)), 'Enter a valid date.'),
+  // A date like 2026-02-31 parses (as 3 March), so it must also come back unchanged.
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the date format YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(s)) && new Date(s + 'T00:00:00Z').toISOString().slice(0, 10) === s, 'Enter a valid date.'),
   lines: z.array(paymentLineSchema).min(1, 'Choose at least one receipt.').max(BULK_MAX, `Pay up to ${BULK_MAX} receipts at a time.`),
 });
 export type PaymentRequest = z.infer<typeof paymentRequestSchema>;

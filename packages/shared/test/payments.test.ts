@@ -81,3 +81,16 @@ describe('report filter', () => {
     expect(PAYMENT_FILTER_LABEL).toEqual({ all: 'Paid and not yet paid', paid: 'Paid', unpaid: 'Not yet paid' });
   });
 });
+
+describe('server-side money and date checks', () => {
+  it('refuses an amount that rounds to zero centavos', () => {
+    expect(paymentLineSchema.safeParse({ receiptId: 1, version: 0, amount: '0.004' }).success).toBe(false);
+    expect(paymentLineSchema.safeParse({ receiptId: 1, version: 0, amount: 0.005 }).success).toBe(true);
+  });
+  it('refuses a date that does not exist on the calendar', () => {
+    const ok = { method: 'Cash', lines: [{ receiptId: 1, version: 0, amount: 10 }] };
+    expect(paymentRequestSchema.safeParse({ ...ok, paidOn: '2026-02-31' }).success).toBe(false);
+    expect(paymentRequestSchema.safeParse({ ...ok, paidOn: '2026-13-01' }).success).toBe(false);
+    expect(paymentRequestSchema.safeParse({ ...ok, paidOn: '2028-02-29' }).success).toBe(true);
+  });
+});
