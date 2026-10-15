@@ -7,7 +7,7 @@ import { PAYMENT_FILTER_LABEL, TRANSACTION_LABEL, VAT_LABEL, type PaymentFilter 
 import { dateOnly, typeLabel } from './receipts.js';
 import { registerJob } from './jobs.js';
 import { drawLogo } from './logo.js';
-import { saveFile } from './storage.js';
+import { readFile, saveFile } from './storage.js';
 
 export interface ReportFilters { from: string; to: string; categoryId?: number | null; transactionType?: string | null; encoderId?: number | null; payment?: PaymentFilter; scope: Prisma.ReceiptWhereInput }
 
@@ -159,9 +159,19 @@ registerJob('report', async ({ reportId }: { reportId: number }) => {
     const { rows, total, totals } = await reportRows(f);
     const buf = rep.format === 'pdf' ? await buildPdf(rows, totals, { ...f, label }) : rep.format === 'xlsx' ? await buildXlsx(rows, { ...f, label }) : await buildCsv(rows, totals);
     const filePath = await saveFile('reports', rep.format, buf);
-    await prisma.liquidationReport.update({ where: { id: rep.id }, data: { status: 'ready', filePath, rowCount: rows.length, total, finishedAt: new Date(), error: null } });
+    // Receipts move from approved to paid all the time, so the screen view reads the same rows the file was made from.
+    const snapshot = await saveFile('reports', 'json', Buffer.from(JSON.stringify({ rows, total, totals })));
+    await prisma.liquidationReport.update({ where: { id: rep.id }, data: { status: 'ready', filePath, rowCount: rows.length, total, finishedAt: new Date(), error: null, filters: JSON.stringify({ ...JSON.parse(rep.filters), snapshot }) } });
   } catch (err) {
     await prisma.liquidationReport.update({ where: { id: rep.id }, data: { status: 'failed', error: (err instanceof Error ? err.message : String(err)).slice(0, 300), finishedAt: new Date() } });
     throw err;
   }
 });
+
+/** The rows a ready report was generated with. Reports made before snapshots existed are worked out again. */
+export async function savedReportRows(f: ReportFilters & { snapshot?: string }) {
+  if (f.snapshot) {
+    try { return JSON.parse((await readFile(f.snapshot)).toString('utf8')) as Awaited<ReturnType<typeof reportRows>>; } catch { /* fall back below */ }
+  }
+  return reportRows(f);
+}

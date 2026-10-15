@@ -155,5 +155,16 @@ ok('the CSV has the payment columns and the payment numbers', csv.includes('Amou
 const ex = await (await fetch(`${B}/receipts/export?format=csv&status=paid`, { headers: H(U.rica, false) })).text();
 ok('the receipt export has the payment columns', ex.includes('Payment no.') && ex.includes(p1.d.payment.paymentNo));
 
+console.log('\nA saved report keeps what it was generated with');
+const unpaidRep = await call(U.rica, 'POST', '/reports', { from: first, to: today(), format: 'csv', payment: 'unpaid' });
+let ur;
+for (let i = 0; i < 40; i++) { ur = (await call(U.rica, 'GET', `/reports/${unpaidRep.d.report.id}/data`)).d; if (ur.report.status !== 'pending') break; await new Promise((r) => setTimeout(r, 500)); }
+const before = ur.rows.length;
+ok('the "not yet paid" report lists the other person\'s receipt', ur.rows.some((r) => r.refNo === m1.refNo && !r.paid));
+const m1now = (await call(U.rica, 'GET', `/receipts/${m1.id}`)).d.receipt;
+ok('that receipt is then paid', (await pay(U.rica, [m1now])).s === 201);
+const after = (await call(U.rica, 'GET', `/reports/${unpaidRep.d.report.id}/data`)).d;
+ok('the saved report still shows the same rows as its file', after.rows.length === before && after.rows.some((r) => r.refNo === m1.refNo && !r.paid));
+
 // END OF CHECKS
 done();

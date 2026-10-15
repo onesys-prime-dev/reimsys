@@ -5,7 +5,7 @@ import { audit } from '../lib/audit.js';
 import { conflict, forbidden, notFound } from '../lib/errors.js';
 import { enqueue } from '../lib/jobs.js';
 import { loadVisible, visibleWhere } from '../lib/receipts.js';
-import { filterLabel, reportRows } from '../lib/reports.js';
+import { filterLabel, reportRows, savedReportRows } from '../lib/reports.js';
 import { abs } from '../lib/storage.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
 
@@ -69,7 +69,7 @@ reportsRouter.get('/:id/data', async (req, res) => {
   if (!rep) throw notFound('Report not found.');
   if (rep.requestedById !== req.auth!.user.id && !req.auth!.permissions.has('audit.view')) throw forbidden();
   const f = JSON.parse(rep.filters);
-  const { rows, total, totals } = await reportRows(f);
+  const { rows, total, totals } = await savedReportRows(f);
   const byCategory = new Map<string, { count: number; total: number }>();
   for (const r of rows) {
     const c = byCategory.get(r.category) ?? { count: 0, total: 0 };
