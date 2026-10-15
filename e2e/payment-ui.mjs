@@ -80,6 +80,43 @@ ok('it confirms with the payment number', /PAY-\d{4}-\d{6}/.test(await toastText
 await acc.page.waitForSelector(`text=${r1.refNo}`, { state: 'detached' });
 ok('the paid receipts leave the queue, the other person stays', (await acc.page.locator(`text=${r2.refNo}`).count()) === 0 && (await acc.page.locator(`text=${r3.refNo}`).count()) === 1);
 
+console.log('The receipt page');
+await acc.page.goto(`/receipts/${r2.id}`);
+const card = acc.page.locator('section.card', { has: acc.page.locator('h3', { hasText: 'Payment' }) });
+await card.waitFor({ timeout: 8000 });
+const cardText = await card.innerText();
+ok('the payment card shows the number, method, amount and reason', /PAY-\d{4}-\d{6}/.test(cardText) && cardText.includes('Bank transfer') && cardText.includes('300.00') && cardText.includes('Parking fee not covered'));
+const proofTab = acc.page.waitForEvent('popup');
+await card.locator('text=View proof').click();
+const proofPage = await proofTab;
+await proofPage.waitForLoadState();
+ok('"View proof" opens the proof', proofPage.url().includes('/proof?mode=view'));
+await proofPage.close();
+await acc.page.click('.actionbar >> text=Reverse payment');
+const rm = acc.page.locator('.modal');
+ok('reversing needs a reason', await rm.locator('button', { hasText: 'Reverse payment' }).isDisabled());
+await rm.locator('textarea').fill('Wrong amount, paying again');
+await rm.locator('button', { hasText: 'Reverse payment' }).click();
+await acc.page.waitForSelector('.dh .pill.s-app');
+ok('the receipt is Approved again and the payment card is gone', (await card.count()) === 0);
+await acc.page.click('.actionbar >> text=Mark as paid');
+const one = acc.page.locator('.modal');
+await one.getByLabel('Proof of payment').setInputFiles(proofFile);
+await one.locator('button.ok', { hasText: 'Mark as paid' }).click();
+await acc.page.waitForSelector('.dh .pill.s-paid');
+ok('it can be paid again from the receipt page', await card.isVisible());
+await shot(acc.page, 'pay-3-receipt');
+
+console.log('Med Ref');
+const ana = await open('ana.reyes@example.com');
+await ana.page.goto(`/receipts/${r1.id}`);
+await ana.page.waitForSelector('.dh .pill.s-paid');
+const anaCard = ana.page.locator('section.card', { has: ana.page.locator('h3', { hasText: 'Payment' }) });
+ok('the Med Ref sees the payment and the proof buttons', /PAY-/.test(await anaCard.innerText()) && await anaCard.locator('text=Download').isVisible());
+ok('the Med Ref has no payment buttons', (await ana.page.locator('.actionbar >> text=Reverse payment').count()) === 0 && (await ana.page.locator('.actionbar >> text=Mark as paid').count()) === 0);
+await ana.page.goto('/receipts');
+ok('the receipts list has a Paid filter', await ana.page.locator('.chip', { hasText: 'Paid' }).first().waitFor({ timeout: 8000 }).then(() => true, () => false));
+
 // END OF CHECKS
 for (const s of sessions) ok(`no errors on the page for ${s.email}`, s.page.errors.length === 0 || (console.log(s.page.errors), false));
 await browser.close();
