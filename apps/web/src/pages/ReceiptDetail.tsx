@@ -19,6 +19,8 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   reserve: { label: 'Reserve', icon: 'pause', cls: 'hold', title: 'Put this record on hold', desc: 'A note is required. You can release it back to your queue later.', field: 'Why is it on hold', ok: 'Put on hold. The Med Ref has been emailed.' },
   request: { label: 'Ask for more proof', icon: 'camera', cls: '', title: 'Ask for more proof', desc: 'The receipt goes back to the Med Ref, who can add photos or fix details and send it again. It will be checked again from the start.', field: 'What proof or correction do you need', ok: 'Sent back to the Med Ref. They have been emailed.' },
   undo: { label: 'Take back decision', icon: 'undo', cls: '', title: 'Take back this decision', desc: 'The receipt goes back to Checked and the Med Ref is told to disregard the earlier decision. Any reimbursement document is removed.', field: 'Why are you taking it back', ok: 'Decision taken back. The receipt is back in your queue.' },
+  pay: { label: 'Mark as paid', icon: 'wallet', cls: 'ok', title: '', desc: '', field: '', ok: '' },
+  reverse_payment: { label: 'Reverse payment', icon: 'undo', cls: 'bad', title: 'Reverse this payment', desc: 'The receipt goes back to Approved and the Med Ref is told to disregard the payment notice. The payment and its proof stay in the history.', field: 'Why is the payment being reversed', ok: 'Payment reversed. The receipt is Approved again.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
 type Seen = { company: boolean; tin: boolean; address: boolean };

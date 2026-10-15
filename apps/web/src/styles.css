@@ -90,6 +90,7 @@ small,.muted{color:var(--muted)}
 .s-draft{background:var(--soft);color:var(--muted)}.s-sub{background:var(--info-soft);color:var(--info)}
 .s-ret{background:var(--warn-soft);color:var(--warn)}.s-chk{background:var(--accent-soft);color:var(--accent)}
 .s-app{background:var(--ok-soft);color:var(--ok)}.s-dis{background:var(--bad-soft);color:var(--bad)}.s-res{background:var(--hold-soft);color:var(--hold)}
+.s-paid{background:var(--accent-soft);color:var(--accent)}
 
 /* list rows */
 .thead,.row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 130px;gap:12px;align-items:center;padding:12px 18px}

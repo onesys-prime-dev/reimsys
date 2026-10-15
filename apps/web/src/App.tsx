@@ -18,6 +18,7 @@ const ImportPage = lazy(() => import('./pages/Import').then((m) => ({ default: m
 const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default: m.ProfilePage })));
 const ReceiptFormPage = lazy(() => import('./pages/ReceiptForm').then((m) => ({ default: m.ReceiptFormPage })));
 const ReportsPage = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsPage })));
+const ReadyToPayPage = lazy(() => import('./pages/ReadyToPay').then((m) => ({ default: m.ReadyToPayPage })));
 const ReportViewPage = lazy(() => import('./pages/ReportView').then((m) => ({ default: m.ReportViewPage })));
 import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
@@ -28,7 +29,7 @@ function titleFor(path: string) {
   if (path === '/receipts/import') return 'Import receipts';
   if (path.startsWith('/reports/')) return 'Report';
   if (path.startsWith('/receipts/')) return path.endsWith('/edit') ? 'Edit receipt' : 'Receipt';
-  return ({ '/receipts': 'Receipts', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSYS';
+  return ({ '/receipts': 'Receipts', '/pay': 'Ready to pay', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSYS';
 }
 
 function Shell() {
@@ -40,7 +41,8 @@ function Shell() {
   const own = can('receipt.create') && !can('receipt.view_all');
   const items = [
     { to: '/', label: 'Dashboard', icon: 'home', show: true },
-    { to: '/receipts', label: own ? 'My receipts' : 'Receipts', icon: 'file', show: can('receipt.create') || can('receipt.view_all') || can('review.decide') },
+    { to: '/receipts', label: own ? 'My receipts' : 'Receipts', icon: 'file', show: can('receipt.create') || can('receipt.view_all') || can('review.decide') || can('payment.mark') },
+    { to: '/pay', label: 'Ready to pay', icon: 'wallet', show: can('payment.mark') },
     { to: '/receipts/new', label: 'New receipt', icon: 'plus', show: can('receipt.create') },
     { to: '/reports', label: 'Reports', icon: 'chart', show: can('report.generate') },
     { to: '/access', label: 'Access', icon: 'shield', show: can('user.manage') || can('role.manage') },
@@ -82,6 +84,7 @@ function Shell() {
             <Route path="/receipts/import" element={can('receipt.import') ? <ImportPage /> : <Navigate to="/receipts" replace />} />
             <Route path="/receipts/:id" element={<ReceiptDetailPage />} />
             <Route path="/receipts/:id/edit" element={<ReceiptFormPage />} />
+            <Route path="/pay" element={can('payment.mark') ? <ReadyToPayPage /> : <Navigate to="/" replace />} />
             <Route path="/reports/:id" element={can('report.generate') ? <ReportViewPage /> : <Navigate to="/" replace />} />
             <Route path="/reports" element={can('report.generate') ? <ReportsPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />

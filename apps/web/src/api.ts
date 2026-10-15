@@ -51,6 +51,8 @@ export const money = (n: number | string) => '₱' + Number(n).toLocaleString('e
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const fmtDate = (d: string) => { const [y, m, day] = d.split('-'); return `${MONTHS[Number(m) - 1]} ${Number(day)}, ${y}`; };
 export const todayIso = () => new Date().toISOString().slice(0, 10);
+/** Today on this device. Use it for dates people pick: in Manila the UTC date is still yesterday until 8am. */
+export const localToday = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10); };
 
 /** Time ago in words for queue items. */
 export function ago(iso: string | null) {
