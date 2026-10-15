@@ -162,6 +162,7 @@ export interface SessionInfo {
   serverNow: string;
 }
 export * from './receipts';
+export * from './payments';
 export * from './settings';
 
 export const mailSettingsSchema = z.object({

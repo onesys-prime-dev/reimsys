@@ -187,12 +187,17 @@ export const categorySchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const PAYMENT_FILTERS = ['all', 'paid', 'unpaid'] as const;
+export type PaymentFilter = (typeof PAYMENT_FILTERS)[number];
+export const PAYMENT_FILTER_LABEL: Record<PaymentFilter, string> = { all: 'Paid and not yet paid', paid: 'Paid', unpaid: 'Not yet paid' };
+
 export const reportRequestSchema = z.object({
   from: dateString,
   to: dateString,
   categoryId: z.number().int().positive().nullish(),
   transactionType: z.enum(TRANSACTION_TYPES).nullish(),
   encoderId: z.number().int().positive().nullish(),
+  payment: z.enum(PAYMENT_FILTERS).default('all'),
   format: z.enum(['pdf', 'xlsx', 'csv']),
 });
 
