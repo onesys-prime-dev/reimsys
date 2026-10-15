@@ -16,6 +16,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.category              TO 'reimsy
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.receipt               TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.receiptevidence       TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.reimbursementdocument TO 'reimsys_app'@'localhost';
+-- Payments are written once and never edited or deleted (a reversal clears the link on the receipt, the payment row stays).
+GRANT SELECT, INSERT ON reimsys.payment TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.notification          TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.emaillog              TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.job                   TO 'reimsys_app'@'localhost';

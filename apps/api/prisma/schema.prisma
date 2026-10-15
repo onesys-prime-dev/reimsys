@@ -62,6 +62,8 @@ model User {
   sessions           Session[]
   auditLogs          AuditLog[]
   receipts           Receipt[]          @relation("Encoder")
+  paymentsReceived   Payment[]          @relation("PaymentPayee")
+  paymentsRecorded   Payment[]          @relation("PaymentRecorder")
   notifications      Notification[]
   comments           Comment[]          @relation("CommentAuthor")
   passwordTokens     PasswordToken[]    @relation("PasswordTokens")
@@ -165,6 +167,12 @@ model Receipt {
   decidedAt    DateTime?
   decisionNote String?                  @db.VarChar(1000)
   lastNote     String?                  @db.VarChar(1000)
+  // Payment step. Filled while the receipt is Paid and cleared again when the payment is reversed.
+  paymentId       Int?
+  payment         Payment?                 @relation(fields: [paymentId], references: [id])
+  paidAmount      Decimal?                 @db.Decimal(12, 2)
+  paidShortReason String?                  @db.VarChar(300)
+  paidAt          DateTime?
   evidence     ReceiptEvidence[]
   document     ReimbursementDocument?
   comments     Comment[]
@@ -176,6 +184,7 @@ model Receipt {
   @@index([receiptDate])
   @@index([categoryId])
   @@index([vendorTin, invoiceNo])
+  @@index([paymentId])
   @@map("receipt")
 }
 
@@ -208,6 +217,28 @@ model ReimbursementDocument {
   createdAt   DateTime  @default(now())
 
   @@map("reimbursementdocument")
+}
+
+/// One payment made by Accounting to one Med Ref. It can cover several receipts. Rows are never edited or deleted.
+model Payment {
+  id           Int       @id @default(autoincrement())
+  paymentNo    String    @unique @db.VarChar(30)
+  payeeId      Int
+  payee        User      @relation("PaymentPayee", fields: [payeeId], references: [id])
+  method       String    @db.VarChar(40)
+  paidOn       DateTime  @db.Date
+  proofFile    String    @db.VarChar(200)
+  proofMime    String    @db.VarChar(60)
+  proofSize    Int
+  proofSha256  String    @db.VarChar(64)
+  recordedById Int
+  recordedBy   User      @relation("PaymentRecorder", fields: [recordedById], references: [id])
+  createdAt    DateTime  @default(now())
+  receipts     Receipt[]
+
+  @@index([payeeId])
+  @@index([recordedById])
+  @@map("payment")
 }
 
 model Notification {

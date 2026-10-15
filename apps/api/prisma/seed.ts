@@ -8,7 +8,10 @@ const CATEGORIES = ['Medicine', 'Transport', 'Meals', 'Supplies', 'Lodging'];
 
 async function main() {
   const roleRows = [];
+  const newRoles = new Set<string>();
   for (const r of DEFAULT_ROLES) {
+    const had = await prisma.role.findUnique({ where: { code: r.code } });
+    if (!had) newRoles.add(r.code);
     roleRows.push(await prisma.role.upsert({ where: { code: r.code }, update: { name: r.name }, create: { code: r.code, name: r.name, rank: r.rank, isSystem: true } }));
   }
   const roleId = new Map(roleRows.map((r) => [r.code, r.id]));
@@ -17,10 +20,10 @@ async function main() {
   for (const p of PERMISSIONS) {
     const existing = await prisma.permission.findUnique({ where: { code: p.code } });
     const row = await prisma.permission.upsert({ where: { code: p.code }, update: { label: p.label, groupName: p.group }, create: { code: p.code, label: p.label, groupName: p.group } });
-    if (!existing) {
-      const roles = DEFAULT_GRANTS[p.code] ?? [];
-      if (roles.length) await prisma.rolePermission.createMany({ data: roles.map((r) => ({ roleId: roleId.get(r)!, permissionId: row.id })), skipDuplicates: true });
-    }
+    const roles = DEFAULT_GRANTS[p.code] ?? [];
+    // A brand-new permission goes to every role that should have it; a brand-new role gets the defaults of the permissions that already existed.
+    const targets = existing ? roles.filter((r) => newRoles.has(r)) : roles;
+    if (targets.length) await prisma.rolePermission.createMany({ data: targets.map((r) => ({ roleId: roleId.get(r)!, permissionId: row.id })), skipDuplicates: true });
   }
 
   for (const [i, name] of CATEGORIES.entries()) {
@@ -32,6 +35,7 @@ async function main() {
     { email: 'mark.dc@example.com', name: 'Mark Dela Cruz', role: 'medref', branch: 'Cebu South' },
     { email: 'liza.santos@example.com', name: 'Liza Santos', role: 'checker', branch: 'Head Office' },
     { email: 'paolo.v@example.com', name: 'Paolo Villanueva', role: 'approver', branch: 'Head Office' },
+    { email: 'accounting@example.com', name: 'Rica Tan', role: 'accounting', branch: 'Head Office' },
     { email: 'admin@example.com', name: 'Admin User', role: 'admin', branch: 'Head Office' },
   ];
   const passwordHash = await hashPassword(DEV_PASSWORD);
