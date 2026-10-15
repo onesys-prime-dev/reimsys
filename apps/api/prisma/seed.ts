@@ -1,6 +1,7 @@
 import { DEFAULT_GRANTS, DEFAULT_ROLES, PERMISSIONS } from '@reimsys/shared';
 import { prisma } from '../src/db.js';
 import { hashPassword } from '../src/lib/password.js';
+import { demoUsersToCreate } from './demoUsers.js';
 
 /** Development password for the seeded accounts. Change or remove before any real deployment. */
 const DEV_PASSWORD = 'Reimsys#2026';
@@ -30,14 +31,9 @@ async function main() {
     await prisma.category.upsert({ where: { name }, update: {}, create: { name, sortOrder: i } });
   }
 
-  const demo = [
-    { email: 'ana.reyes@example.com', name: 'Ana Reyes', role: 'medref', branch: 'Cebu North' },
-    { email: 'mark.dc@example.com', name: 'Mark Dela Cruz', role: 'medref', branch: 'Cebu South' },
-    { email: 'liza.santos@example.com', name: 'Liza Santos', role: 'checker', branch: 'Head Office' },
-    { email: 'paolo.v@example.com', name: 'Paolo Villanueva', role: 'approver', branch: 'Head Office' },
-    { email: 'accounting@example.com', name: 'Rica Tan', role: 'accounting', branch: 'Head Office' },
-    { email: 'admin@example.com', name: 'Admin User', role: 'admin', branch: 'Head Office' },
-  ];
+  // A live system that has switched the demo accounts off (pnpm demo:off) gets none back when it is re-seeded during an upgrade.
+  const retired = (await prisma.auditLog.count({ where: { action: 'user.demo_retired' } })) > 0;
+  const demo = demoUsersToCreate(retired);
   const passwordHash = await hashPassword(DEV_PASSWORD);
   for (const u of demo) {
     await prisma.user.upsert({

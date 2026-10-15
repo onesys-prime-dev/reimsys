@@ -6,8 +6,9 @@
  * Nothing is deleted: the accounts are deactivated and signed out, so the audit trail keeps their names.
  */
 import { prisma } from '../src/db.js';
+import { DEMO_EMAILS } from './demoUsers.js';
 
-const DEMO = ['ana.reyes@example.com', 'mark.dc@example.com', 'liza.santos@example.com', 'paolo.v@example.com', 'admin@example.com'];
+const DEMO = DEMO_EMAILS;
 
 async function main() {
   const realAdmins = await prisma.user.count({ where: { isActive: true, role: { code: 'admin' }, email: { notIn: DEMO } } });
