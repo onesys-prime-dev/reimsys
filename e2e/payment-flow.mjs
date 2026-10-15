@@ -166,5 +166,16 @@ ok('that receipt is then paid', (await pay(U.rica, [m1now])).s === 201);
 const after = (await call(U.rica, 'GET', `/reports/${unpaidRep.d.report.id}/data`)).d;
 ok('the saved report still shows the same rows as its file', after.rows.length === before && after.rows.some((r) => r.refNo === m1.refNo && !r.paid));
 
+console.log('\nThe reversed payment stays reachable');
+const h2 = (await call(U.rica, 'GET', `/receipts/${a2.id}/history`)).d.items;
+const oldPay = h2.find((h) => h.action === 'payment.marked' && h.payment?.id === oldPaymentId);
+ok('the history marks the first payment as reversed and links its proof', !!oldPay && oldPay.payment.reversed === true && oldPay.payment.canOpenProof === true);
+const newPay = h2.find((h) => h.action === 'payment.marked' && h.payment?.id !== oldPaymentId);
+ok('the current payment is not marked reversed', !!newPay && newPay.payment.reversed === false);
+const h2ana = (await call(U.ana, 'GET', `/receipts/${a2.id}/history`)).d.items;
+ok('the Med Ref who was paid can open the old proof too', h2ana.some((h) => h.payment?.id === oldPaymentId && h.payment.canOpenProof));
+const h2paolo = (await call(U.paolo, 'GET', `/receipts/${a2.id}/history`)).d.items;
+ok('the approver is not offered the old proof (the server would refuse it)', h2paolo.some((h) => h.payment?.id === oldPaymentId && h.payment.canOpenProof === false));
+
 // END OF CHECKS
 done();

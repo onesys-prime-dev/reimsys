@@ -239,11 +239,21 @@ receiptsRouter.get('/:id/history', async (req, res) => {
     where: { entityType: 'receipt', entityId: String(r.id), NOT: { action: 'evidence.viewed', actorId: r.encoderId } },
     orderBy: { id: 'desc' }, take: 200,
   });
+  const after = (a: { after: string | null }) => { try { return a.after ? JSON.parse(a.after) : {}; } catch { return {}; } };
+  // Every payment ever recorded on this receipt, so a reversed one (no longer linked to the receipt) can still be found with its proof.
+  const paymentNos = rows.filter((a) => a.action === 'payment.marked').map((a) => after(a).paymentNo).filter((x): x is string => typeof x === 'string');
+  const payments = paymentNos.length ? await prisma.payment.findMany({ where: { paymentNo: { in: paymentNos } }, select: { id: true, paymentNo: true, payeeId: true } }) : [];
+  const auth = req.auth!;
+  // The same rule as the proof download: the person paid, Accounting, or anyone who can see a receipt the payment still covers.
+  const canOpen = (p: { id: number; payeeId: number }) => auth.permissions.has('evidence.view') && (p.payeeId === auth.user.id || auth.permissions.has('payment.mark') || p.id === r.paymentId);
   res.json({
     items: rows.map((a) => {
-      let note: string | null = null;
-      try { note = a.after ? (JSON.parse(a.after).note ?? null) : null; } catch { /* ignore */ }
-      return { id: a.id, actor: a.actorName, action: a.action, summary: a.summary, note, createdAt: a.createdAt };
+      const data = after(a);
+      const p = a.action === 'payment.marked' ? payments.find((x) => x.paymentNo === data.paymentNo) : undefined;
+      return {
+        id: a.id, actor: a.actorName, action: a.action, summary: a.summary, note: data.note ?? null, createdAt: a.createdAt,
+        ...(p ? { payment: { id: p.id, paymentNo: p.paymentNo, reversed: p.id !== r.paymentId, canOpenProof: canOpen(p) } } : {}),
+      };
     }),
   });
 });

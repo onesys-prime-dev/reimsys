@@ -99,6 +99,8 @@ await rm.locator('textarea').fill('Wrong amount, paying again');
 await rm.locator('button', { hasText: 'Reverse payment' }).click();
 await acc.page.waitForSelector('.dh .pill.s-app');
 ok('the receipt is Approved again and the payment card is gone', (await card.count()) === 0);
+const reversedItem = acc.page.locator('.tl li', { has: acc.page.locator('.pill', { hasText: 'Reversed' }) }).first();
+ok('the history shows the earlier payment as Reversed with its proof', await reversedItem.waitFor({ timeout: 8000 }).then(() => true, () => false) && await reversedItem.locator('a:has-text("View proof")').isVisible());
 await acc.page.click('.actionbar >> text=Mark as paid');
 const one = acc.page.locator('.modal');
 await one.getByLabel('Proof of payment').setInputFiles(proofFile);
@@ -147,6 +149,19 @@ await admin.page.goto('/access');
 await admin.page.click('[role=tab] >> text=Settings');
 ok('the Super Admin can edit the payment methods', await admin.page.locator('h2:has-text("Payment methods")').waitFor({ timeout: 8000 }).then(() => true, () => false) && await admin.page.getByLabel('Payment method 1', { exact: true }).waitFor({ timeout: 8000 }).then(() => true, () => false));
 await shot(admin.page, 'pay-7-settings');
+
+const anaDash = ana.page;
+await anaDash.goto('/');
+await anaDash.waitForSelector('.tiles');
+const anaTiles = await anaDash.locator('.tiles').innerText();
+ok('the Med Ref dashboard shows approved-not-paid and paid', anaTiles.includes('Approved, not paid') && /\nPaid\n/.test('\n' + anaTiles + '\n'));
+const lizaS = await open('liza.santos@example.com');
+await lizaS.page.waitForSelector('.tiles');
+const lizaTiles = await lizaS.page.locator('.tiles').innerText();
+ok('the Checker dashboard shows approved-not-paid and paid', lizaTiles.includes('Approved, not paid') && /\nPaid\n/.test('\n' + lizaTiles + '\n'));
+await admin.page.goto('/');
+await admin.page.waitForSelector('.tiles');
+ok('the admin "Approved total" counts paid receipts too', (await admin.page.locator('.tiles').innerText()).includes('Approved total (incl. paid)'));
 
 console.log('Phone screen');
 const phone = await open('accounting@example.com', { width: 390, height: 800 });

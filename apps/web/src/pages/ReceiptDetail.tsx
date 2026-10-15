@@ -225,7 +225,7 @@ export function ReceiptDetailPage() {
             <div className="card-b">
               <ol className="tl">
                 {history.data?.items.slice(0, allHistory ? 200 : 6).map((h) => (
-                  <li key={h.id}><span className="dot" /><div><b>{h.actor}</b> {h.summary ?? h.action}<small>{fmtDateTime(h.createdAt)}</small>{h.note && <q>{h.note}</q>}</div></li>
+                  <li key={h.id}><span className="dot" /><div><b>{h.actor}</b> {h.summary ?? h.action}{h.payment?.reversed && <span className="pill s-dis" style={{ marginLeft: 6 }}>Reversed</span>}<small>{fmtDateTime(h.createdAt)}</small>{h.payment?.canOpenProof && <a href={`/api/payments/${h.payment.id}/proof?mode=view`} target="_blank" rel="noopener" style={{ color: 'var(--accent)', fontSize: '.84rem' }}>View proof</a>}{h.note && <q>{h.note}</q>}</div></li>
                 ))}
               </ol>
               {history.data && !history.data.items.length && <span className="muted">Nothing yet.</span>}

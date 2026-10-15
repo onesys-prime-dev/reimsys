@@ -52,7 +52,11 @@ export interface ReceiptDetail extends ReceiptBrief {
 }
 
 export interface Category { id: number; name: string; isActive: boolean; receiptCount?: number }
-export interface HistoryItem { id: number; actor: string; action: string; summary: string | null; note: string | null; createdAt: string }
+export interface HistoryItem {
+  id: number; actor: string; action: string; summary: string | null; note: string | null; createdAt: string;
+  /** On "marked as paid" entries: that payment, whether it was later reversed, and whether this person may open its proof. */
+  payment?: { id: number; paymentNo: string; reversed: boolean; canOpenProof: boolean };
+}
 
 export interface CommentItem { id: number; body: string; createdAt: string; author: { id: number; name: string }; mine: boolean }
 

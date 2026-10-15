@@ -39,14 +39,14 @@ export function DashboardPage() {
   const tiles: { label: string; value: string | number; to: string; alert?: boolean }[] =
     kind === 'receipt' ? [
       { label: 'Needs your action', value: n('returned', 'reserved'), to: '/receipts', alert: true },
-      { label: 'Drafts', value: n('draft'), to: '/receipts' },
       { label: 'In review', value: n('submitted', 'checked'), to: '/receipts' },
-      { label: 'Approved', value: n('approved'), to: '/receipts' },
+      { label: 'Approved, not paid', value: n('approved'), to: '/receipts' },
+      { label: 'Paid', value: n('paid'), to: '/receipts' },
     ] : kind === 'check' ? [
       { label: 'To check', value: n('submitted'), to: '/receipts', alert: true },
-      { label: 'Returned', value: n('returned'), to: '/receipts' },
       { label: 'Checked', value: n('checked'), to: '/receipts' },
-      { label: 'All records', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
+      { label: 'Approved, not paid', value: n('approved'), to: '/receipts' },
+      { label: 'Paid', value: n('paid'), to: '/receipts' },
     ] : kind === 'decide' ? [
       { label: 'To decide', value: n('checked'), to: '/receipts', alert: true },
       { label: 'On hold', value: n('reserved'), to: '/receipts' },
@@ -61,7 +61,7 @@ export function DashboardPage() {
       { label: 'Waiting for review', value: n('submitted', 'checked'), to: '/receipts', alert: true },
       { label: 'All receipts', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
       { label: 'Active users', value: users.data ? users.data.users.filter((u) => u.isActive).length : '–', to: '/access' },
-      { label: 'Approved total', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
+      { label: 'Approved total (incl. paid)', value: money((d.data?.sums.approved ?? 0) + (d.data?.sums.paid ?? 0)), to: '/receipts' },
     ];
 
   return (
