@@ -119,6 +119,14 @@ pnpm build
 pm2 restart reimsys
 ```
 
+## Upgrading to the payment step
+
+1. Back up the database and the storage folder, and tag the version you are leaving (`before-payment-step`).
+2. `pnpm --filter @reimsys/api exec prisma migrate deploy` (applies `20261015030000_payment_step`: a new `payment` table and four new columns on `receipt`, nothing removed), then `pnpm db:seed` (adds the Accounting role, its permissions and `payment.mark`; edits made on the Access page are kept).
+3. As a MySQL administrator, run the new line of `docs/db-grants.sql` for the `payment` table (`SELECT, INSERT` only).
+4. Create the real Accounting user on the Access page, and check the payment methods under Access → Settings.
+5. To go back: `docs/rollback-payment-step.sql`, or restore the backup.
+
 ## 8. Checks after deploying
 
 - `https://<host>/api/health` returns `{"ok":true}`
