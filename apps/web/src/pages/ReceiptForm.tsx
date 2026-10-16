@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
+import { FilePreview } from '../components/FilePreview';
+import { ScanDialog } from '../components/ScanDialog';
 import { Field, Icon, useToast } from '../ui';
 
 const kb = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -84,6 +86,11 @@ export function ReceiptFormPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const pick = useRef<HTMLInputElement>(null);
+  const scanPick = useRef<HTMLInputElement>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
+  const [previewing, setPreviewing] = useState<{ title: string; url: string; pdf: boolean; revoke: boolean } | null>(null);
+  const closePreview = () => setPreviewing((p) => { if (p?.revoke) URL.revokeObjectURL(p.url); return null; });
+  const previewQueued = (x: File) => setPreviewing({ title: x.name, url: URL.createObjectURL(x), pdf: x.type === 'application/pdf' || /\.pdf$/i.test(x.name), revoke: true });
   const [over, setOver] = useState(false);
   const [f, setF] = useState<FormState>(EMPTY);
   const [stepIx, setStepIx] = useState(0);
@@ -335,19 +342,22 @@ export function ReceiptFormPage() {
                   <Icon name="upload" />
                   <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to {rules.evidenceMaxMb} MB each</div>
                   <div className="btns">
-                    <button type="button" className="btn" onClick={() => { pick.current?.removeAttribute('capture'); pick.current?.click(); }}><Icon name="upload" size={18} />Choose files</button>
-                    <button type="button" className="btn" onClick={() => { pick.current?.setAttribute('capture', 'environment'); pick.current?.click(); }}><Icon name="camera" size={18} />Take photo</button>
+                    <button type="button" className="btn" onClick={() => pick.current?.click()}><Icon name="upload" size={18} />Choose files</button>
+                    <button type="button" className="btn" onClick={() => scanPick.current?.click()}><Icon name="scan" size={18} />Scan receipt</button>
                   </div>
                   <input ref={pick} type="file" multiple accept={ACCEPT} onChange={(ev) => { if (ev.target.files) addFiles(ev.target.files); ev.target.value = ''; }} />
+                  <input ref={scanPick} type="file" accept="image/*" capture="environment" aria-label="Scan a receipt photo" onChange={(ev) => { const x = ev.target.files?.[0]; if (x) setScanFile(x); ev.target.value = ''; }} />
                 </div>
                 {e.evidence && <span className="err">{e.evidence}</span>}
                 <div className="files">
                   {files.map((x) => (
                     <div className="file" key={x.id}><span className="thumb"><Icon name={x.mime === 'application/pdf' ? 'file' : 'camera'} /></span><div><b>{x.fileName}</b><small className="muted">Saved · {kb(x.size)}</small></div>
+                      <button type="button" className="btn sm ghost" aria-label={`Preview ${x.fileName}`} title="Preview" onClick={() => setPreviewing({ title: x.fileName, url: `/api/receipts/${id}/evidence/${x.id}/file?mode=view`, pdf: x.mime === 'application/pdf', revoke: false })}><Icon name="eye" size={16} /></button>
                       <button type="button" className="btn sm ghost" aria-label={`Remove ${x.fileName}`} onClick={() => removeSaved.mutate(x.id)}><Icon name="x" size={16} /></button></div>
                   ))}
                   {queued.map((x, i) => (
                     <div className="file" key={x.name + i}><span className="thumb"><Icon name={x.type === 'application/pdf' ? 'file' : 'camera'} /></span><div><b>{x.name}</b><small className="muted">Ready to upload · {kb(x.size)}</small></div>
+                      <button type="button" className="btn sm ghost" aria-label={`Preview ${x.name}`} title="Preview" onClick={() => previewQueued(x)}><Icon name="eye" size={16} /></button>
                       <button type="button" className="btn sm ghost" aria-label={`Remove ${x.name}`} onClick={() => setQueued((q) => q.filter((_, j) => j !== i))}><Icon name="x" size={16} /></button></div>
                   ))}
                 </div>
@@ -383,6 +393,16 @@ export function ReceiptFormPage() {
           </div>
         </form>
       </section>
+      {previewing && <FilePreview title={previewing.title} url={previewing.url} pdf={previewing.pdf} onClose={closePreview} />}
+      {scanFile && (
+        <ScanDialog
+          file={scanFile} maxBytes={MAX_BYTES}
+          onCancel={() => setScanFile(null)}
+          onRetake={() => { setScanFile(null); scanPick.current?.click(); }}
+          onUse={(scan, another) => { addFiles([scan]); setScanFile(null); if (another) scanPick.current?.click(); }}
+          onUnreadable={() => { addFiles([scanFile]); setScanFile(null); toast('This photo could not be opened in the scanner, so it was added as it is.', 'bad'); }}
+        />
+      )}
     </>
   );
 }

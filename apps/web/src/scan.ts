@@ -97,7 +97,11 @@ export function detectQuad(img: Raster): Quad {
     if (x - y < bl) { bl = x - y; pBL = { x, y }; }
   }
   const up = (p: Pt): Pt => ({ x: Math.min(img.width - 1, Math.round((p.x + 0.5) * k)), y: Math.min(img.height - 1, Math.round((p.y + 0.5) * k)) });
-  return [up(pTL), up(pTR), up(pBR), up(pBL)];
+  const q = [up(pTL), up(pTR), up(pBR), up(pBL)] as Quad;
+  // The edge of a photographed receipt is soft and ragged, so cut a little inside it rather than keep a rim of the table.
+  const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+  const trim = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * 0.025), y: Math.round(p.y + (cy - p.y) * 0.025) });
+  return q.map(trim) as Quad;
 }
 
 /** Maps a point of the straight page, (0,0) top left to (1,1) bottom right, to where it is in the photo. Keeps perspective. */

@@ -122,3 +122,15 @@ describe('cleaning up the page', () => {
     expect(img.data).toEqual(copy);
   });
 });
+
+describe('the cut-out page', () => {
+  it('has no rim of the dark table around its edges', () => {
+    const truth: Pt[] = [{ x: 90, y: 40 }, { x: 330, y: 70 }, { x: 305, y: 270 }, { x: 60, y: 245 }];
+    const img = raster(400, 300, (x, y) => (inside(truth, x, y) ? 225 : 35));
+    const out = warpToRect(img, detectQuad(img), 600);
+    let darkest = 255;
+    for (let x = 0; x < out.width; x++) darkest = Math.min(darkest, px(out, x, 0), px(out, x, out.height - 1));
+    for (let y = 0; y < out.height; y++) darkest = Math.min(darkest, px(out, 0, y), px(out, out.width - 1, y));
+    expect(darkest).toBeGreaterThan(200);
+  });
+});
