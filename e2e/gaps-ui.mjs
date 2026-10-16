@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fillQuickForm } from './form-helpers.mjs';
 
 const OUT = process.argv[2];
 fs.mkdirSync(OUT, { recursive: true });
@@ -23,9 +24,9 @@ async function login(email, size = { width: 1280, height: 900 }) {
 }
 const tag = 'Gap test ' + Date.now().toString().slice(-6);
 async function newReceipt(p, name, { submit = false, amount = '64.50' } = {}) {
-  await p.goto('/receipts/new'); await p.waitForSelector('form');
-  await p.fill('input[placeholder="Store or provider name"]', name);
-  await p.fill('input[placeholder="0.00"]', amount);
+  await p.goto('/receipts/new');
+  // The reimbursement form is a wizard now; this walks the shortest path to the last step.
+  await fillQuickForm(p, { payee: name, amount });
   await p.setInputFiles('input[type=file]', img(name.slice(-4)));
   await p.click(submit ? 'button:has-text("Submit for checking")' : 'button:has-text("Save draft")');
   await p.waitForURL(/\/receipts\/\d+$/);
