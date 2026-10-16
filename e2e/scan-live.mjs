@@ -107,6 +107,12 @@ await live.waitFor();
 await live.getByRole('button', { name: 'Page 1' }).waitFor({ timeout: 12000 });
 await live.getByRole('button', { name: 'Close camera' }).click();
 ok('closing asks before throwing away scanned pages', await live.getByText(/Discard 1 page/).isVisible());
+await p.waitForTimeout(800); // the shutter ignores a second tap in the half second after a picture
+await live.getByRole('button', { name: 'Take picture' }).click();
+await live.getByRole('button', { name: 'Page 2' }).waitFor();
+ok('changing your mind (taking another picture) takes the question away', (await live.getByText(/Discard/).count()) === 0);
+await live.getByRole('button', { name: 'Close camera' }).click();
+ok('and closing asks again, now for both pages', await live.getByText(/Discard 2 pages/).isVisible());
 await live.getByRole('button', { name: 'Close camera' }).click();
 await live.waitFor({ state: 'detached' });
 ok('and then adds nothing', (await p.locator('.file', { hasText: 'scan-' }).count()) === 1);

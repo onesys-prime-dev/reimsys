@@ -98,6 +98,7 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
     steady.current.reset(); setProgress(0);
     setPages((ps) => [...ps, { id: nextPage++, raster, quad: q, mode: 'document' }]);
     setFlash((n) => n + 1);
+    setConfirmClose(false); // another picture means they changed their mind about leaving
     window.setTimeout(() => { busy.current = false; }, 500);
   }, [maxPages]);
 
@@ -174,7 +175,7 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
       <div className="live-bar"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
       <div className="live-bottom">
         <div className="live-thumbs">
-          {pages.map((p, i) => <button key={p.id} type="button" className="live-thumb" aria-label={`Page ${i + 1}`} onClick={() => setEditing(p)}><img src={thumbs[i]} alt="" /><b>{i + 1}</b></button>)}
+          {pages.map((p, i) => <button key={p.id} type="button" className="live-thumb" aria-label={`Page ${i + 1}`} onClick={() => { setConfirmClose(false); setEditing(p); }}><img src={thumbs[i]} alt="" /><b>{i + 1}</b></button>)}
         </div>
         <button type="button" className="live-shutter" aria-label="Take picture" disabled={!size || full} onClick={capture}><i /></button>
         <button type="button" className="live-done" disabled={!pages.length} onClick={() => onDone(pages)}>Done ({pages.length})</button>
