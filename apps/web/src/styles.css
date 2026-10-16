@@ -144,8 +144,8 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .modal.issues-modal{width:min(680px,100%)}
 .fixlist{display:grid;gap:6px;margin:6px 0 8px}
 .fixrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.fixrow span{flex:1 1 220px;min-width:0}
-.fixlink{font-weight:600;color:var(--primary,#0b6e7a);text-decoration:none}.fixlink:hover{text-decoration:underline}
+.fixrow span{flex:1 1 220px;min-width:0}.fixlink span{flex:0 1 auto}
+.fixlink{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-weight:600;color:var(--accent);text-decoration:none;cursor:pointer;transition:border-color .15s,box-shadow .15s}.fixlink:hover{border-color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.12)}.fixlink:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .issues{display:flex;flex-wrap:wrap;gap:8px}
 .issue{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 12px;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
 .issue.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}

@@ -125,7 +125,7 @@ export function ReceiptDetailPage() {
                   const step = fixStepFor(c);
                   return (
                     <div key={c} className="fixrow">
-                      {r.canEdit && step ? <Link className="fixlink" to={fixUrl(step)}>{issueLabel(c)} →</Link> : <span>{c === 'other' ? 'Something else: see the note' : issueLabel(c)}</span>}
+                      {r.canEdit && step ? <Link className="fixlink" to={fixUrl(step)}><span>{issueLabel(c)}</span><span aria-hidden>Fix →</span></Link> : <span>{c === 'other' ? 'Something else: see the note' : issueLabel(c)}</span>}
                                           </div>
                   );
                 })}
