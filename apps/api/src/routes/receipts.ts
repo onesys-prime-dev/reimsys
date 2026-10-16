@@ -6,7 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
-  cleanFormData, VAT_LABEL, classificationText, issuesText, joinIssues, fixStepFor, type ReturnIssueCode,
+  cleanFormData, VAT_LABEL, classificationText, issuesText, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -280,7 +280,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (body.version !== r.version) throw conflict('Someone else changed this receipt. Reload and try again.', 'RECORD_CHANGED');
   const note = body.note?.trim() || null;
   // Sending a receipt back: the problems ticked from the short list, with or without a typed note.
-  const issues: ReturnIssueCode[] = action === 'return' || action === 'request' ? [...new Set(body.issues ?? [])] : [];
+  const issues: ReturnIssueCode[] = action === 'return' || action === 'request' ? RETURN_ISSUE_CODES.filter((c) => body.issues?.includes(c)) : [];
   if (body.issues?.length && !issues.length) throw badRequest('Problems can only be listed when sending a receipt back.', 'ISSUES_NOT_ALLOWED');
   // What people read in notices, emails and the history: the ticked problems, then the note.
   const reason = issues.length ? issuesText(issues, note) : note;

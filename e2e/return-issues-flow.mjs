@@ -43,6 +43,11 @@ ok('both are kept: problems and note', bd.returnIssues.includes('vendor_wrong') 
 const bn = (await call(U.ana, 'GET', '/notifications')).d.items;
 ok('"Something else" is not printed, the note is', bn.some((n) => n.text.includes('Vendor name, address or TIN is missing or wrong. The TIN is cut off.') && !n.text.includes('Something else')));
 
+console.log('The order does not depend on which was clicked first');
+const o = await ready('Return Order');
+const backwards = await call(U.liza, 'POST', `/receipts/${o.id}/return`, { version: o.version, issues: ['amount_wrong', 'photo_unclear'] });
+ok('problems are saved in the order of the list, not the order they were ticked', backwards.s === 200 && JSON.stringify((await view(U.ana, o)).d.receipt.returnIssues) === JSON.stringify(['photo_unclear', 'amount_wrong']));
+
 console.log('Only a note, as before');
 const c = await ready('Return C');
 ok('a note alone still works', (await call(U.liza, 'POST', `/receipts/${c.id}/return`, { version: c.version, note: 'Please retake the photo.' })).s === 200);

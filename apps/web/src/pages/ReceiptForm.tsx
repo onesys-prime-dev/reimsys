@@ -144,12 +144,12 @@ export function ReceiptFormPage() {
 
   // "Fix" in the returned-receipt box opens the form on the step to fix. Done once, after the saved answers are in (the steps depend on them).
   useEffect(() => {
-    if (jumped.current || !ready || !rec || !wantedStep || !(FIX_STEPS as readonly string[]).includes(wantedStep)) return;
+    if (jumped.current || !ready || !rec || !(appSet.isSuccess || appSet.isError) || !wantedStep || !(FIX_STEPS as readonly string[]).includes(wantedStep)) return;
     jumped.current = true;
     const target = resolveFixStep(wantedStep as FixStep, steps);
     const at = target ? steps.indexOf(target as StepId) : -1;
     if (at > 0) setStepIx(at);
-  }, [ready, rec?.id, steps]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, rec?.id, steps, appSet.isSuccess, appSet.isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const files = rec?.evidence ?? [];
   const total = files.length + queued.length;
@@ -254,7 +254,7 @@ export function ReceiptFormPage() {
       <Link className="back" to={id ? `/receipts/${id}` : '/receipts'}><Icon name="back" size={18} />Back</Link>
       <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Answer the questions about the invoice, then attach a clear photo or PDF.</p></div></div>
       {rec?.status === 'returned' && (rec.lastNote || rec.returnIssues.length > 0) && (
-        <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b>{rec.returnIssues.filter((c) => c !== 'other').length > 0 && <span>{rec.returnIssues.filter((c) => c !== 'other').map(issueLabel).join(' · ')}</span>}{rec.lastNote && <span>{rec.lastNote}</span>}</div></div>
+        <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b>{rec.returnIssues.filter((c) => c !== 'other').length > 0 && <span style={{ display: 'block' }}>{rec.returnIssues.filter((c) => c !== 'other').map(issueLabel).join(' · ')}</span>}{rec.lastNote && <span style={{ display: 'block' }}>{rec.lastNote}</span>}</div></div>
       )}
 
       <ol className="steps" aria-label="Progress">
