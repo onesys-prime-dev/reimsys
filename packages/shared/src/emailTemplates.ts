@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reset', 'invite', 'test'] as const;
+export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -63,6 +63,7 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
   payment_reversed: { label: 'Payment reversed', when: 'Accounting reverses a payment', to: 'The Med Ref who was paid', allowed: [...RECEIPT_VARS, 'paymentNo'], hasReceipt: true },
   reversed: { label: 'Decision reversed', when: 'An approver undoes an approval or disapproval within ten minutes', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   digest: { label: 'Daily summary', when: 'About 8am, only if something is waiting', to: 'Anyone who has the summary turned on', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
+  reminder: { label: 'Waiting receipts reminder', when: 'About 9am, when receipts have waited longer than the reminder days set on the Settings page', to: 'Whoever has to act: Checkers, Approvers, Accounting, or the Med Ref of a returned receipt', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
   reset: { label: 'Forgot password', when: 'Someone asks to reset their password on the sign-in page', to: 'The person who asked', allowed: ['recipientName', 'orgName', 'minutes'], hasReceipt: false },
   invite: { label: 'Invitation to a new user', when: 'An administrator creates a new user', to: 'The new user', allowed: ['recipientName', 'actorName', 'orgName', 'hours'], hasReceipt: false },
   test: { label: 'Test email', when: 'An administrator presses "Send test email"', to: 'The address the administrator typed', allowed: ['actorName', 'orgName'], hasReceipt: false },
@@ -132,6 +133,13 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     buttonLabel: 'Open {{orgName}}',
     showDetails: false,
   },
+  reminder: {
+    subject: '{{orgName}}: receipts are waiting for you',
+    heading: 'Some receipts have been waiting a while',
+    body: 'Hi {{recipientName}},\n\nThese receipts need your attention:\n\n{{summary}}',
+    buttonLabel: 'Open {{orgName}}',
+    showDetails: false,
+  },
   reset: {
     subject: '{{orgName}}: choose a new password',
     heading: 'Choose a new password',
@@ -171,6 +179,7 @@ const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
   reset: { recipientName: 'Ana', minutes: '60' },
   invite: { recipientName: 'Ana', actorName: 'Admin User', hours: '72' },
   digest: { summary: '• 2 receipts waiting to be checked.\n• 1 draft not submitted yet.' },
+  reminder: { summary: '• RC-2026-000123 · Mercury Drug - Mandaue: waiting to be checked for 3 days\n• RC-2026-000131 · Shell Mandaue: waiting to be checked for 2 days' },
   test: { actorName: 'Admin User' },
 };
 export const sampleFor = (key: TemplateKey): Record<string, string> => ({ ...SAMPLE_DATA, ...SAMPLE_OVERRIDES[key] });

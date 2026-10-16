@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { FilePreview } from '../components/FilePreview';
@@ -103,6 +103,9 @@ export function ReceiptFormPage() {
   const [over, setOver] = useState(false);
   const [f, setF] = useState<FormState>(EMPTY);
   const [stepIx, setStepIx] = useState(0);
+  const [params] = useSearchParams();
+  const wantedStep = params.get('step');
+  const jumped = useRef(false);
   const [queued, setQueued] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -138,6 +141,15 @@ export function ReceiptFormPage() {
     return s;
   }, [f.bir, f.underCo, f.withheld, rules.askWithholding]);
   const step = steps[Math.min(stepIx, steps.length - 1)]!;
+
+  // "Fix" in the returned-receipt box opens the form on the step to fix. Done once, after the saved answers are in (the steps depend on them).
+  useEffect(() => {
+    if (jumped.current || !ready || !rec || !(appSet.isSuccess || appSet.isError) || !wantedStep || !(FIX_STEPS as readonly string[]).includes(wantedStep)) return;
+    jumped.current = true;
+    const target = resolveFixStep(wantedStep as FixStep, steps);
+    const at = target ? steps.indexOf(target as StepId) : -1;
+    if (at > 0) setStepIx(at);
+  }, [ready, rec?.id, steps, appSet.isSuccess, appSet.isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const files = rec?.evidence ?? [];
   const total = files.length + queued.length;
@@ -241,7 +253,9 @@ export function ReceiptFormPage() {
     <>
       <Link className="back" to={id ? `/receipts/${id}` : '/receipts'}><Icon name="back" size={18} />Back</Link>
       <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Answer the questions about the invoice, then attach a clear photo or PDF.</p></div></div>
-      {rec?.status === 'returned' && rec.lastNote && <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b><span>{rec.lastNote}</span></div></div>}
+      {rec?.status === 'returned' && (rec.lastNote || rec.returnIssues.length > 0) && (
+        <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b>{rec.returnIssues.filter((c) => c !== 'other').length > 0 && <span style={{ display: 'block' }}>{rec.returnIssues.filter((c) => c !== 'other').map(issueLabel).join(' · ')}</span>}{rec.lastNote && <span style={{ display: 'block' }}>{rec.lastNote}</span>}</div></div>
+      )}
 
       <ol className="steps" aria-label="Progress">
         {steps.map((s, i) => (
@@ -389,6 +403,7 @@ export function ReceiptFormPage() {
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
                   {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
+                {rec && rec.possibleDuplicates.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>Possible duplicate</b><span>Same invoice, or same vendor, amount and date, as {rec.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link></span>)}. If this is a different purchase, carry on.</span></div></div>}
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}
               </div>
             </div>

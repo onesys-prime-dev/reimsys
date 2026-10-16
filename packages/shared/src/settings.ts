@@ -23,6 +23,11 @@ export const appSettingsSchema = z.object({
   evidenceMaxFiles: num(1, 10, 'Files per receipt').transform(Math.round),
   evidenceMaxMb: num(1, 10, 'File size').transform(Math.round),
   undoMinutes: num(1, 120, 'The undo window').transform(Math.round),
+  /* reminders for receipts that have waited too long (0 = off) */
+  reminderCheckDays: num(0, 60, 'The check reminder').transform(Math.round),
+  reminderDecideDays: num(0, 60, 'The decision reminder').transform(Math.round),
+  reminderPayDays: num(0, 60, 'The payment reminder').transform(Math.round),
+  reminderFixDays: num(0, 60, 'The correction reminder').transform(Math.round),
   /* sessions (people already signed in keep the limits they signed in with, except the idle limit, which applies at once) */
   sessionIdleMinutes: num(5, 1440, 'The idle limit').transform(Math.round),
   sessionMaxHours: num(1, 168, 'The maximum session').transform(Math.round),
@@ -32,7 +37,7 @@ export type AppSettings = z.infer<typeof appSettingsSchema>;
 export const DEFAULT_SETTINGS: AppSettings = {
   vatRate: 12, tolerance: 0.02, warningsBlock: false, allowNoBir: true,
   requireInvoiceNo: true, requireVendorAddress: true, requireVendorTin: true, askWithholding: true, showDescription: true,
-  evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, sessionIdleMinutes: 60, sessionMaxHours: 12,
+  evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, reminderCheckDays: 2, reminderDecideDays: 2, reminderPayDays: 3, reminderFixDays: 5, sessionIdleMinutes: 60, sessionMaxHours: 12,
 };
 
 /** Plain-words description of each setting, in the order they are shown. Used by the Settings screen and the audit log. */
@@ -65,6 +70,16 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
       { key: 'evidenceMaxFiles', label: 'Files per receipt', help: 'Up to 10.', kind: 'number', unit: 'files', step: 1 },
       { key: 'evidenceMaxMb', label: 'Largest file', help: 'Up to 10.', kind: 'number', unit: 'MB', step: 1 },
       { key: 'undoMinutes', label: 'Time to take back an approval or disapproval', help: '', kind: 'number', unit: 'minutes', step: 1 },
+    ],
+  },
+  {
+    title: 'Reminders',
+    help: 'A receipt that waits longer than this gets a reminder (a notice and one email a day per person). Set 0 to switch a reminder off.',
+    items: [
+      { key: 'reminderCheckDays', label: 'Waiting to be checked', help: 'Reminds the Checkers.', kind: 'number', unit: 'days', step: 1 },
+      { key: 'reminderDecideDays', label: 'Waiting for a decision', help: 'Reminds the Approvers.', kind: 'number', unit: 'days', step: 1 },
+      { key: 'reminderPayDays', label: 'Approved and waiting to be paid', help: 'Reminds Accounting.', kind: 'number', unit: 'days', step: 1 },
+      { key: 'reminderFixDays', label: 'Returned and not corrected', help: 'Reminds the Med Ref who sent it.', kind: 'number', unit: 'days', step: 1 },
     ],
   },
   {

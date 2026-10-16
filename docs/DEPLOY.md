@@ -119,6 +119,10 @@ pnpm build
 pm2 restart reimsys
 ```
 
+## Upgrading to return reasons
+
+Back up the database first and tag the version you are leaving (`before-return-issues`). Then run `pnpm --filter @reimsys/api exec prisma migrate deploy` (adds one nullable column, `receipt.returnIssues`). Nothing to seed. Receipts that were already returned keep their note and simply have no Fix buttons. To go back: `docs/rollback-return-issues.sql`, or restore the backup.
+
 ## Upgrading to the payment step
 
 1. Back up the database and the storage folder, and tag the version you are leaving (`before-payment-step`).
@@ -181,3 +185,9 @@ A new database is built with `pnpm db:migrate` and ends up identical to the sche
 - Screens people open rarely (Access, Audit, Import, Reports, Profile, the receipt form) load only when opened, so the first page is much smaller.
 - If nginx or Caddy sits in front, it can compress instead; just keep `/api/events` unbuffered and uncompressed (see "Live updates").
 - A small VPS should have at least 1 GB of memory for the database, and sign-in is the heaviest action (the password check is deliberately slow).
+6. Back up (`node scripts/backup.mjs`), then clear the test receipts and files that built up while testing:
+   ```
+   pnpm --filter @reimsys/api data:clear -- --confirm <database name>
+   ```
+   It keeps users, roles, rights, settings and categories, restarts the reference numbers, and refuses to run unless you type the database name. Set up the nightly backup from `docs/BACKUP.md` before the first real receipt.
+7. Check who holds which rights on the Access page. One person must never be able to check, approve and pay the same receipt: the system now refuses it (a checker cannot decide on a receipt they checked, and nobody can pay a receipt they encoded, checked or approved), but the Super Admin should not be handed all three roles anyway.

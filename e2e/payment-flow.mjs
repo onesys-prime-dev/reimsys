@@ -4,6 +4,10 @@ import { B, H, PNG, call, checker, loginAll, makeApproved, makeDraft, pay, tag, 
 
 const { ok, done } = checker();
 const U = await loginAll();
+// By default the Super Admin cannot mark receipts paid (separation of duties). If someone has deliberately granted it on the
+// Access page of the database being tested, those two checks do not apply: skip them, and never pay as the admin.
+const adminCanPay = (await call(U.admin, 'GET', '/me')).d.permissions.includes('payment.mark');
+if (adminCanPay) console.log('  note: the Super Admin has payment.mark in this database (granted on the Access page), so the "admin cannot pay" checks are skipped');
 console.log(`Run tag: ${tag}`);
 
 console.log('\nWho sees what');
@@ -25,7 +29,7 @@ console.log('\nThe payment queue');
 const a2 = await makeApproved(U, 'ana', 'Batch A', 250.5);
 const a3 = await makeApproved(U, 'ana', 'Batch B', 749.5);
 const m1 = await makeApproved(U, 'mark', 'Other person', 300);
-for (const who of ['ana', 'liza', 'paolo', 'admin']) ok(`${who} cannot open the payment queue`, (await call(U[who], 'GET', '/payments/queue')).s === 403);
+for (const who of ['ana', 'liza', 'paolo', ...(adminCanPay ? [] : ['admin'])]) ok(`${who} cannot open the payment queue`, (await call(U[who], 'GET', '/payments/queue')).s === 403);
 const q = await call(U.rica, 'GET', '/payments/queue');
 const groupOf = (name) => q.d?.groups.find((g) => g.payee.name === name);
 ok('accounting can open the queue', q.s === 200);
@@ -44,7 +48,7 @@ if (methods.length) await call(U.admin, 'PUT', '/payments/methods', { methods })
 console.log('\nRefused payments');
 const code = (r) => r.d?.error?.code;
 ok('approver cannot pay', (await pay(U.paolo, [a1])).s === 403);
-ok('Super Admin cannot pay by default', (await pay(U.admin, [a1])).s === 403);
+if (!adminCanPay) ok('Super Admin cannot pay by default', (await pay(U.admin, [a1])).s === 403);
 ok('receipts of two people in one payment are refused', code(await pay(U.rica, [a2, m1])) === 'MIXED_PAYEES');
 ok('paying more than the receipt is refused', code(await pay(U.rica, [a1], { amounts: { [a1.id]: 1000.01 } })) === 'OVERPAID');
 ok('paying less without a reason is refused', code(await pay(U.rica, [a1], { amounts: { [a1.id]: 999.99 } })) === 'SHORT_REASON');

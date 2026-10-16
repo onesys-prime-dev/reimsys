@@ -9,6 +9,7 @@ import { queueEmail } from '../lib/email.js';
 import { renderEmail } from '../lib/emailTemplates.js';
 import { resolveMail } from '../lib/mailSettings.js';
 import { sendDigestNow } from '../lib/digest.js';
+import { sendReminders } from '../lib/reminders.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -158,6 +159,13 @@ emailLogRouter.post('/test', async (req, res) => {
   await queueEmail({ to, template: 'test', subject: mail.subject, html: mail.html });
   await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}` });
   res.status(202).json({ ok: true });
+});
+
+/** Sends the reminders for receipts that have waited too long right now (they also go out by themselves at 9am), so an administrator can try the settings. */
+emailLogRouter.post('/reminders-now', async (req, res) => {
+  const sent = await sendReminders();
+  await audit(req, { action: 'email.reminders_sent', entityType: 'email', summary: `sent waiting-receipt reminders to ${sent} people now` });
+  res.json({ sent });
 });
 
 /** Sends one person their daily summary right now, so an administrator can see what it looks like. */

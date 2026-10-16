@@ -6,7 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
-  cleanFormData, VAT_LABEL, classificationText,
+  cleanFormData, VAT_LABEL, classificationText, issuesText, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -14,7 +14,7 @@ import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/err
 import { enqueue } from '../lib/jobs.js';
 import { getSettings } from '../lib/appSettings.js';
 import { receiptData } from '../lib/emailTemplates.js';
-import { notify, usersWithPermission } from '../lib/notify.js';
+import { notify, receiptUrl, usersWithPermission } from '../lib/notify.js';
 import { assertOwner, typeLabel, dateOnly, filterWhere, loadVisible, receiptBrief, receiptDetail, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { nextDocNo, nextReceiptRef } from '../lib/sequence.js';
 import { copyFile, readFile, removeFile, saveFile, sha256Of, sniff } from '../lib/storage.js';
@@ -279,7 +279,14 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (!t.from.includes(r.status as ReceiptStatus)) throw conflict(`This receipt is ${r.status}, so it cannot be changed this way.`, 'INVALID_STATE');
   if (body.version !== r.version) throw conflict('Someone else changed this receipt. Reload and try again.', 'RECORD_CHANGED');
   const note = body.note?.trim() || null;
-  if (t.note === 'required' && !note) throw badRequest(action === 'return' ? 'Tell the Med Ref what to fix.' : action === 'disapprove' ? 'A reason is required.' : 'A note is required.', 'NOTE_REQUIRED');
+  // Sending a receipt back: the problems ticked from the short list, with or without a typed note.
+  const issues: ReturnIssueCode[] = action === 'return' || action === 'request' ? RETURN_ISSUE_CODES.filter((c) => body.issues?.includes(c)) : [];
+  if (body.issues?.length && !issues.length) throw badRequest('Problems can only be listed when sending a receipt back.', 'ISSUES_NOT_ALLOWED');
+  // What people read in notices, emails and the history: the ticked problems, then the note.
+  const reason = issues.length ? issuesText(issues, note) : note;
+  const hasReason = !!note || issues.some((c) => c !== 'other');
+  if (t.note === 'required' && !hasReason) throw badRequest(action === 'return' ? 'Tell the Med Ref what to fix.' : action === 'disapprove' ? 'A reason is required.' : 'A note is required.', 'NOTE_REQUIRED');
+  if (issues.includes('other') && !note) throw badRequest('Say what the other problem is.', 'NOTE_REQUIRED');
 
   if (action === 'submit') {
     const n = await prisma.receiptEvidence.count({ where: { receiptId: r.id, deletedAt: null } });
@@ -296,6 +303,9 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.
   if ((action === 'approve' || action === 'disapprove' || action === 'reserve') && (!r.checkedById || !r.checkedAt)) {
     throw conflict('This receipt has not been checked yet, so it cannot be decided.', 'NOT_CHECKED');
+  }
+  if ((action === 'approve' || action === 'disapprove' || action === 'reserve') && r.checkedById === auth.user.id) {
+    throw forbidden('You checked this receipt, so someone else has to make the decision.', 'SAME_PERSON');
   }
   if (action === 'approve' || action === 'disapprove' || action === 'reserve') {
     const seen = await prisma.auditLog.count({
@@ -326,6 +336,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note, ckCompany: body.seen?.company ?? null, ckTin: body.seen?.tin ?? null, ckAddress: body.seen?.address ?? null });
   if (action === 'return' || action === 'reserve' || action === 'request') data.lastNote = note;
+  // The ticked problems belong to one return: replaced on every return, cleared by every other action.
+  data.returnIssues = action === 'return' || action === 'request' ? joinIssues(issues) : null;
   // Asking for more proof sends it back to be checked again from the start.
   if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'release') data.lastNote = null;
@@ -349,19 +361,22 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
 
   await audit(req, {
     action: action === 'reverse_payment' ? 'payment.reversed' : `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
-    before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
+    before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(reason ? { note: reason } : {}), ...(issues.length ? { issues } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
 
   /* notifications */
   const who = auth.user.name;
   const ref = `${r.refNo} (${r.payee})`;
   const others = (ids: (number | null | undefined)[]) => ids.filter((x): x is number => !!x && x !== auth.user.id);
-  const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: typeLabel(r) }, { actorName: who, note, docNo });
+  const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: typeLabel(r) }, { actorName: who, note: reason, docNo });
   if (action === 'withdraw') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.withdrawn', receiptId: r.id, text: `${ref} was withdrawn by ${who}.` });
   if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
   if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });
-  if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${note}`, email: { template: 'returned', data: mail } });
-  if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${note}`, email: { template: 'returned', data: mail } });
+  // The Med Ref's email button opens the form on the first problem that has a step to fix.
+  const firstStep = issues.map(fixStepFor).find((s) => s);
+  const fixLink = issues.length ? `${receiptUrl(r.id)}/edit${firstStep ? `?step=${firstStep}` : ''}` : undefined;
+  if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${reason}`, email: { template: 'returned', data: mail, link: fixLink } });
+  if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${reason}`, email: { template: 'returned', data: mail, link: fixLink } });
   if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
   if (action === 'approve') await notify({ userIds: others(await usersWithPermission('payment.mark')).filter((id) => id !== r.encoderId), type: 'receipt.ready_to_pay', receiptId: r.id, text: `${ref} was approved and is ready to pay.` });

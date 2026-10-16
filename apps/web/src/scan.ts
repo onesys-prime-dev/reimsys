@@ -2,6 +2,8 @@
  * The maths behind "Scan receipt": find the receipt in a photo, cut it out straight, and clean it up.
  * Plain functions on pixel data (no browser objects), so they can be tested with made-up images.
  */
+import { edgeQuad, findEdges, scoreCorners, type Corners } from './scanEdges';
+
 export interface Pt { x: number; y: number }
 /** Corners in reading order: top left, top right, bottom right, bottom left. */
 export type Quad = [Pt, Pt, Pt, Pt];
@@ -60,26 +62,44 @@ export function detectQuad(img: Raster): Quad {
  * Like detectQuad, but says "nothing found" (null) instead of falling back to the whole photo. The live camera needs to know.
  * `trim` is how far (as a share of the way to the middle) the corners are pulled inside the receipt's edge: 0 hugs it.
  */
-export function findQuad(img: Raster, trim = 0.025): Quad | null {
-  const fallback = null;
+export function findQuad(img: Raster, trim = 0.03): Quad | null {
   const { gray, w, h, k } = smallGray(img, 320);
+  const edges = findEdges(gray, w, h);
+  // 1. By the receipt's edges: the lines that make its sides. Works on a light table, in shadow, with a finger over a corner.
+  let corners: Corners | null = edgeQuad(gray, w, h, edges)?.corners ?? null;
+  // 2. By "the biggest bright shape", only trusted when real edges run along all four of its sides.
+  if (!corners) {
+    const blob = blobCorners(gray, w, h);
+    if (blob && scoreCorners(blob, edges) > 0) corners = blob;
+  }
+  if (!corners) return null;
+  const up = (p: { x: number; y: number }): Pt => ({ x: Math.min(img.width - 1, Math.max(0, Math.round((p.x + 0.5) * k))), y: Math.min(img.height - 1, Math.max(0, Math.round((p.y + 0.5) * k))) });
+  const q = corners.map(up) as Quad;
+  // The edge of a photographed receipt is soft and ragged, so cut a little inside it rather than keep a rim of the table.
+  const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+  const pull = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * trim), y: Math.round(p.y + (cy - p.y) * trim) });
+  return q.map(pull) as Quad;
+}
+
+/** The older method: the biggest bright patch in the picture and its four extreme points. Returns corners in the small picture. */
+function blobCorners(gray: Uint8Array, w: number, h: number): Corners | null {
   const { threshold, best } = otsu(gray);
   // Two clearly different brightnesses are needed; otherwise there is nothing to find.
-  if (best < 18) return fallback;
+  if (best < 18) return null;
   const bright = new Uint8Array(w * h);
   let count = 0;
   for (let i = 0; i < gray.length; i++) if (gray[i]! > threshold) { bright[i] = 1; count++; }
-  if (count < w * h * 0.12 || count > w * h * 0.97) return fallback;
+  if (count < w * h * 0.12 || count > w * h * 0.97) return null;
 
   // Keep only the biggest connected bright patch, so specks and a bright window do not count.
   const label = new Int32Array(w * h);
   let bestLabel = 0, bestSize = 0, next = 0;
   const stack: number[] = [];
-  for (let s = 0; s < bright.length; s++) {
-    if (!bright[s] || label[s]) continue;
+  for (let s0 = 0; s0 < bright.length; s0++) {
+    if (!bright[s0] || label[s0]) continue;
     next++;
     let size = 0;
-    stack.push(s); label[s] = next;
+    stack.push(s0); label[s0] = next;
     while (stack.length) {
       const p = stack.pop()!;
       size++;
@@ -91,7 +111,7 @@ export function findQuad(img: Raster, trim = 0.025): Quad | null {
     }
     if (size > bestSize) { bestSize = size; bestLabel = next; }
   }
-  if (bestSize < w * h * 0.12) return fallback;
+  if (bestSize < w * h * 0.12) return null;
 
   // The corners of a tilted rectangle are the points furthest along each diagonal.
   let tl = Infinity, br = -Infinity, tr = -Infinity, bl = Infinity;
@@ -104,12 +124,7 @@ export function findQuad(img: Raster, trim = 0.025): Quad | null {
     if (x - y > tr) { tr = x - y; pTR = { x, y }; }
     if (x - y < bl) { bl = x - y; pBL = { x, y }; }
   }
-  const up = (p: Pt): Pt => ({ x: Math.min(img.width - 1, Math.round((p.x + 0.5) * k)), y: Math.min(img.height - 1, Math.round((p.y + 0.5) * k)) });
-  const q = [up(pTL), up(pTR), up(pBR), up(pBL)] as Quad;
-  // The edge of a photographed receipt is soft and ragged, so cut a little inside it rather than keep a rim of the table.
-  const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
-  const pull = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * trim), y: Math.round(p.y + (cy - p.y) * trim) });
-  return q.map(pull) as Quad;
+  return [pTL, pTR, pBR, pBL];
 }
 
 const maxMove = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i]!.x, p.y - b[i]!.y)));

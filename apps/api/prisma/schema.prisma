@@ -167,6 +167,8 @@ model Receipt {
   decidedAt    DateTime?
   decisionNote String?                  @db.VarChar(1000)
   lastNote     String?                  @db.VarChar(1000)
+  // The problems ticked when the receipt was sent back (codes joined by commas, see packages/shared/src/returnIssues.ts). Cleared when it leaves "Returned".
+  returnIssues String?                  @db.VarChar(300)
   // Payment step. Filled while the receipt is Paid and cleared again when the payment is reversed.
   paymentId       Int?
   payment         Payment?                 @relation(fields: [paymentId], references: [id])

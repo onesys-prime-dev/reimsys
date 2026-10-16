@@ -29,6 +29,7 @@ import { tlsOptions } from './lib/tls.js';
 import './lib/documents.js';
 import './lib/reports.js';
 import { startDigest } from './lib/digest.js';
+import { startReminders } from './lib/reminders.js';
 import { startWorker } from './lib/jobs.js';
 
 const app = express();
@@ -103,6 +104,7 @@ if (tls) https.createServer(tls, app).listen(config.port, () => console.log(`REI
 else app.listen(config.port, () => console.log(`REIMSYS API listening on http://localhost:${config.port}`));
 void startWorker();
 startDigest();
+startReminders();
 
 // Every half minute, close live connections that belong to sessions which have ended, so a timed-out or signed-out browser cannot keep listening.
 setInterval(async () => {

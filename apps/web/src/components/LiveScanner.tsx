@@ -149,9 +149,9 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
   const hint = confirmClose ? `Discard ${pages.length} page${pages.length === 1 ? '' : 's'}? Press the cross again.`
     : full ? 'That is the most pages this receipt can have.'
     : !size ? 'Opening the camera…'
-    : !auto ? (quad ? 'Press the button to take the picture' : 'Hold the receipt in view')
+    : !auto ? (quad ? 'Press the button to take the picture' : 'Show the whole receipt')
     : !armed.current && pages.length ? 'Got it. Show the next page, or press Done.'
-    : !quad ? 'Hold the receipt in view' : progress > 0 ? 'Hold still…' : 'Receipt found';
+    : !quad ? 'Show the whole receipt' : progress > 0 ? 'Hold still…' : 'Receipt found';
 
   return (
     <div className="live-scan" role="dialog" aria-modal="true" aria-label="Scan receipt camera">

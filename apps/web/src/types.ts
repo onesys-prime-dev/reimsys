@@ -1,4 +1,4 @@
-import type { ReceiptAction, ReceiptStatus } from '@reimsys/shared';
+import type { ReceiptAction, ReceiptStatus, ReturnIssueCode } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;
@@ -38,6 +38,7 @@ export interface ReceiptDetail extends ReceiptBrief {
   checkedBy: string | null; checkedAt: string | null; checkNote: string | null;
   decidedBy: string | null; decidedAt: string | null; decisionNote: string | null;
   lastNote: string | null;
+  returnIssues: ReturnIssueCode[];
   createdAt: string;
   isOwner: boolean;
   canEdit: boolean;

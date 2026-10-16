@@ -9,3 +9,7 @@ coverage/
 
 # Self-made https certificate for phone testing (start-lan.ps1). Never commit it.
 .lan-cert/
+
+# Backups (scripts/backup.mjs) hold real data. Never commit them.
+backups/
+.scratch-*/

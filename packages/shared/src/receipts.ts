@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type AppSettings } from './settings';
+import { RETURN_ISSUE_CODES } from './returnIssues';
 export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved', 'paid'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
@@ -177,6 +178,8 @@ export type ReceiptInput = z.infer<typeof receiptInputSchema>;
 
 export const actionBodySchema = z.object({
   note: z.string().trim().max(1000).optional(),
+  /** The problems the Checker or Approver ticked when sending a receipt back to the Med Ref. */
+  issues: z.array(z.enum(RETURN_ISSUE_CODES)).max(10).optional(),
   /** The Checker's answer to "can it be seen completely on the invoice?" for the company name, TIN and address. */
   seen: z.object({ company: z.boolean(), tin: z.boolean(), address: z.boolean() }).optional(),
   version: z.number().int().min(0),

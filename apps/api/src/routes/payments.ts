@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
+import ExcelJS from 'exceljs';
 import { EVIDENCE_MAX_BYTES, paymentIssues, paymentMethodsSchema, paymentRequestSchema, totalOf } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -8,7 +9,8 @@ import { getSettings } from '../lib/appSettings.js';
 import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { getPaymentMethods, savePaymentMethods } from '../lib/paymentMethods.js';
 import { announcePaid } from '../lib/paymentNotices.js';
-import { receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
+import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
+import { toCsv } from '../lib/reports.js';
 import { nextPaymentNo } from '../lib/sequence.js';
 import { readFile, removeFile, saveFile, sha256Of, sniff } from '../lib/storage.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
@@ -77,6 +79,7 @@ paymentsRouter.post('/', requirePerm('payment.mark'), payLimiter, upload.single(
   if (receipts.length !== ids.length) throw notFound('One of the receipts was not found.');
   for (const r of receipts) {
     if (r.encoderId === auth.user.id) throw forbidden('You cannot pay a receipt you encoded.', 'OWN_RECEIPT');
+    if (r.checkedById === auth.user.id || r.decidedById === auth.user.id) throw forbidden('You checked or approved this receipt, so someone else has to pay it.', 'SAME_PERSON');
     if (r.status !== 'approved') throw conflict(`${r.refNo} is ${r.status}, so it cannot be paid.`, 'INVALID_STATE');
     if (body.lines.find((l) => l.receiptId === r.id)!.version !== r.version) throw conflict(`${r.refNo} changed since you opened it. Reload and try again.`, 'RECORD_CHANGED');
   }
@@ -131,6 +134,44 @@ const MODES = { view: ['evidence.view', 'inline', 'viewed'], print: ['evidence.p
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'application/pdf': 'pdf' };
 
 /** The person who was paid, Accounting, and anyone who can see a receipt in the payment. Everyone else gets "not found". */
+/* ---------- export for the accountant ---------- */
+
+const day = (v: unknown, label: string) => {
+  const s = typeof v === 'string' ? v : '';
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00Z') : null;
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) throw badRequest(`${label} must be a date like 2026-10-31.`, 'BAD_DATE');
+  return d;
+};
+
+/** One row per receipt paid in the period, ordered by payment date, as CSV or Excel. */
+paymentsRouter.get('/export', requirePerm('payment.mark'), async (req, res) => {
+  const from = day(req.query.from, 'The start date');
+  const to = day(req.query.to, 'The end date');
+  if (from > to) throw badRequest('The start date is after the end date.', 'BAD_PERIOD');
+  const rows = await prisma.receipt.findMany({
+    where: { AND: [visibleWhere(req.auth!), { paymentId: { not: null }, payment: { paidOn: { gte: from, lte: to } } }] },
+    include: { payment: { include: { payee: { select: { name: true } }, recordedBy: { select: { name: true } } } } },
+    take: 20000,
+  });
+  rows.sort((a, b) => a.payment!.paidOn.getTime() - b.payment!.paidOn.getTime() || a.payment!.paymentNo.localeCompare(b.payment!.paymentNo) || a.id - b.id);
+  const head = ['Payment no.', 'Paid on', 'Method', 'Paid to', 'Receipt ref.', 'Vendor', 'Invoice no.', 'Invoice date', 'Receipt amount (PHP)', 'Amount paid (PHP)', 'Short-payment reason', 'Recorded by'];
+  const data = rows.map((r) => [r.payment!.paymentNo, dateOnly(r.payment!.paidOn), r.payment!.method, r.payment!.payee.name, r.refNo, r.payee, r.invoiceNo ?? '', dateOnly(r.receiptDate), Number(r.amount), Number(r.paidAmount ?? 0), r.paidShortReason ?? '', r.payment!.recordedBy.name]);
+  await audit(req, { action: 'payment.exported', entityType: 'export', summary: `exported ${rows.length} paid receipt${rows.length === 1 ? '' : 's'} (${from.toISOString().slice(0, 10)} to ${to.toISOString().slice(0, 10)})` });
+  const name = `payments-${from.toISOString().slice(0, 10)}-to-${to.toISOString().slice(0, 10)}`;
+  if (req.query.format !== 'xlsx') {
+    res.type('text/csv').attachment(`${name}.csv`).send(toCsv([head, ...data]));
+    return;
+  }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Payments');
+  ws.addRow(head).font = { bold: true };
+  data.forEach((d) => ws.addRow(d));
+  ws.columns.forEach((c) => { c.width = 20; });
+  ws.getColumn(9).numFmt = '#,##0.00';
+  ws.getColumn(10).numFmt = '#,##0.00';
+  res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`${name}.xlsx`).send(Buffer.from(await wb.xlsx.writeBuffer()));
+});
+
 paymentsRouter.get('/:id/proof', async (req, res) => {
   const auth = req.auth!;
   const mode = (typeof req.query.mode === 'string' && req.query.mode in MODES ? req.query.mode : 'view') as keyof typeof MODES;

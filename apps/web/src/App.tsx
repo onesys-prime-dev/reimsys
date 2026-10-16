@@ -59,7 +59,7 @@ function Shell() {
   return (
     <div className="shell">
       <aside className="side">
-        <div className="brand"><Logo size={34} /></div>
+        <NavLink to="/" className="brand" aria-label="Go to the dashboard" style={{ textDecoration: 'none', color: 'inherit' }}><Logo size={34} /></NavLink>
         <nav className="nav" aria-label="Main">{items.map(link)}</nav>
         <button className="who" onClick={() => nav('/profile')}>
           <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} />
