@@ -5,7 +5,9 @@ import { CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMP
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { FilePreview } from '../components/FilePreview';
+import { LiveScanner } from '../components/LiveScanner';
 import { ScanDialog } from '../components/ScanDialog';
+import { pageToFile } from '../scanPage';
 import { Field, Icon, useToast } from '../ui';
 
 const kb = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
@@ -88,6 +90,13 @@ export function ReceiptFormPage() {
   const pick = useRef<HTMLInputElement>(null);
   const scanPick = useRef<HTMLInputElement>(null);
   const [scanFile, setScanFile] = useState<File | null>(null);
+  const [liveOpen, setLiveOpen] = useState(false);
+  // The live camera needs a secure page and the person's permission. When it cannot open, the phone's own camera app is used instead.
+  const [liveBlocked, setLiveBlocked] = useState(false);
+  const startScan = () => {
+    if (!liveBlocked && window.isSecureContext && typeof navigator.mediaDevices?.getUserMedia === 'function') setLiveOpen(true);
+    else scanPick.current?.click();
+  };
   const [previewing, setPreviewing] = useState<{ title: string; url: string; pdf: boolean; revoke: boolean } | null>(null);
   const closePreview = () => setPreviewing((p) => { if (p?.revoke) URL.revokeObjectURL(p.url); return null; });
   const previewQueued = (x: File) => setPreviewing({ title: x.name, url: URL.createObjectURL(x), pdf: x.type === 'application/pdf' || /\.pdf$/i.test(x.name), revoke: true });
@@ -343,7 +352,7 @@ export function ReceiptFormPage() {
                   <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to {rules.evidenceMaxMb} MB each</div>
                   <div className="btns">
                     <button type="button" className="btn" onClick={() => pick.current?.click()}><Icon name="upload" size={18} />Choose files</button>
-                    <button type="button" className="btn" onClick={() => scanPick.current?.click()}><Icon name="scan" size={18} />Scan receipt</button>
+                    <button type="button" className="btn" onClick={startScan}><Icon name="scan" size={18} />Scan receipt</button>
                   </div>
                   <input ref={pick} type="file" multiple accept={ACCEPT} onChange={(ev) => { if (ev.target.files) addFiles(ev.target.files); ev.target.value = ''; }} />
                   <input ref={scanPick} type="file" accept="image/*" capture="environment" aria-label="Scan a receipt photo" onChange={(ev) => { const x = ev.target.files?.[0]; if (x) setScanFile(x); ev.target.value = ''; }} />
@@ -394,12 +403,31 @@ export function ReceiptFormPage() {
         </form>
       </section>
       {previewing && <FilePreview title={previewing.title} url={previewing.url} pdf={previewing.pdf} onClose={closePreview} />}
+      {liveOpen && (
+        <LiveScanner
+          maxPages={Math.max(0, MAX_FILES - total)}
+          onClose={() => setLiveOpen(false)}
+          onUnavailable={() => { setLiveOpen(false); setLiveBlocked(true); toast("The camera could not be opened here. Press Scan receipt again to use your phone's camera app.", 'bad'); }}
+          onDone={(pages) => {
+            setLiveOpen(false);
+            void Promise.all(pages.map((pg) => pageToFile(pg, MAX_BYTES))).then((made) => {
+              const ok = made.filter((f): f is File => !!f);
+              if (ok.length) addFiles(ok);
+              if (ok.length < pages.length) toast('One of the pages could not be saved. Scan it again.', 'bad');
+            });
+          }}
+        />
+      )}
       {scanFile && (
         <ScanDialog
-          file={scanFile} maxBytes={MAX_BYTES}
+          file={scanFile}
           onCancel={() => setScanFile(null)}
           onRetake={() => { setScanFile(null); scanPick.current?.click(); }}
-          onUse={(scan, another) => { addFiles([scan]); setScanFile(null); if (another) scanPick.current?.click(); }}
+          onApply={(pg, another) => {
+            setScanFile(null);
+            if (another) scanPick.current?.click(); // inside the tap, so the phone allows the camera to open
+            void pageToFile(pg, MAX_BYTES).then((f) => (f ? addFiles([f]) : toast('The scan could not be saved. Try again.', 'bad')));
+          }}
           onUnreadable={() => { addFiles([scanFile]); setScanFile(null); toast('This photo could not be opened in the scanner, so it was added as it is.', 'bad'); }}
         />
       )}

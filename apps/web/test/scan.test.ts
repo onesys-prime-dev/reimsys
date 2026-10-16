@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectQuad, enhance, quadMapper, warpToRect, type Pt, type Raster } from '../src/scan';
+import { detectQuad, enhance, findQuad, quadMapper, steadyTracker, warpToRect, type Pt, type Quad, type Raster } from '../src/scan';
 
 const raster = (width: number, height: number, fn: (x: number, y: number) => number | [number, number, number]): Raster => {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -132,5 +132,69 @@ describe('the cut-out page', () => {
     for (let x = 0; x < out.width; x++) darkest = Math.min(darkest, px(out, x, 0), px(out, x, out.height - 1));
     for (let y = 0; y < out.height; y++) darkest = Math.min(darkest, px(out, 0, y), px(out, out.width - 1, y));
     expect(darkest).toBeGreaterThan(200);
+  });
+});
+
+describe('knowing whether a receipt is really in view', () => {
+  const truth: Pt[] = [{ x: 90, y: 40 }, { x: 330, y: 70 }, { x: 305, y: 270 }, { x: 60, y: 245 }];
+
+  it('finds the receipt, or says there is none instead of guessing the whole photo', () => {
+    const withReceipt = raster(400, 300, (x, y) => (inside(truth, x, y) ? 225 : 35));
+    const found = findQuad(withReceipt);
+    expect(found).not.toBeNull();
+    found!.forEach((p, i) => expect(near(p, truth[i]!, 12), `corner ${i}`).toBe(true));
+    expect(findQuad(raster(400, 300, () => 120))).toBeNull();
+    expect(findQuad(raster(400, 300, (x, y) => (x > 100 && x < 130 && y > 100 && y < 130 ? 230 : 40)))).toBeNull();
+  });
+
+  it('does not accept something that is only a thin strip', () => {
+    expect(findQuad(raster(400, 300, (x, y) => (y > 140 && y < 160 ? 230 : 40)))).toBeNull();
+  });
+
+  it('keeps detectQuad answering with the whole photo when nothing is found', () => {
+    expect(detectQuad(raster(400, 300, () => 120))[2]).toEqual({ x: 399, y: 299 });
+  });
+});
+
+describe('waiting until the receipt holds still', () => {
+  const base: Quad = [{ x: 90, y: 40 }, { x: 330, y: 70 }, { x: 305, y: 270 }, { x: 60, y: 245 }];
+  const shift = (q: Quad, dx: number, dy: number): Quad => q.map((p) => ({ x: p.x + dx, y: p.y + dy })) as Quad;
+
+  it('says steady after enough frames in nearly the same place', () => {
+    const t = steadyTracker({ frames: 5, tolerance: 0.02 });
+    const results = [0, 1, 2, 3, 4].map((i) => t.push(shift(base, i % 2, 0), 400, 300));
+    expect(results).toEqual([false, false, false, false, true]);
+  });
+
+  it('starts counting again when the receipt moves or disappears', () => {
+    const t = steadyTracker({ frames: 4, tolerance: 0.02 });
+    for (let i = 0; i < 3; i++) t.push(base, 400, 300);
+    expect(t.push(shift(base, 40, 0), 400, 300)).toBe(false);
+    for (let i = 0; i < 2; i++) t.push(shift(base, 40, 0), 400, 300);
+    expect(t.push(null, 400, 300)).toBe(false);
+    for (let i = 0; i < 3; i++) expect(t.push(base, 400, 300)).toBe(false);
+    expect(t.push(base, 400, 300)).toBe(true);
+  });
+
+  it('reports how far along it is, for the progress ring', () => {
+    const t = steadyTracker({ frames: 4, tolerance: 0.02 });
+    expect(t.progress()).toBe(0);
+    t.push(base, 400, 300); t.push(base, 400, 300);
+    expect(t.progress()).toBeCloseTo(0.5, 5);
+    t.push(null, 400, 300);
+    expect(t.progress()).toBe(0);
+  });
+});
+
+describe('the outline shown on the live camera', () => {
+  it('hugs the receipt, while the saved page is cut a little inside it', () => {
+    const truth: Pt[] = [{ x: 90, y: 40 }, { x: 330, y: 70 }, { x: 305, y: 270 }, { x: 60, y: 245 }];
+    const img = raster(400, 300, (x, y) => (inside(truth, x, y) ? 225 : 35));
+    const hug = findQuad(img, 0)!;
+    const cut = findQuad(img)!;
+    hug.forEach((p, i) => expect(near(p, truth[i]!, 3.5), `hugging corner ${i}: ${JSON.stringify(p)}`).toBe(true));
+    // the default trim pulls every corner toward the middle
+    const mid = { x: 195, y: 156 };
+    cut.forEach((p, i) => expect(Math.hypot(p.x - mid.x, p.y - mid.y)).toBeLessThan(Math.hypot(hug[i]!.x - mid.x, hug[i]!.y - mid.y)));
   });
 });

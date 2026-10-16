@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import https from 'node:https';
 import path from 'node:path';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -24,6 +25,7 @@ import { importsRouter } from './routes/imports.js';
 import { receiptsRouter } from './routes/receipts.js';
 import { documentsRouter, reportsRouter } from './routes/reports.js';
 import { paymentsRouter } from './routes/payments.js';
+import { tlsOptions } from './lib/tls.js';
 import './lib/documents.js';
 import './lib/reports.js';
 import { startDigest } from './lib/digest.js';
@@ -96,7 +98,9 @@ if (fs.existsSync(indexHtml)) {
 }
 app.use(errorHandler);
 
-app.listen(config.port, () => console.log(`REIMSYS API listening on http://localhost:${config.port}`));
+const tls = tlsOptions(process.env);
+if (tls) https.createServer(tls, app).listen(config.port, () => console.log(`REIMSYS API listening on https://localhost:${config.port}`));
+else app.listen(config.port, () => console.log(`REIMSYS API listening on http://localhost:${config.port}`));
 void startWorker();
 startDigest();
 
