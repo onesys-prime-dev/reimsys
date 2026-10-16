@@ -4,8 +4,30 @@ import { totalOf } from '@reimsys/shared';
 import { api, money } from '../api';
 import { PayDialog } from '../components/PayDialog';
 import type { PaymentQueue } from '../types';
-import { Empty } from '../ui';
+import { Empty, Icon } from '../ui';
 import { ReceiptRow } from './Receipts';
+
+const isoDay = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+
+/** Download the payments made in a period, for the accountant's books. */
+function ExportPayments() {
+  const now = new Date();
+  const [from, setFrom] = useState(isoDay(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [to, setTo] = useState(isoDay(now));
+  const valid = !!from && !!to && from <= to;
+  const qs = `from=${from}&to=${to}`;
+  return (
+    <section className="card" style={{ marginTop: 16 }}>
+      <div className="card-h"><h2>Export payments</h2><small>One row per paid receipt, by payment date</small></div>
+      <div className="card-b" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label className="field" style={{ margin: 0 }}><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="field" style={{ margin: 0 }}><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
+        <a className={'btn' + (valid ? '' : ' disabled')} aria-disabled={!valid} href={valid ? `/api/payments/export?format=xlsx&${qs}` : undefined}><Icon name="download" size={18} />Excel</a>
+        <a className={'btn' + (valid ? '' : ' disabled')} aria-disabled={!valid} href={valid ? `/api/payments/export?format=csv&${qs}` : undefined}>CSV</a>
+      </div>
+    </section>
+  );
+}
 
 export function ReadyToPayPage() {
   const q = useQuery({ queryKey: ['payments-queue'], queryFn: () => api<PaymentQueue>('/payments/queue'), refetchInterval: 30_000 });
@@ -52,6 +74,7 @@ export function ReadyToPayPage() {
           </span>
         </div>
       )}
+      <ExportPayments />
       {paying && group && (
         <PayDialog
           payee={group.payee.name}

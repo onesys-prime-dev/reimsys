@@ -70,6 +70,7 @@ small,.muted{color:var(--muted)}
 .btn.hold{color:var(--hold);border-color:color-mix(in srgb,var(--hold) 45%,var(--line))}
 .btn.sm{min-height:32px;padding:4px 10px;font-size:.84rem}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.disabled{opacity:.45;pointer-events:none}
 .btn.ghost{border-color:transparent;background:none;color:var(--muted)}
 
 /* cards, tiles */
