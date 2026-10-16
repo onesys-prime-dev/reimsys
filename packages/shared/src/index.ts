@@ -164,6 +164,7 @@ export interface SessionInfo {
 export * from './receipts';
 export * from './payments';
 export * from './returnIssues';
+export * from './reminders';
 export * from './settings';
 
 export const mailSettingsSchema = z.object({

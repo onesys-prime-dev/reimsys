@@ -67,6 +67,7 @@ Sign in as the administrator, open **Audit log**, then **Emails**:
 | Reimbursement paid | the Med Ref who was paid: one email per payment, listing every receipt and amount, the method, date and payment number |
 | Payment reversed | the Med Ref, with the reason, telling them to disregard the earlier payment notice |
 | Daily summary (about 8am) | anyone who has it turned on, only if they have something waiting |
+| Waiting receipts reminder (about 9am) | Checkers, Approvers, Accounting, or the Med Ref of a returned receipt, once a day each, only when receipts have waited longer than the days set under Settings → Reminders (0 turns one off) |
 
 New receipts waiting to be checked, checked receipts waiting for approval, and approved receipts waiting to be paid (for Accounting) notify people inside the app only (the bell), not by email, so inboxes do not fill up.
 
