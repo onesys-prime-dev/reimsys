@@ -163,6 +163,7 @@ export interface SessionInfo {
 }
 export * from './receipts';
 export * from './payments';
+export * from './returnIssues';
 export * from './settings';
 
 export const mailSettingsSchema = z.object({
