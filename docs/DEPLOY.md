@@ -153,6 +153,14 @@ pm2 restart reimsys
 4. Set `WEB_ORIGIN` to the real `https://` address. Emails then include the "Open the receipt" button, and forgot-password and invitation links point at it.
 5. Apply `docs/db-grants.sql` so the app cannot change or delete audit entries.
 
+## The live scanner needs https
+
+"Scan receipt" opens the phone's live camera, and browsers only allow that on a secure page (https), or on the same computer (localhost). On a plain `http` address the button quietly uses the phone's own camera app instead, and the receipt can still be scanned (find the edges, straighten, clean up) afterwards.
+
+- **Live server:** serve REIMSYS over https as usual (the Nginx section above, with a real certificate). Nothing else to set.
+- **Testing on a phone over Wi-Fi:** `start-lan.ps1` makes a self-signed certificate for this PC's address (needs OpenSSL, which comes with Git for Windows), keeps it in `.lan-cert` (never committed) and starts the server on https. The phone warns once that the certificate is not from a known company: choose Advanced, then Continue.
+- The server reads `TLS_CERT` and `TLS_KEY` (paths to the certificate and its key). Both or neither: setting only one stops it from starting, so nobody believes they are on https when they are not.
+
 ## Live updates
 
 Screens update by themselves: when someone approves a receipt, the person watching it sees it change, the checker's queue fills in, and the bell lights up, with no refresh.

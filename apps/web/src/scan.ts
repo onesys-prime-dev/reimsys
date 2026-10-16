@@ -53,7 +53,15 @@ function otsu(gray: Uint8Array) {
  * and the person drags the corners themselves.
  */
 export function detectQuad(img: Raster): Quad {
-  const fallback = wholePhoto(img.width, img.height);
+  return findQuad(img) ?? wholePhoto(img.width, img.height);
+}
+
+/**
+ * Like detectQuad, but says "nothing found" (null) instead of falling back to the whole photo. The live camera needs to know.
+ * `trim` is how far (as a share of the way to the middle) the corners are pulled inside the receipt's edge: 0 hugs it.
+ */
+export function findQuad(img: Raster, trim = 0.025): Quad | null {
+  const fallback = null;
   const { gray, w, h, k } = smallGray(img, 320);
   const { threshold, best } = otsu(gray);
   // Two clearly different brightnesses are needed; otherwise there is nothing to find.
@@ -100,8 +108,30 @@ export function detectQuad(img: Raster): Quad {
   const q = [up(pTL), up(pTR), up(pBR), up(pBL)] as Quad;
   // The edge of a photographed receipt is soft and ragged, so cut a little inside it rather than keep a rim of the table.
   const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
-  const trim = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * 0.025), y: Math.round(p.y + (cy - p.y) * 0.025) });
-  return q.map(trim) as Quad;
+  const pull = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * trim), y: Math.round(p.y + (cy - p.y) * trim) });
+  return q.map(pull) as Quad;
+}
+
+const maxMove = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i]!.x, p.y - b[i]!.y)));
+
+/**
+ * Tells the live camera when the receipt has been held still long enough to take the picture:
+ * the same four corners (within `tolerance` of the frame's diagonal) for `frames` checks in a row.
+ */
+export function steadyTracker({ frames, tolerance }: { frames: number; tolerance: number }) {
+  let window: Quad[] = [];
+  return {
+    push(q: Quad | null, w: number, h: number): boolean {
+      if (!q) { window = []; return false; }
+      if (window.length && maxMove(window[0]!, q) > tolerance * Math.hypot(w, h)) window = [];
+      window.push(q);
+      if (window.length > frames) window.shift();
+      return window.length >= frames;
+    },
+    /** 0 to 1, how close the picture is to being taken. */
+    progress: () => Math.min(1, window.length / frames),
+    reset() { window = []; },
+  };
 }
 
 /** Maps a point of the straight page, (0,0) top left to (1,1) bottom right, to where it is in the photo. Keeps perspective. */

@@ -6,3 +6,6 @@ storage/
 .DS_Store
 .vite/
 coverage/
+
+# Self-made https certificate for phone testing (start-lan.ps1). Never commit it.
+.lan-cert/
