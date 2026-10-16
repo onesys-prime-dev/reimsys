@@ -403,6 +403,7 @@ export function ReceiptFormPage() {
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
                   {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
+                {rec && rec.possibleDuplicates.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>Possible duplicate</b><span>Same invoice, or same vendor, amount and date, as {rec.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link></span>)}. If this is a different purchase, carry on.</span></div></div>}
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}
               </div>
             </div>
