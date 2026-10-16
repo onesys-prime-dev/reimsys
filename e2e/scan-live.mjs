@@ -13,23 +13,25 @@ let failed = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) failed++; };
 
 /** The pretend camera: a clip of a tilted receipt on a dark table, as a motion-JPEG file Chrome can play as a webcam. */
-async function makeClip(browser) {
+async function makeClip(browser, name = 'receipt-clip', look = { table: '#1d2226', paper: '#ecece6', shadow: false }) {
   const p = await browser.newPage();
-  const b64 = await p.evaluate(() => {
+  const b64 = await p.evaluate((look) => {
     const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
-    const g = c.getContext('2d'); g.fillStyle = '#1d2226'; g.fillRect(0, 0, 1280, 720);
-    g.fillStyle = '#ecece6'; g.beginPath(); g.moveTo(430, 70); g.lineTo(880, 110); g.lineTo(850, 650); g.lineTo(400, 610); g.closePath(); g.fill();
+    const g = c.getContext('2d'); g.fillStyle = look.table; g.fillRect(0, 0, 1280, 720);
+    g.fillStyle = look.paper; g.beginPath(); g.moveTo(430, 70); g.lineTo(880, 110); g.lineTo(850, 650); g.lineTo(400, 610); g.closePath(); g.fill();
     g.fillStyle = '#2a2a2a'; for (let i = 0; i < 14; i++) g.fillRect(480 + i * 2, 170 + i * 30, 300 - i * 4, 8);
-    return c.toDataURL('image/jpeg', 0.9).split(',')[1];
-  });
+    if (look.shadow) { const s = g.createLinearGradient(0, 0, 1280, 0); s.addColorStop(0, 'rgba(0,0,0,0)'); s.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = s; g.fillRect(0, 0, 1280, 720); }
+    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+  }, look);
   await p.close();
-  const file = path.join(OUT, 'receipt-clip.mjpeg');
+  const file = path.join(OUT, name + '.mjpeg');
   fs.writeFileSync(file, Buffer.concat(Array.from({ length: 30 }, () => Buffer.from(b64, 'base64'))));
   return file;
 }
 
 const tmp = await chromium.launch({ channel: 'chrome' });
 const clip = await makeClip(tmp);
+const lightClip = await makeClip(tmp, 'light-desk-clip', { table: '#d6d2c8', paper: '#f3f2ec', shadow: true });
 await tmp.close();
 
 const b = await chromium.launch({ channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${clip}`] });
@@ -138,7 +140,28 @@ await n.getByRole('button', { name: 'Scan receipt' }).click();
 await chooser;
 ok('and the next press uses the phone\'s own camera app instead', true);
 
-ok('no browser errors', [p, m, n].every((x) => x.errors.length === 0), JSON.stringify([p, m, n].flatMap((x) => x.errors).slice(0, 3)));
+console.log('A white receipt on a light desk, with a shadow');
 await b.close();
+const b2 = await chromium.launch({ channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${lightClip}`] });
+const lctx = await b2.newContext({ viewport: { width: 1280, height: 860 }, baseURL: process.env.WEB ?? 'http://localhost:5173', permissions: ['camera'] });
+const l = await lctx.newPage();
+l.errors = [];
+l.on('pageerror', (e) => l.errors.push(String(e)));
+await l.goto('/'); await l.fill('input[type=email]', 'ana.reyes@example.com'); await l.fill('input[type=password]', 'Reimsys#2026'); await l.click('button[type=submit]'); await l.waitForSelector('.shell');
+await l.goto('/receipts/new');
+await fillQuickForm(l, { payee: 'Light desk ' + Date.now().toString().slice(-6), amount: '7' });
+await l.getByRole('button', { name: 'Scan receipt' }).click();
+const lpoly = l.locator('.live-scan polygon.live-poly');
+await lpoly.waitFor({ timeout: 10000 });
+const pts = (await lpoly.getAttribute('points')).split(' ').map((s) => s.split(',').map(Number));
+const TRUE = [[430, 70], [880, 110], [850, 650], [400, 610]];
+ok('the outline sits on the receipt even on a light desk in shadow', pts.length === 4 && pts.every(([x, y], i) => Math.hypot(x - TRUE[i][0], y - TRUE[i][1]) < 30), JSON.stringify(pts));
+await l.screenshot({ path: path.join(OUT, 'live-4-light-desk.png') });
+await l.locator('.live-scan').getByRole('button', { name: 'Page 1' }).waitFor({ timeout: 12000 });
+ok('and it takes the picture by itself there too', true);
+ok('no browser errors on the light desk', l.errors.length === 0);
+await b2.close();
+
+ok('no browser errors', [p, m, n].every((x) => x.errors.length === 0), JSON.stringify([p, m, n].flatMap((x) => x.errors).slice(0, 3)));
 console.log(failed ? `\n${failed} FAILED. Screenshots in ${OUT}` : `\nAll checks passed. Screenshots in ${OUT}`);
 process.exit(failed ? 1 : 0);
