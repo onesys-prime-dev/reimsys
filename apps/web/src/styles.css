@@ -142,6 +142,9 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .pv img{max-width:100%;max-height:68vh;border-radius:6px}
 .pv iframe{width:100%;height:68vh;border:0;border-radius:6px;background:#fff}
 .modal.issues-modal{width:min(680px,100%)}
+.fixlist{display:grid;gap:6px;margin:6px 0 8px}
+.fixrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.fixrow span{flex:1 1 220px;min-width:0}
 .issues{display:flex;flex-wrap:wrap;gap:8px}
 .issue{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 12px;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
 .issue.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}

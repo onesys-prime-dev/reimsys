@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { classificationText, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
+import { classificationText, fixStepFor, issueLabel, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -86,9 +86,11 @@ export function ReceiptDetailPage() {
   const viewedSince = !!history.data?.items.some((h) => h.action === 'evidence.viewed' && h.actor === me.name && (!since || new Date(h.createdAt) >= new Date(since)));
   const actions = [...r.actions].sort((a, b) => ORDER.indexOf(a.action) - ORDER.indexOf(b.action));
   const needsView = (a: ReceiptAction) => ['check', 'approve', 'disapprove', 'reserve'].includes(a) && !viewedSince && r.evidence.length > 0;
-  const note = r.status === 'returned' ? { cls: 'warn', icon: 'undo', title: 'Returned for correction', text: r.lastNote }
-    : r.status === 'reserved' ? { cls: 'hold', icon: 'pause', title: 'On hold', text: r.lastNote }
+  const note = r.status === 'reserved' ? { cls: 'hold', icon: 'pause', title: 'On hold', text: r.lastNote }
     : r.status === 'disapproved' ? { cls: 'bad', icon: 'x', title: 'Disapproved', text: r.lastNote } : null;
+  // "Fix" opens the receipt form on the step where that problem is fixed.
+  const fixUrl = (step: string | null) => `/receipts/${r.id}/edit${step ? `?step=${step}` : ''}`;
+  const firstStep = r.returnIssues.map(fixStepFor).find((s) => s) ?? null;
   const modalCfg = modal ? COPY[modal] : null;
 
   return (
@@ -111,6 +113,30 @@ export function ReceiptDetailPage() {
           {actions.some((a) => needsView(a.action)) && <span className="hint-line"><Icon name="eye" size={16} />Open the evidence first. The buttons unlock after you view it.</span>}
         </div>
       </div>
+
+      {r.status === 'returned' && (r.lastNote || r.returnIssues.length > 0) && (
+        <div className="callout warn">
+          <Icon name="undo" />
+          <div>
+            <b>Returned for correction</b>
+            {r.returnIssues.length > 0 && (
+              <div className="fixlist">
+                {r.returnIssues.map((c) => {
+                  const step = fixStepFor(c);
+                  return (
+                    <div key={c} className="fixrow">
+                      <span>{c === 'other' ? 'Something else: see the note' : issueLabel(c)}</span>
+                      {r.canEdit && step && <Link className="btn sm" to={fixUrl(step)}>Fix</Link>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {r.lastNote && <span>{r.lastNote}</span>}
+            {r.canEdit && <div style={{ marginTop: 10 }}><Link className="btn sm pri" to={fixUrl(firstStep)}>Start fixing</Link></div>}
+          </div>
+        </div>
+      )}
 
       {note?.text && <div className={`callout ${note.cls}`}><Icon name={note.icon} /><div><b>{note.title}</b><span>{note.text}</span></div></div>}
 
