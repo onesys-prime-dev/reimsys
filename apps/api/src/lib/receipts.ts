@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, receiptWarnings, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { availableActions, canEditReceipt, receiptWarnings, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import { getSettings } from './appSettings.js';
@@ -95,6 +95,7 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     checkedBy: name(r.checkedById), checkedAt: r.checkedAt, checkNote: r.checkNote,
     decidedBy: name(r.decidedById), decidedAt: r.decidedAt, decisionNote: r.decisionNote,
     lastNote: r.lastNote,
+    returnIssues: parseIssues(r.returnIssues),
     createdAt: r.createdAt,
     isOwner,
     canEdit: isOwner && auth.permissions.has('receipt.create') && canEditReceipt(status),
