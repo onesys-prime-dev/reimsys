@@ -59,7 +59,7 @@ Sign in as the administrator, open **Audit log**, then **Emails**:
 
 | Event | Email goes to |
 |---|---|
-| Returned for correction | the Med Ref |
+| Returned for correction | the Med Ref. It lists the problems the Checker ticked (in words), then any note, and its button opens the receipt form on the first problem's step |
 | Approved | the Med Ref and the Checker |
 | Disapproved | the Med Ref and the Checker, with the reason |
 | Put on hold | the Med Ref and the Checker, with the note |

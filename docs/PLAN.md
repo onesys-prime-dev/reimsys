@@ -241,3 +241,12 @@ Spec: `docs/superpowers/specs/2026-10-15-payment-step-design.md`. Plan: `docs/su
 - **Screens:** "Ready to pay" (queue by person, tick boxes, "Mark as paid" bar and dialog), Payment card on the receipt (proof view/download/print, audited), "Reverse payment", Paid pill and filter, Accounting dashboard, approver tiles "Approved, not paid" and "Paid", report Payment filter with paid columns and totals, payment methods list under Access → Settings.
 - **Notices:** Med Ref gets one email per payment (`paid`) and one per reversal (`payment_reversed`); Accounting gets an in-app notice when a receipt is approved, no email.
 - **Tests:** `packages/shared/test/payments.test.ts`, `e2e/payment-flow.mjs` (API, every role), `e2e/payment-ui.mjs` (browser, computer and phone).
+
+## Return reasons (built 2026-10-16)
+Plan: `docs/superpowers/plans/2026-10-16-return-issues.md`.
+- **What:** when a Checker returns a receipt, or an Approver asks for more proof, they tick problems from a short list instead of typing. The Med Ref sees each problem with a **Fix** button that opens the receipt form on the right step.
+- **The list** (one place: `packages/shared/src/returnIssues.ts`): photo blurry or cut off; photo missing or wrong file (both go to Proof and review); amount, date, vendor name/address/TIN, invoice number (go to Invoice details); VAT or withholding (VAT details); reason for spending or classification (Reason for spending); and "Something else" (no Fix, the note says it).
+- **Rules:** ticks make the note optional; nothing ticked, or "Something else", needs words. The problems are saved as codes in `receipt.returnIssues` and the typed note stays in `lastNote`. They are replaced on every return and cleared whenever the receipt leaves Returned. Notices, emails and the history show the ticked problems in words, then the note.
+- **Fix:** opens `/receipts/<id>/edit?step=<step>`, only for the owner while the receipt can be edited. The form skips steps the answers make unnecessary, so a step that does not exist (for example VAT on a receipt with no BIR invoice) falls back to Invoice details; an unknown or misplaced `?step=` is ignored. Receipts returned before this feature show their note as before, with no Fix buttons.
+- **Data:** one additive nullable column (migration `20261016010000_return_issues`), undone by `docs/rollback-return-issues.sql`.
+- **Tests:** `packages/shared/test/returnIssues.test.ts`, `e2e/return-issues-flow.mjs` (API), `e2e/return-ui.mjs` (browser, computer and phone).

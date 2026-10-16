@@ -162,7 +162,12 @@ const lizaTiles = await lizaS.page.locator('.tiles').innerText();
 ok('the Checker dashboard shows approved-not-paid and paid', lizaTiles.includes('Approved, not paid') && /\nPaid\n/.test('\n' + lizaTiles + '\n'));
 await admin.page.goto('/');
 await admin.page.waitForSelector('.tiles');
-ok('the admin "Approved total" counts paid receipts too', (await admin.page.locator('.tiles').innerText()).includes('Approved total (incl. paid)'));
+// The dashboard follows the permissions: by default the Super Admin has the admin one, but anyone granted review, encode or payment
+// rights on the Access page gets that role's dashboard instead. Each of those shows the paid figures.
+const adminPerms = (await call(U.admin, 'GET', '/me')).d.permissions;
+const custom = ['review.check', 'review.decide', 'receipt.create', 'payment.mark'].some((p) => adminPerms.includes(p));
+const adminTiles = await admin.page.locator('.tiles').innerText();
+ok(custom ? 'a Super Admin who was granted extra rights sees the matching dashboard, with the paid figures' : 'the admin "Approved total" counts paid receipts too', custom ? /Paid/.test(adminTiles) : adminTiles.includes('Approved total (incl. paid)'));
 
 console.log('Phone screen');
 const phone = await open('accounting@example.com', { width: 390, height: 800 });

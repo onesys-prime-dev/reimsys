@@ -119,6 +119,10 @@ pnpm build
 pm2 restart reimsys
 ```
 
+## Upgrading to return reasons
+
+Run `pnpm --filter @reimsys/api exec prisma migrate deploy` (adds one nullable column, `receipt.returnIssues`). Nothing to seed. Receipts that were already returned keep their note and simply have no Fix buttons. To go back: `docs/rollback-return-issues.sql`, or restore the backup.
+
 ## Upgrading to the payment step
 
 1. Back up the database and the storage folder, and tag the version you are leaving (`before-payment-step`).
