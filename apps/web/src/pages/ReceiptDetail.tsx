@@ -133,7 +133,7 @@ export function ReceiptDetailPage() {
               </div>
             )}
             {r.lastNote && <span>{r.lastNote}</span>}
-            {r.canEdit && <div style={{ marginTop: 10 }}><Link className="btn sm pri" to={fixUrl(firstStep)}>Start fixing</Link></div>}
+            {r.canEdit && !(r.returnIssues.length === 1 && r.returnIssues[0] !== 'other') && <div style={{ marginTop: 10 }}><Link className="btn sm pri" to={fixUrl(firstStep)}>Start fixing</Link></div>}
           </div>
         </div>
       )}
