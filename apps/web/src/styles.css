@@ -141,6 +141,10 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .pv{display:grid;place-items:center;background:var(--soft);border-radius:10px;padding:8px;min-height:120px}
 .pv img{max-width:100%;max-height:68vh;border-radius:6px}
 .pv iframe{width:100%;height:68vh;border:0;border-radius:6px;background:#fff}
+.modal.issues-modal{width:min(680px,100%)}
+.issues{display:flex;flex-wrap:wrap;gap:8px}
+.issue{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 12px;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
+.issue.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
 .live-scan{position:fixed;inset:0;z-index:60;background:#000;color:#fff;display:flex;flex-direction:column}
 .live-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 6px}
 .live-btn{min-width:48px;height:44px;padding:0 14px;border-radius:22px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font:600 .9rem var(--font,inherit);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
@@ -251,6 +255,8 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .modal{background:var(--surface);border-radius:14px;width:min(460px,100%);padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:90vh;overflow:auto}
 .modal h2{margin-bottom:6px}.modal p{margin:0 0 14px;color:var(--muted)}
 .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+/* A tall window (a long list of choices) scrolls, but its buttons stay in view at the bottom. */
+.modal .btns{position:sticky;bottom:-22px;background:var(--surface);padding:12px 0 22px;margin:4px 0 -22px}
 .modal ul{padding-left:1.1rem;margin:0}.modal li{margin:8px 0}
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(480px,calc(100vw - 32px));pointer-events:none}
 .toast{background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 16px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center}

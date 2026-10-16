@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { classificationText, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction } from '@reimsys/shared';
+import { classificationText, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -58,7 +58,7 @@ export function ReceiptDetailPage() {
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ['receipt', id] }); qc.invalidateQueries({ queryKey: ['history', id] }); qc.invalidateQueries({ queryKey: ['receipts'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }); };
   const act = useMutation({
-    mutationFn: ({ action, note, seen }: { action: ReceiptAction; note?: string; seen?: Seen }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, seen, version: r!.version } }),
+    mutationFn: ({ action, note, seen, issues }: { action: ReceiptAction; note?: string; seen?: Seen; issues?: ReturnIssueCode[] }) => api<{ receipt: ReceiptDetail }>(`/receipts/${id}/${action}`, { method: 'POST', body: { note, seen, issues, version: r!.version } }),
     onSuccess: (d, v) => {
       toast(COPY[v.action].ok); setModal(null);
       // Sending it back takes the receipt out of the approver's view, so go to the list instead of showing "not found".
@@ -247,7 +247,7 @@ export function ReceiptDetailPage() {
         </Modal>
       )}
       {payOpen && <PayDialog payee={r.encoder.name} lines={[{ id: r.id, refNo: r.refNo, vendor: r.payee, amount: r.amount, version: r.version }]} onClose={() => setPayOpen(false)} onDone={() => { setPayOpen(false); refresh(); }} />}
-      {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note, seen) => act.mutate({ action: modal, note, seen })} />}
+      {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note, seen, issues) => act.mutate({ action: modal, note, seen, issues })} />}
     </>
   );
 }
@@ -255,7 +255,7 @@ export function ReceiptDetailPage() {
 const seenText = (ticked: boolean | null, checker: boolean | null | undefined) =>
   `Med Ref: ${ticked === null ? '-' : ticked ? 'ticked' : 'not ticked'} · Checker: ${checker === undefined || checker === null ? 'not checked yet' : checker ? 'seen' : 'NOT seen'}`;
 
-function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string, seen?: Seen) => void }) {
+function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose, onSubmit }: { receipt: ReceiptDetail; action: ReceiptAction; cfg: (typeof COPY)[ReceiptAction]; required: boolean; busy: boolean; onClose: () => void; onSubmit: (note: string, seen?: Seen, issues?: ReturnIssueCode[]) => void }) {
   const [text, setText] = useState('');
   // For a receipt with a BIR invoice, the Checker answers for themselves whether the company details can be seen on it.
   const askSeen = action === 'check' && receipt.form.birInvoice === true && receipt.form.invoiceUnderCompany !== false;
@@ -263,9 +263,14 @@ function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose
   const answered = !askSeen || (seen.company !== undefined && seen.tin !== undefined && seen.address !== undefined);
   const anyNo = askSeen && (seen.company === false || seen.tin === false || seen.address === false);
   const required = baseRequired || anyNo;
-  const ok = answered && (!required || text.trim().length >= 4);
+  // Sending a receipt back: the problems are ticked from a short list, and typing becomes optional.
+  const picking = action === 'return' || action === 'request';
+  const [issues, setIssues] = useState<ReturnIssueCode[]>([]);
+  const real = issues.some((c) => c !== 'other');
+  const needsWords = picking ? issues.length === 0 || issues.includes('other') : required;
+  const ok = answered && (picking ? (real || text.trim().length >= 4) && (!needsWords || text.trim().length >= 4) : !required || text.trim().length >= 4);
   return (
-    <Modal title={cfg.title} onClose={onClose}>
+    <Modal title={cfg.title} onClose={onClose} className={picking ? 'issues-modal' : ''}>
       <div className="callout" style={{ margin: '0 0 14px', display: 'block' }}>
         <b>{receipt.payee}</b>
         <span style={{ display: 'block' }}>{receipt.refNo} · {money(receipt.amount)}</span>
@@ -291,13 +296,24 @@ function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose
           {anyNo && <small style={{ color: 'var(--warn)' }}>Say what could not be seen. The Approver will read it.</small>}
         </div>
       )}
+      {picking && (
+        <div style={{ margin: '0 0 14px' }}>
+          <b style={{ fontSize: '.9rem', display: 'block', marginBottom: 8 }}>What is the problem? <span className="hint muted">Pick all that apply</span></b>
+          <div className="issues" role="group" aria-label="Problems">
+            {RETURN_ISSUES.map((i) => {
+              const on = issues.includes(i.code);
+              return <button key={i.code} type="button" className={`issue ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setIssues((s) => (on ? s.filter((x) => x !== i.code) : [...s, i.code]))}>{i.label}</button>;
+            })}
+          </div>
+        </div>
+      )}
       <label className="f">
-        <span>{cfg.field}{!required && <span className="hint"> Optional</span>}</span>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={required ? 'Required' : 'Add a remark'} autoFocus maxLength={1000} />
+        <span>{picking ? (needsWords ? 'Say what is wrong' : 'Add details') : cfg.field}{!needsWords && <span className="hint"> Optional</span>}</span>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={picking ? (needsWords ? 'Required' : 'Add details') : required ? 'Required' : 'Add a remark'} autoFocus={!picking} maxLength={1000} />
       </label>
       <div className="btns">
         <button className="btn" onClick={onClose}>Cancel</button>
-        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(text.trim(), askSeen ? (seen as Seen) : undefined)}>{action === 'return' ? 'Return record' : cfg.label}</button>
+        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(text.trim(), askSeen ? (seen as Seen) : undefined, picking ? issues : undefined)}>{action === 'return' ? 'Return record' : cfg.label}</button>
       </div>
     </Modal>
   );
