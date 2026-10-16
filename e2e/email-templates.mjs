@@ -32,7 +32,7 @@ const frame = (p) => p.frameLocator('iframe[title="Email preview"]');
 const p = await login('admin@example.com');
 await p.goto('/access'); await p.click('button[role=tab]:has-text("Email templates")');
 await p.waitForSelector('.tpl-list');
-ok('lists every email the system sends (ten)', (await p.locator('.tpl-list button').count()) === 10);
+ok('lists every email the system sends (twelve, with the two payment emails)', (await p.locator('.tpl-list button').count()) === 12);
 await p.waitForSelector('iframe[title="Email preview"]');
 await frame(p).locator('h1').waitFor();
 ok('preview shows the heading with the real organisation name', (await frame(p).locator('h1').innerText()) === 'Please correct this receipt');

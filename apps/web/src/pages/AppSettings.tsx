@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { SETTINGS_SECTIONS, appSettingsSchema, type AppSettings } from '@reimsys/shared';
 import { api, errMsg } from '../api';
+import { PaymentMethodsCard } from '../components/PaymentMethods';
 import { Icon, Modal, Switch, useToast } from '../ui';
 
 interface Data { settings: AppSettings; defaults: AppSettings }
@@ -69,6 +70,7 @@ export function AppSettingsTab() {
           </div>
         </section>
       ))}
+      <PaymentMethodsCard />
       <div className="formbar" style={{ justifyContent: 'space-between' }}>
         <button className="btn" type="button" disabled={isDefault || reset.isPending} onClick={() => setConfirmReset(true)}>Reset everything to default</button>
         <span style={{ display: 'flex', gap: 10 }}>

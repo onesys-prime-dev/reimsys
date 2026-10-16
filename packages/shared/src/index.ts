@@ -1,13 +1,14 @@
 import { z } from 'zod';
 
 /* ---------- roles ---------- */
-export const ROLE_CODES = ['medref', 'checker', 'approver', 'admin'] as const;
+export const ROLE_CODES = ['medref', 'checker', 'approver', 'accounting', 'admin'] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const DEFAULT_ROLES: { code: RoleCode; name: string; rank: number }[] = [
   { code: 'medref', name: 'Med Ref', rank: 10 },
   { code: 'checker', name: 'Checker', rank: 20 },
   { code: 'approver', name: 'Approver', rank: 30 },
+  { code: 'accounting', name: 'Accounting', rank: 25 },
   { code: 'admin', name: 'Super Admin', rank: 100 },
 ];
 
@@ -23,6 +24,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'evidence.print', label: 'Print evidence', group: 'Evidence' },
   { code: 'review.check', label: 'Check or return', group: 'Review' },
   { code: 'review.decide', label: 'Approve, disapprove, reserve, release', group: 'Review' },
+  { code: 'payment.mark', label: 'Mark approved receipts as paid', group: 'Payments' },
   { code: 'report.generate', label: 'Generate liquidation reports', group: 'Reports' },
   { code: 'user.manage', label: 'Manage users', group: 'Administration' },
   { code: 'role.manage', label: 'Manage roles and permissions', group: 'Administration' },
@@ -32,7 +34,7 @@ export const PERMISSIONS: PermissionDef[] = [
 ];
 export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 
-const ALL: RoleCode[] = ['medref', 'checker', 'approver', 'admin'];
+const ALL: RoleCode[] = ['medref', 'checker', 'approver', 'accounting', 'admin'];
 export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'receipt.create': ['medref'],
   'receipt.view_all': ['checker', 'admin'],
@@ -42,6 +44,7 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'evidence.print': ALL,
   'review.check': ['checker'],
   'review.decide': ['approver'],
+  'payment.mark': ['accounting'],
   'report.generate': ALL,
   'user.manage': ['admin'],
   'role.manage': ['admin'],
@@ -54,6 +57,7 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
 export const LOCKED_GRANTS: { role: RoleCode; permission: string }[] = [
   { role: 'checker', permission: 'review.check' },
   { role: 'approver', permission: 'review.decide' },
+  { role: 'accounting', permission: 'payment.mark' },
   { role: 'admin', permission: 'user.manage' },
   { role: 'admin', permission: 'role.manage' },
   { role: 'admin', permission: 'settings.manage' },
@@ -158,6 +162,7 @@ export interface SessionInfo {
   serverNow: string;
 }
 export * from './receipts';
+export * from './payments';
 export * from './settings';
 
 export const mailSettingsSchema = z.object({

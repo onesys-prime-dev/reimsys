@@ -88,12 +88,18 @@ dashboardRouter.get('/', async (req, res) => {
   if (p.has('review.check')) { queueWhere = { status: 'submitted' }; queueTitle = 'Waiting to be checked'; }
   else if (p.has('review.decide')) { queueWhere = { status: 'checked' }; queueTitle = 'Ready for your decision'; }
   else if (p.has('receipt.create')) { queueWhere = { encoderId: auth.user.id, status: { in: ['returned', 'reserved', 'draft'] } }; queueTitle = 'Your next steps'; oldestFirst = false; }
+  else if (p.has('payment.mark')) { queueWhere = { status: 'approved', encoderId: { not: auth.user.id } }; queueTitle = 'Ready to pay'; }
   else { queueWhere = { status: { in: ['submitted', 'checked'] } }; queueTitle = 'Pending in the workflow'; }
   const queue = await prisma.receipt.findMany({
     where: { AND: [scope, queueWhere] }, include: receiptInclude,
     orderBy: oldestFirst ? [{ submittedAt: 'asc' }, { id: 'asc' }] : [{ updatedAt: 'desc' }], take: 6,
   });
   const queueTotal = await prisma.receipt.count({ where: { AND: [scope, queueWhere] } });
+  const now = new Date();
+  const paidMonth = await prisma.receipt.aggregate({
+    where: { AND: [scope, { status: 'paid', paidAt: { gte: new Date(now.getFullYear(), now.getMonth(), 1) } }] },
+    _count: { _all: true }, _sum: { paidAmount: true },
+  });
 
   let activity;
   if (p.has('audit.view')) {
@@ -106,6 +112,7 @@ dashboardRouter.get('/', async (req, res) => {
   const refs = await prisma.receipt.findMany({ where: { id: { in: activity.filter((a) => a.entityType === 'receipt' && a.entityId).map((a) => Number(a.entityId)) } }, select: { id: true, refNo: true } });
   res.json({
     counts, sums, queueTitle, queueTotal,
+    paidThisMonth: { count: paidMonth._count._all, total: Number(paidMonth._sum.paidAmount ?? 0) },
     queue: queue.map((r) => ({ ...receiptBrief(r), status: r.status as ReceiptStatus })),
     activity: activity.map((a) => ({ id: a.id, actor: a.actorName, summary: a.summary ?? a.action, receiptId: a.entityType === 'receipt' && a.entityId ? Number(a.entityId) : null, refNo: refs.find((x) => String(x.id) === a.entityId)?.refNo ?? null, createdAt: a.createdAt })),
     today: dateOnly(new Date()),

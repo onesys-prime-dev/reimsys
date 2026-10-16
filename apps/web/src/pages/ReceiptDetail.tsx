@@ -6,6 +6,7 @@ import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
 import { EvidenceViewer } from '../components/EvidenceViewer';
+import { PayDialog } from '../components/PayDialog';
 import type { HistoryItem, ReceiptDetail } from '../types';
 import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
 
@@ -19,21 +20,24 @@ const COPY: Record<ReceiptAction, { label: string; icon: string; cls: string; ti
   reserve: { label: 'Reserve', icon: 'pause', cls: 'hold', title: 'Put this record on hold', desc: 'A note is required. You can release it back to your queue later.', field: 'Why is it on hold', ok: 'Put on hold. The Med Ref has been emailed.' },
   request: { label: 'Ask for more proof', icon: 'camera', cls: '', title: 'Ask for more proof', desc: 'The receipt goes back to the Med Ref, who can add photos or fix details and send it again. It will be checked again from the start.', field: 'What proof or correction do you need', ok: 'Sent back to the Med Ref. They have been emailed.' },
   undo: { label: 'Take back decision', icon: 'undo', cls: '', title: 'Take back this decision', desc: 'The receipt goes back to Checked and the Med Ref is told to disregard the earlier decision. Any reimbursement document is removed.', field: 'Why are you taking it back', ok: 'Decision taken back. The receipt is back in your queue.' },
+  pay: { label: 'Mark as paid', icon: 'wallet', cls: 'ok', title: '', desc: '', field: '', ok: '' },
+  reverse_payment: { label: 'Reverse payment', icon: 'undo', cls: 'bad', title: 'Reverse this payment', desc: 'The receipt goes back to Approved and the Med Ref is told to disregard the payment notice. The payment and its proof stay in the history.', field: 'Why is the payment being reversed', ok: 'Payment reversed. The receipt is Approved again.' },
   release: { label: 'Release to queue', icon: 'check', cls: 'pri', title: 'Release the hold', desc: 'The record returns to your approval queue.', field: 'Remark', ok: 'Released. The record is back in your queue.' },
 };
 type Seen = { company: boolean; tin: boolean; address: boolean };
 const yn = (v: boolean | null) => (v === null ? '-' : v ? 'Yes' : 'No');
-const ORDER: ReceiptAction[] = ['undo', 'request', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit'];
+const ORDER: ReceiptAction[] = ['reverse_payment', 'undo', 'request', 'withdraw', 'return', 'disapprove', 'reserve', 'check', 'approve', 'release', 'submit', 'pay'];
 
 export function ReceiptDetailPage() {
   const id = Number(useParams().id);
-  const { me } = useAuth();
+  const { me, can } = useAuth();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const [modal, setModal] = useState<ReceiptAction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [allHistory, setAllHistory] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const q = useQuery({
     queryKey: ['receipt', id],
@@ -101,7 +105,7 @@ export function ReceiptDetailPage() {
           {r.canDelete && <button className="btn bad" onClick={() => setConfirmDelete(true)}><Icon name="x" size={18} />Delete draft</button>}
           {actions.map((a) => {
             const c = COPY[a.action];
-            const click = () => (a.action === 'submit' ? act.mutate({ action: 'submit' }) : setModal(a.action));
+            const click = () => (a.action === 'submit' ? act.mutate({ action: 'submit' }) : a.action === 'pay' ? setPayOpen(true) : setModal(a.action));
             return <button key={a.action} className={`btn ${c.cls}`} disabled={act.isPending || needsView(a.action)} onClick={click}><Icon name={c.icon} size={18} />{a.action === 'submit' && r.status === 'returned' ? 'Resubmit' : c.label}</button>;
           })}
           {actions.some((a) => needsView(a.action)) && <span className="hint-line"><Icon name="eye" size={16} />Open the evidence first. The buttons unlock after you view it.</span>}
@@ -110,14 +114,14 @@ export function ReceiptDetailPage() {
 
       {note?.text && <div className={`callout ${note.cls}`}><Icon name={note.icon} /><div><b>{note.title}</b><span>{note.text}</span></div></div>}
 
-      {r.warnings.length > 0 && r.status !== 'approved' && r.status !== 'disapproved' && (
+      {r.warnings.length > 0 && !['approved', 'disapproved', 'paid'].includes(r.status) && (
         <div className="callout warn">
           <Icon name="info" />
           <div><b>Worth a closer look</b>{r.warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</div>
         </div>
       )}
 
-      {r.possibleDuplicates.length > 0 && r.status !== 'approved' && r.status !== 'disapproved' && (
+      {r.possibleDuplicates.length > 0 && !['approved', 'disapproved', 'paid'].includes(r.status) && (
         <div className="callout warn">
           <Icon name="info" />
           <div>
@@ -129,7 +133,28 @@ export function ReceiptDetailPage() {
 
       <div className="dgrid">
         <div className="stack">
-          {r.status === 'approved' && r.document && (
+          {r.payment && (
+            <section className="card">
+              <div className="card-h"><h3>Payment</h3><StatusPill status="paid" /></div>
+              <div className="card-b">
+                <dl className="dl">
+                  <dt>Payment no.</dt><dd>{r.payment.paymentNo}</dd>
+                  <dt>Paid on</dt><dd>{fmtDate(r.payment.paidOn)}</dd>
+                  <dt>Method</dt><dd>{r.payment.method}</dd>
+                  <dt>Amount paid</dt><dd>{money(r.payment.amount)}{r.payment.amount < r.amount && <small className="muted"> of {money(r.amount)}</small>}</dd>
+                  {r.payment.shortReason && <><dt>Why less was paid</dt><dd>{r.payment.shortReason}</dd></>}
+                  <dt>Recorded by</dt><dd>{r.payment.recordedBy}{r.payment.recordedAt ? ` · ${fmtDateTime(r.payment.recordedAt)}` : ''}</dd>
+                </dl>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  {can('evidence.view') && <a className="btn sm" href={`/api/payments/${r.payment.id}/proof?mode=view`} target="_blank" rel="noopener"><Icon name="eye" size={16} />View proof</a>}
+                  {can('evidence.download') && <a className="btn sm" href={`/api/payments/${r.payment.id}/proof?mode=download`}><Icon name="download" size={16} />Download</a>}
+                  {can('evidence.print') && <button className="btn sm" onClick={() => printUrl(`/api/payments/${r.payment!.id}/proof?mode=print`)}><Icon name="print" size={16} />Print</button>}
+                </div>
+                <small className="muted" style={{ display: 'block', marginTop: 8 }}>Opening the proof is recorded in the audit log.</small>
+              </div>
+            </section>
+          )}
+          {(r.status === 'approved' || r.status === 'paid') && r.document && (
             <section className="card">
               <div className="card-h"><h3>Reimbursement document</h3><StatusPill status="approved" /></div>
               <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -200,7 +225,7 @@ export function ReceiptDetailPage() {
             <div className="card-b">
               <ol className="tl">
                 {history.data?.items.slice(0, allHistory ? 200 : 6).map((h) => (
-                  <li key={h.id}><span className="dot" /><div><b>{h.actor}</b> {h.summary ?? h.action}<small>{fmtDateTime(h.createdAt)}</small>{h.note && <q>{h.note}</q>}</div></li>
+                  <li key={h.id}><span className="dot" /><div><b>{h.actor}</b> {h.summary ?? h.action}{h.payment?.reversed && <span className="pill s-dis" style={{ marginLeft: 6 }}>Reversed</span>}<small>{fmtDateTime(h.createdAt)}</small>{h.payment?.canOpenProof && <a href={`/api/payments/${h.payment.id}/proof?mode=view`} target="_blank" rel="noopener" style={{ color: 'var(--accent)', fontSize: '.84rem' }}>View proof</a>}{h.note && <q>{h.note}</q>}</div></li>
                 ))}
               </ol>
               {history.data && !history.data.items.length && <span className="muted">Nothing yet.</span>}
@@ -221,6 +246,7 @@ export function ReceiptDetailPage() {
           <div className="btns"><button className="btn" onClick={() => setConfirmDelete(false)}>Keep it</button><button className="btn bad" disabled={del.isPending} onClick={() => del.mutate()}>Delete draft</button></div>
         </Modal>
       )}
+      {payOpen && <PayDialog payee={r.encoder.name} lines={[{ id: r.id, refNo: r.refNo, vendor: r.payee, amount: r.amount, version: r.version }]} onClose={() => setPayOpen(false)} onDone={() => { setPayOpen(false); refresh(); }} />}
       {modal && modalCfg && <NoteModal receipt={r} action={modal} cfg={modalCfg} required={r.actions.find((a) => a.action === modal)?.note === 'required'} busy={act.isPending} onClose={() => setModal(null)} onSubmit={(note, seen) => act.mutate({ action: modal, note, seen })} />}
     </>
   );

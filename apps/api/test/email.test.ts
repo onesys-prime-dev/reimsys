@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_TEMPLATES, SAMPLE_DATA, TEMPLATE_KEYS, sampleFor, type EmailBranding } from '@reimsys/shared';
 import { buildMessage, htmlToText, isPublicLink, isReservedAddress } from '../src/lib/email';
 import { renderEmail } from '../src/lib/emailTemplates';
+import { paidEmailData } from '../src/lib/paymentNotices';
 
 const branding: EmailBranding = { orgName: 'Test Pharmacy', footer: 'Cebu City', accent: '#0c7480' };
 const HTTPS = 'https://reimsys.example.com/receipts/9';
@@ -165,5 +166,30 @@ describe('sample previews fit the email they belong to', () => {
       expect(m.subject, key).toBeTruthy();
       expect(m.text, key).not.toContain('{{');
     }
+  });
+});
+
+describe('payment emails', () => {
+  it('the paid email lists every receipt, the method and the total, and escapes what people typed', async () => {
+    const data = paidEmailData({ paymentNo: 'PAY-2026-000007', method: 'GCash <b>', paidOn: '2026-10-15', actorName: 'Rica Tan' }, [
+      { id: 1, refNo: 'RC-2026-000001', payee: 'Mercury <script>', amount: 1284.5, paid: 1284.5 },
+      { id: 2, refNo: 'RC-2026-000002', payee: 'Shell', amount: 700, paid: 600 },
+    ]);
+    const m = await render('paid', { ...data, recipientName: 'Ana' }, HTTPS);
+    expect(m.subject).toBe('Payment sent: PAY-2026-000007');
+    expect(m.text).toContain('RC-2026-000001 · Mercury <script> · PHP 1,284.50');
+    expect(m.text).toContain('RC-2026-000002 · Shell · PHP 600.00 (receipt PHP 700.00)');
+    expect(m.text).toContain('PHP 1,884.50');
+    expect(m.text).toContain('Oct 15, 2026');
+    expect(m.html).not.toContain('<script>');
+    expect(m.html).toContain('Mercury &lt;script&gt;');
+    expect(m.html).toContain('GCash &lt;b&gt;');
+  });
+  it('the reversal email names the payment and the reason', async () => {
+    const s = sampleFor('payment_reversed');
+    const m = await render('payment_reversed', s, HTTPS);
+    expect(m.subject).toContain(s.refNo);
+    expect(m.text).toContain(s.paymentNo);
+    expect(m.text).toContain(s.note);
   });
 });

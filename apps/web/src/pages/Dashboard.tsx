@@ -12,6 +12,7 @@ interface Dash {
   sums: Record<string, number>;
   queueTitle: string;
   queueTotal: number;
+  paidThisMonth: { count: number; total: number };
   queue: ReceiptBrief[];
   activity: { id: number; actor: string; summary: string; receiptId: number | null; refNo: string | null; createdAt: string }[];
 }
@@ -20,6 +21,7 @@ const BLURB: Record<string, string> = {
   receipt: 'Encode receipts, attach evidence and track each one.',
   check: 'Verify receipts and evidence, oldest first.',
   decide: 'Only checked records reach you.',
+  pay: 'Record payments for approved reimbursements.',
   admin: 'A read-only view of the whole system.',
 };
 
@@ -30,31 +32,36 @@ export function DashboardPage() {
   if (!me) return null;
   const hr = new Date().getHours();
   const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-  const kind = can('review.check') ? 'check' : can('review.decide') ? 'decide' : can('receipt.create') ? 'receipt' : 'admin';
+  const kind = can('review.check') ? 'check' : can('review.decide') ? 'decide' : can('receipt.create') ? 'receipt' : can('payment.mark') ? 'pay' : 'admin';
   const c = d.data?.counts ?? {};
   const n = (...s: ReceiptStatus[]) => s.reduce((t, k) => t + (c[k] ?? 0), 0);
 
   const tiles: { label: string; value: string | number; to: string; alert?: boolean }[] =
     kind === 'receipt' ? [
       { label: 'Needs your action', value: n('returned', 'reserved'), to: '/receipts', alert: true },
-      { label: 'Drafts', value: n('draft'), to: '/receipts' },
       { label: 'In review', value: n('submitted', 'checked'), to: '/receipts' },
-      { label: 'Approved', value: n('approved'), to: '/receipts' },
+      { label: 'Approved, not paid', value: n('approved'), to: '/receipts' },
+      { label: 'Paid', value: n('paid'), to: '/receipts' },
     ] : kind === 'check' ? [
       { label: 'To check', value: n('submitted'), to: '/receipts', alert: true },
-      { label: 'Returned', value: n('returned'), to: '/receipts' },
       { label: 'Checked', value: n('checked'), to: '/receipts' },
-      { label: 'All records', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
+      { label: 'Approved, not paid', value: n('approved'), to: '/receipts' },
+      { label: 'Paid', value: n('paid'), to: '/receipts' },
     ] : kind === 'decide' ? [
       { label: 'To decide', value: n('checked'), to: '/receipts', alert: true },
       { label: 'On hold', value: n('reserved'), to: '/receipts' },
-      { label: 'Approved', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
-      { label: 'Disapproved', value: n('disapproved'), to: '/receipts' },
+      { label: 'Approved, not paid', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
+      { label: 'Paid', value: money(d.data?.sums.paid ?? 0), to: '/receipts' },
+    ] : kind === 'pay' ? [
+      { label: 'To pay', value: n('approved'), to: '/pay', alert: true },
+      { label: 'Waiting to be paid', value: money(d.data?.sums.approved ?? 0), to: '/pay' },
+      { label: 'Paid this month', value: money(d.data?.paidThisMonth.total ?? 0), to: '/receipts' },
+      { label: 'Paid', value: n('paid'), to: '/receipts' },
     ] : [
       { label: 'Waiting for review', value: n('submitted', 'checked'), to: '/receipts', alert: true },
       { label: 'All receipts', value: Object.values(c).reduce((a, b) => a + b, 0), to: '/receipts' },
       { label: 'Active users', value: users.data ? users.data.users.filter((u) => u.isActive).length : '–', to: '/access' },
-      { label: 'Approved total', value: money(d.data?.sums.approved ?? 0), to: '/receipts' },
+      { label: 'Approved total (incl. paid)', value: money((d.data?.sums.approved ?? 0) + (d.data?.sums.paid ?? 0)), to: '/receipts' },
     ];
 
   return (
@@ -71,7 +78,7 @@ export function DashboardPage() {
       <div className="grid2">
         <div className="stack">
         <section className="card">
-          <div className="card-h"><h2>{d.data?.queueTitle ?? 'Your queue'}</h2>{d.data && d.data.queueTotal > d.data.queue.length && <Link className="btn sm ghost" to="/receipts">View all {d.data.queueTotal}</Link>}</div>
+          <div className="card-h"><h2>{d.data?.queueTitle ?? 'Your queue'}</h2>{d.data && d.data.queueTotal > d.data.queue.length && <Link className="btn sm ghost" to={kind === 'pay' ? '/pay' : '/receipts'}>View all {d.data.queueTotal}</Link>}</div>
           {d.data?.queue.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={kind !== 'receipt'} />)}
           {d.data && !d.data.queue.length && <Empty title="You are all caught up">Nothing needs your attention right now.</Empty>}
           {!d.data && <div className="empty">Loading…</div>}

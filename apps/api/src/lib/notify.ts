@@ -10,7 +10,7 @@ interface NotifyInput {
   text: string;
   receiptId?: number;
   /** When set, the recipients also get this email, written from the template an administrator can edit. */
-  email?: { template: TemplateKey; data: Record<string, string>; respectPref?: 'reservationReleased' };
+  email?: { template: TemplateKey; data: Record<string, string>; respectPref?: 'reservationReleased'; link?: string };
 }
 
 export const receiptUrl = (id: number) => `${config.webOrigin}/receipts/${id}`;
@@ -27,7 +27,7 @@ export async function notify(input: NotifyInput) {
     const mail = await renderEmail({
       key: input.email.template,
       data: { ...input.email.data, recipientName: u.name.split(' ')[0] },
-      link: input.receiptId ? receiptUrl(input.receiptId) : undefined,
+      link: input.email.link ?? (input.receiptId ? receiptUrl(input.receiptId) : undefined),
     });
     await queueEmail({ userId: u.id, to: u.email, template: input.email.template, subject: mail.subject, html: mail.html });
   }

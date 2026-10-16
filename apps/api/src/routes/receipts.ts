@@ -77,8 +77,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '']);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount)]);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -89,8 +89,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const ws = wb.addWorksheet('Receipts');
   ws.addRow(head).font = { bold: true };
   data.forEach((d) => ws.addRow(d));
-  for (const c of [10, 12, 13, 15, 16]) ws.getColumn(c).numFmt = '#,##0.00';
-  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 22, 30, 30, 20, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  for (const c of [10, 12, 13, 15, 16, 24]) ws.getColumn(c).numFmt = '#,##0.00';
+  [16, 12, 13, 16, 28, 18, 30, 10, 11, 16, 12, 14, 12, 10, 12, 14, 22, 30, 30, 20, 16, 18, 12, 16].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
   ws.views = [{ state: 'frozen', ySplit: 1 }];
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').attachment(`receipts-${stamp}.xlsx`).send(Buffer.from(await wb.xlsx.writeBuffer()));
 });
@@ -239,11 +239,21 @@ receiptsRouter.get('/:id/history', async (req, res) => {
     where: { entityType: 'receipt', entityId: String(r.id), NOT: { action: 'evidence.viewed', actorId: r.encoderId } },
     orderBy: { id: 'desc' }, take: 200,
   });
+  const after = (a: { after: string | null }) => { try { return a.after ? JSON.parse(a.after) : {}; } catch { return {}; } };
+  // Every payment ever recorded on this receipt, so a reversed one (no longer linked to the receipt) can still be found with its proof.
+  const paymentNos = rows.filter((a) => a.action === 'payment.marked').map((a) => after(a).paymentNo).filter((x): x is string => typeof x === 'string');
+  const payments = paymentNos.length ? await prisma.payment.findMany({ where: { paymentNo: { in: paymentNos } }, select: { id: true, paymentNo: true, payeeId: true } }) : [];
+  const auth = req.auth!;
+  // The same rule as the proof download: the person paid, Accounting, or anyone who can see a receipt the payment still covers.
+  const canOpen = (p: { id: number; payeeId: number }) => auth.permissions.has('evidence.view') && (p.payeeId === auth.user.id || auth.permissions.has('payment.mark') || p.id === r.paymentId);
   res.json({
     items: rows.map((a) => {
-      let note: string | null = null;
-      try { note = a.after ? (JSON.parse(a.after).note ?? null) : null; } catch { /* ignore */ }
-      return { id: a.id, actor: a.actorName, action: a.action, summary: a.summary, note, createdAt: a.createdAt };
+      const data = after(a);
+      const p = a.action === 'payment.marked' ? payments.find((x) => x.paymentNo === data.paymentNo) : undefined;
+      return {
+        id: a.id, actor: a.actorName, action: a.action, summary: a.summary, note: data.note ?? null, createdAt: a.createdAt,
+        ...(p ? { payment: { id: p.id, paymentNo: p.paymentNo, reversed: p.id !== r.paymentId, canOpenProof: canOpen(p) } } : {}),
+      };
     }),
   });
 });
@@ -252,12 +262,14 @@ receiptsRouter.get('/:id/history', async (req, res) => {
 
 const SUMMARY: Record<ReceiptAction, string> = {
   submit: 'submitted for checking', withdraw: 'withdrew the receipt', check: 'marked as checked', return: 'returned the record',
+  pay: 'marked as paid', reverse_payment: 'reversed the payment',
   undo: 'took back the decision', request: 'asked for more proof', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
 async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body) {
   const auth = req.auth!;
   const t = transitionFor(action)!;
+  if (action === 'pay') throw badRequest('Use the payment form to mark receipts as paid.', 'USE_PAYMENT_FORM');
   const body = actionBodySchema.parse(rawBody);
   const r = await loadVisible(auth, receiptId);
   if (!auth.permissions.has(t.permission)) throw forbidden();
@@ -318,6 +330,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'request') Object.assign(data, { checkedById: null, checkedAt: null, checkNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'release') data.lastNote = null;
   if (action === 'undo') Object.assign(data, { decidedById: null, decidedAt: null, decisionNote: null, lastNote: null });
+  // The payment row stays (it is the record of what happened); only the receipt's link to it is cleared.
+  if (action === 'reverse_payment') Object.assign(data, { paymentId: null, paidAmount: null, paidShortReason: null, paidAt: null });
   if (action === 'approve' || action === 'disapprove') Object.assign(data, { decidedById: auth.user.id, decidedAt: now, decisionNote: note, lastNote: action === 'disapprove' ? note : null });
 
   let docNo: string | null = null;
@@ -334,8 +348,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'undo' && r.document?.filePath) await removeFile(r.document.filePath).catch(() => undefined);
 
   await audit(req, {
-    action: `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
-    before: { status: r.status }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
+    action: action === 'reverse_payment' ? 'payment.reversed' : `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
+    before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(note ? { note } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
 
   /* notifications */
@@ -350,6 +364,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${note}`, email: { template: 'returned', data: mail } });
   if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
+  if (action === 'approve') await notify({ userIds: others(await usersWithPermission('payment.mark')).filter((id) => id !== r.encoderId), type: 'receipt.ready_to_pay', receiptId: r.id, text: `${ref} was approved and is ready to pay.` });
+  if (action === 'reverse_payment') await notify({ userIds: [r.encoderId], type: 'payment.reversed', receiptId: r.id, text: `The payment for ${ref} was reversed. ${note}`, email: { template: 'payment_reversed', data: { ...mail, paymentNo: r.payment?.paymentNo ?? '' } } });
   if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
   if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });
   if (action === 'undo') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reversed', receiptId: r.id, text: `The decision on ${ref} was reversed. ${note}`, email: { template: 'reversed', data: mail } });
@@ -404,6 +420,7 @@ receiptsRouter.post('/:id/comments', commentLimiter, async (req, res) => {
 });
 
 for (const t of TRANSITIONS) {
+  if (t.action === 'pay') continue; // paying needs the proof and amounts: POST /api/payments
   receiptsRouter.post(`/:id/${t.action}`, async (req, res) => {
     res.json({ receipt: await runAction(req, t.action) });
   });

@@ -64,9 +64,13 @@ Sign in as the administrator, open **Audit log**, then **Emails**:
 | Disapproved | the Med Ref and the Checker, with the reason |
 | Put on hold | the Med Ref and the Checker, with the note |
 | Hold released | the Med Ref, only if they turned that on in their profile |
+| Reimbursement paid | the Med Ref who was paid: one email per payment, listing every receipt and amount, the method, date and payment number |
+| Payment reversed | the Med Ref, with the reason, telling them to disregard the earlier payment notice |
 | Daily summary (about 8am) | anyone who has it turned on, only if they have something waiting |
 
-New receipts waiting to be checked and checked receipts waiting for approval notify people inside the app only (the bell), not by email, so inboxes do not fill up.
+New receipts waiting to be checked, checked receipts waiting for approval, and approved receipts waiting to be paid (for Accounting) notify people inside the app only (the bell), not by email, so inboxes do not fill up.
+
+The two payment emails can be edited like the others. Extra placeholders: `{{paymentNo}}`, `{{method}}`, `{{paidOn}}` and, in the paid email, `{{receiptList}}` (one line per receipt).
 
 ## Changing what the emails say
 

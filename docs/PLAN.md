@@ -16,9 +16,10 @@ Visual references: `docs/REIMSYS BUILD PLAN.html` (diagrams) and `docs/REIMSYS U
 | Stack | React + Vite + TypeScript, Node/Express + TypeScript, MySQL (XAMPP MariaDB in dev), Prisma |
 | Repo | Monorepo: `apps/api`, `apps/web`, `packages/shared` |
 | Auth | Argon2, httpOnly cookie sessions with refresh, CSRF token, lockout after repeated failures |
-| Roles | Med Ref, Checker, Approver, Super Admin. Permissions are rows, set per role only |
-| Super Admin | Manages users and roles. Cannot approve |
-| Statuses | Draft, Submitted, Returned, Checked, Approved, Disapproved, Reserved |
+| Roles | Med Ref, Checker, Approver, Accounting, Super Admin. Permissions are rows, set per role only |
+| Super Admin | Manages users and roles. Cannot approve. Cannot mark paid by default (can be granted on the Access page, audited) |
+| Accounting | Rank 25. Marks approved receipts as paid (`payment.mark`, locked). Sees only Approved and Paid receipts. Never pays a receipt they encoded |
+| Statuses | Draft, Submitted, Returned, Checked, Approved, Disapproved, Reserved, Paid |
 | Reserved | Approver can release it back to the Checked queue |
 | Disapproved / Approved | Final. Disapproved can be copied to a new Draft |
 | Approval | Any Approver can act; first one wins (optimistic `version` check) |
@@ -44,6 +45,10 @@ Visual references: `docs/REIMSYS BUILD PLAN.html` (diagrams) and `docs/REIMSYS U
 | Checked to Disapproved | Approver | Reason | Email with reason |
 | Checked to Reserved | Approver | Note | Email with note |
 | Reserved to Checked | Approver | Remark optional | In-app notice |
+| Approved to Paid | Accounting (not the encoder) | Payment date, method, proof file, amount per receipt (a shortfall needs a reason) | One email to the Med Ref per payment |
+| Paid to Approved | Accounting | Reason | Email: disregard the payment notice. The payment row and proof stay |
+
+The Approver's "take back" (undo) only works from Approved, so a paid receipt must have its payment reversed first.
 
 All transitions go through one state-machine module. Each writes an audit row and queues notifications.
 
@@ -226,3 +231,13 @@ The work lives on its own branch, so `main` is untouched until it is merged.
 6. **Proof and review:** proof stays required (up to the file limit in Settings), then submit. The chart's "Review the details?" question, the "new reimbursement code" and the "reference no. cancellation" are left out: REIMSYS shows a review page, numbers every receipt, and keeps the history.
 
 Changes in data: three new optional columns (`invoiceUnderCompany`, `reasonForSpending`, `classification`; migration `20261015010000_form_flow`, undone by the second part of `docs/rollback-client-form.sql`). The written "no BIR reason" is no longer asked. Product / Service is asked only on the BIR path; reports fall back to the classification for receipts without a BIR invoice. The Checker's "seen / not seen" answers are asked only when the invoice is under the company.
+
+## Payment step (built 2026-10-15)
+Spec: `docs/superpowers/specs/2026-10-15-payment-step-design.md`. Plan: `docs/superpowers/plans/2026-10-15-payment-step.md`.
+- **Role:** Accounting (`accounting`, rank 25). Permission `payment.mark` (locked for Accounting). Default grants: `payment.mark`, evidence view/download/print, reports.
+- **Status:** Approved → Paid (pay) and Paid → Approved (reverse, reason required). Paid cannot be edited, withdrawn or deleted.
+- **Data:** table `payment` (`PAY-YYYY-NNNNNN`, payee, method, date, proof file with type, size and SHA-256, who recorded it). Receipts gain `paymentId`, `paidAmount`, `paidShortReason`, `paidAt`. Migration `20261015030000_payment_step`, undone by `docs/rollback-payment-step.sql`. The app database user can only read and add payment rows.
+- **Rules:** one payment covers one person's receipts (up to 25), the amount per receipt is at most the receipt amount, a shortfall needs a reason, the date cannot be in the future, the proof (JPG/PNG/WEBP/HEIC/PDF) is required for every method. All receipts change in one transaction with a version check, so a receipt is never paid twice.
+- **Screens:** "Ready to pay" (queue by person, tick boxes, "Mark as paid" bar and dialog), Payment card on the receipt (proof view/download/print, audited), "Reverse payment", Paid pill and filter, Accounting dashboard, approver tiles "Approved, not paid" and "Paid", report Payment filter with paid columns and totals, payment methods list under Access → Settings.
+- **Notices:** Med Ref gets one email per payment (`paid`) and one per reversal (`payment_reversed`); Accounting gets an in-app notice when a receipt is approved, no email.
+- **Tests:** `packages/shared/test/payments.test.ts`, `e2e/payment-flow.mjs` (API, every role), `e2e/payment-ui.mjs` (browser, computer and phone).

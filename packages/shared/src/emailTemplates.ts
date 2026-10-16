@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'digest', 'reset', 'invite', 'test'] as const;
+export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reset', 'invite', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -29,6 +29,10 @@ export const PLACEHOLDERS: PlaceholderDef[] = [
   { key: 'status', label: 'Status of the receipt', example: 'Approved' },
   { key: 'note', label: 'Reason or note that was written', example: 'The receipt photo is blurry.' },
   { key: 'docNo', label: 'Reimbursement document number', example: 'REIM-2026-000045' },
+  { key: 'paymentNo', label: 'Payment number', example: 'PAY-2026-000012' },
+  { key: 'method', label: 'How it was paid', example: 'Bank transfer' },
+  { key: 'paidOn', label: 'Payment date', example: 'Oct 15, 2026' },
+  { key: 'receiptList', label: 'Receipts in the payment, one per line (payment email only)', example: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50' },
   { key: 'summary', label: 'List of what is waiting (daily summary only)', example: '2 receipts waiting to be checked.' },
   { key: 'orgName', label: 'Your organisation name', example: 'Your Organisation' },
   { key: 'minutes', label: 'How long a reset link works, in minutes', example: '60' },
@@ -55,6 +59,8 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
   disapproved: { label: 'Receipt disapproved', when: 'An approver disapproves a receipt', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   reserved: { label: 'Receipt put on hold', when: 'An approver puts a receipt on hold', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   released: { label: 'Hold released', when: 'An approver releases a hold', to: 'The Med Ref, if they turned this on in their profile', allowed: RECEIPT_VARS, hasReceipt: true },
+  paid: { label: 'Reimbursement paid', when: 'Accounting marks one or more receipts as paid', to: 'The Med Ref who was paid', allowed: ['recipientName', 'actorName', 'paymentNo', 'method', 'paidOn', 'amount', 'receiptList', 'orgName'], hasReceipt: false },
+  payment_reversed: { label: 'Payment reversed', when: 'Accounting reverses a payment', to: 'The Med Ref who was paid', allowed: [...RECEIPT_VARS, 'paymentNo'], hasReceipt: true },
   reversed: { label: 'Decision reversed', when: 'An approver undoes an approval or disapproval within ten minutes', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   digest: { label: 'Daily summary', when: 'About 8am, only if something is waiting', to: 'Anyone who has the summary turned on', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
   reset: { label: 'Forgot password', when: 'Someone asks to reset their password on the sign-in page', to: 'The person who asked', allowed: ['recipientName', 'orgName', 'minutes'], hasReceipt: false },
@@ -105,6 +111,20 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     buttonLabel: 'Open the receipt',
     showDetails: true,
   },
+  paid: {
+    subject: 'Payment sent: {{paymentNo}}',
+    heading: 'You have been paid',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} recorded payment {{paymentNo}} to you on {{paidOn}} by {{method}}, for a total of {{amount}}.\n\n{{receiptList}}\n\nYou can open the proof of payment on each receipt.',
+    buttonLabel: 'View the payment',
+    showDetails: false,
+  },
+  payment_reversed: {
+    subject: 'Correction: the payment for {{refNo}} was reversed',
+    heading: 'Please disregard the earlier payment notice',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} reversed payment {{paymentNo}} for {{refNo}} ({{payee}}). The receipt is back to Approved and is waiting to be paid again.\n\nReason:\n> {{note}}',
+    buttonLabel: 'Open the receipt',
+    showDetails: true,
+  },
   digest: {
     subject: '{{orgName}}: your daily summary',
     heading: 'Good morning, {{recipientName}}',
@@ -146,6 +166,8 @@ const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
   reserved: { actorName: 'Paolo Villanueva', status: 'Reserved', note: 'Waiting for the regional office to confirm the room rate.', docNo: '' },
   released: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Rate confirmed.', docNo: '' },
   reversed: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Approved by mistake. Re-checking the amount.', docNo: '' },
+  paid: { actorName: 'Rica Tan', amount: 'PHP 1,884.50', receiptList: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50\n• RC-2026-000131 · Shell Mandaue · PHP 600.00' },
+  payment_reversed: { actorName: 'Rica Tan', status: 'Approved', note: 'Recorded against the wrong person. It will be paid again today.', docNo: '' },
   reset: { recipientName: 'Ana', minutes: '60' },
   invite: { recipientName: 'Ana', actorName: 'Admin User', hours: '72' },
   digest: { summary: '• 2 receipts waiting to be checked.\n• 1 draft not submitted yet.' },

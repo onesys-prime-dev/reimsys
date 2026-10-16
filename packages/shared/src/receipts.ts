@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type AppSettings } from './settings';
-export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved'] as const;
+export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved', 'paid'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
 export const STATUS_LABEL: Record<ReceiptStatus, string> = {
   draft: 'Draft', submitted: 'Submitted', returned: 'Returned', checked: 'Checked',
-  approved: 'Approved', disapproved: 'Disapproved', reserved: 'Reserved',
+  approved: 'Approved', disapproved: 'Disapproved', reserved: 'Reserved', paid: 'Paid',
 };
 
-export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release' | 'undo' | 'request';
+export type ReceiptAction = 'submit' | 'withdraw' | 'check' | 'return' | 'approve' | 'disapprove' | 'reserve' | 'release' | 'undo' | 'request' | 'pay' | 'reverse_payment';
 export type NoteRule = 'none' | 'optional' | 'required';
 
 export interface Transition {
@@ -35,6 +35,9 @@ export const TRANSITIONS: Transition[] = [
   { action: 'request', from: ['checked'], to: 'returned', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'undo', from: ['approved', 'disapproved'], to: 'checked', permission: 'review.decide', note: 'required', notOwner: true },
   { action: 'release', from: ['reserved'], to: 'checked', permission: 'review.decide', note: 'optional', notOwner: true },
+  /** Paying is done from the payment form (it needs a date, method, proof and amounts), so the API has no plain /pay action route. */
+  { action: 'pay', from: ['approved'], to: 'paid', permission: 'payment.mark', note: 'none', notOwner: true },
+  { action: 'reverse_payment', from: ['paid'], to: 'approved', permission: 'payment.mark', note: 'required', notOwner: true },
 ];
 
 /** How long the person who decided has to take a decision back. */
@@ -184,12 +187,17 @@ export const categorySchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const PAYMENT_FILTERS = ['all', 'paid', 'unpaid'] as const;
+export type PaymentFilter = (typeof PAYMENT_FILTERS)[number];
+export const PAYMENT_FILTER_LABEL: Record<PaymentFilter, string> = { all: 'Paid and not yet paid', paid: 'Paid', unpaid: 'Not yet paid' };
+
 export const reportRequestSchema = z.object({
   from: dateString,
   to: dateString,
   categoryId: z.number().int().positive().nullish(),
   transactionType: z.enum(TRANSACTION_TYPES).nullish(),
   encoderId: z.number().int().positive().nullish(),
+  payment: z.enum(PAYMENT_FILTERS).default('all'),
   format: z.enum(['pdf', 'xlsx', 'csv']),
 });
 

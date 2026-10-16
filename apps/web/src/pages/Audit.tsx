@@ -10,7 +10,7 @@ interface Item {
 interface Result { total: number; page: number; pageSize: number; items: Item[] }
 
 const lc = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-const GROUPS = [['', 'All activity'], ['auth.', 'Sign in and security'], ['receipt.', 'Receipts and decisions'], ['evidence.', 'Evidence access'], ['document.', 'Documents'], ['report.', 'Reports'], ['import.', 'Imports'], ['user.', 'Users'], ['role.', 'Roles and permissions'], ['profile.', 'Profiles']];
+const GROUPS = [['', 'All activity'], ['auth.', 'Sign in and security'], ['receipt.', 'Receipts and decisions'], ['evidence.', 'Evidence access'], ['document.', 'Documents'], ['payment.', 'Payments'], ['report.', 'Reports'], ['import.', 'Imports'], ['user.', 'Users'], ['role.', 'Roles and permissions'], ['profile.', 'Profiles']];
 
 export function AuditPage() {
   const [tab, setTab] = useState<'log' | 'email'>('log');
