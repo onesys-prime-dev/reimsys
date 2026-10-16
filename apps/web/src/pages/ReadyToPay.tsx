@@ -17,15 +17,15 @@ function ExportPayments() {
   const valid = !!from && !!to && from <= to;
   const qs = `from=${from}&to=${to}`;
   return (
-    <section className="card" style={{ marginTop: 16 }}>
-      <div className="card-h"><h2>Export payments</h2><small>One row per paid receipt, by payment date</small></div>
+    <details className="card" style={{ marginBottom: 16 }}>
+      <summary className="card-h" style={{ cursor: 'pointer' }}><h2>Export payments</h2><small>One row per paid receipt, by payment date</small></summary>
       <div className="card-b" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label className="field" style={{ margin: 0 }}><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className="field" style={{ margin: 0 }}><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
         <a className={'btn' + (valid ? '' : ' disabled')} aria-disabled={!valid} href={valid ? `/api/payments/export?format=xlsx&${qs}` : undefined}><Icon name="download" size={18} />Excel</a>
         <a className={'btn' + (valid ? '' : ' disabled')} aria-disabled={!valid} href={valid ? `/api/payments/export?format=csv&${qs}` : undefined}>CSV</a>
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -51,6 +51,7 @@ export function ReadyToPayPage() {
         <div><h1>Ready to pay</h1><p>Approved receipts waiting for payment, by person. One payment covers one person's receipts.</p></div>
         {q.data && <div className="muted" style={{ textAlign: 'right' }}><b style={{ display: 'block', fontSize: '1.3rem', color: 'var(--ink)' }}>{money(q.data.totals.total)}</b>{q.data.totals.count} receipt{q.data.totals.count === 1 ? '' : 's'}</div>}
       </div>
+      <ExportPayments />
       {!q.data && <div className="empty">Loading…</div>}
       {q.data && !groups.length && <Empty title="Nothing to pay">Every approved receipt has been paid.</Empty>}
       <div className="stack">
@@ -74,7 +75,6 @@ export function ReadyToPayPage() {
           </span>
         </div>
       )}
-      <ExportPayments />
       {paying && group && (
         <PayDialog
           payee={group.payee.name}
