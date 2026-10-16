@@ -125,15 +125,14 @@ export function ReceiptDetailPage() {
                   const step = fixStepFor(c);
                   return (
                     <div key={c} className="fixrow">
-                      <span>{c === 'other' ? 'Something else: see the note' : issueLabel(c)}</span>
-                      {r.canEdit && step && r.returnIssues.length > 1 && <Link className="btn sm" to={fixUrl(step)}>Fix</Link>}
-                    </div>
+                      {r.canEdit && step ? <Link className="fixlink" to={fixUrl(step)}>{issueLabel(c)} →</Link> : <span>{c === 'other' ? 'Something else: see the note' : issueLabel(c)}</span>}
+                                          </div>
                   );
                 })}
               </div>
             )}
             {r.lastNote && <span>{r.lastNote}</span>}
-            {r.canEdit && <div style={{ marginTop: 10 }}><Link className="btn sm pri" to={fixUrl(firstStep)}>Start fixing</Link></div>}
+            {r.canEdit && !(r.returnIssues.length === 1 && fixStepFor(r.returnIssues[0])) && <div style={{ marginTop: 10 }}><Link className="btn sm pri" to={fixUrl(firstStep)}>Start fixing</Link></div>}
           </div>
         </div>
       )}

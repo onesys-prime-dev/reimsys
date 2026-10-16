@@ -145,6 +145,7 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .fixlist{display:grid;gap:6px;margin:6px 0 8px}
 .fixrow{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .fixrow span{flex:1 1 220px;min-width:0}
+.fixlink{font-weight:600;color:var(--primary,#0b6e7a);text-decoration:none}.fixlink:hover{text-decoration:underline}
 .issues{display:flex;flex-wrap:wrap;gap:8px}
 .issue{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:20px;padding:8px 12px;font:inherit;font-size:.9rem;cursor:pointer;text-align:left}
 .issue.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
