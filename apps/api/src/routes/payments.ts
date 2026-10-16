@@ -77,6 +77,7 @@ paymentsRouter.post('/', requirePerm('payment.mark'), payLimiter, upload.single(
   if (receipts.length !== ids.length) throw notFound('One of the receipts was not found.');
   for (const r of receipts) {
     if (r.encoderId === auth.user.id) throw forbidden('You cannot pay a receipt you encoded.', 'OWN_RECEIPT');
+    if (r.checkedById === auth.user.id || r.decidedById === auth.user.id) throw forbidden('You checked or approved this receipt, so someone else has to pay it.', 'SAME_PERSON');
     if (r.status !== 'approved') throw conflict(`${r.refNo} is ${r.status}, so it cannot be paid.`, 'INVALID_STATE');
     if (body.lines.find((l) => l.receiptId === r.id)!.version !== r.version) throw conflict(`${r.refNo} changed since you opened it. Reload and try again.`, 'RECORD_CHANGED');
   }
