@@ -61,7 +61,9 @@ try {
   let r1 = await makeReceipt(ana, tag1);
   r1 = (await api(ana, 'POST', `/receipts/${r1.id}/submit`, { version: r1.version })).data.receipt;
   ok('the checker\'s dashboard count goes up without a refresh', await eventually(async () => (await num(lizaDash, 'To check')) === toCheck0 + 1), `was ${toCheck0}`);
-  ok('the receipt appears in the checker\'s queue', await eventually(() => lizaDash.locator(`.row:has-text("${tag1}")`).count().then((n) => n === 1)));
+  // The dashboard queue shows only the six oldest waiting receipts, so a new one is visible there only when fewer than six are waiting.
+  if (toCheck0 < 6) ok('the receipt appears in the checker\'s queue', await eventually(() => lizaDash.locator(`.row:has-text("${tag1}")`).count().then((n) => n === 1)));
+  else console.log("  note: six or more receipts were already waiting, so the new one is not in the dashboard queue; the count above proves the live update");
   ok('the checker\'s open receipt list gets the new row by itself', await eventually(() => lizaList.locator(`a.row:has-text("${tag1}")`).count().then((n) => n === 1)));
   ok('the bell on the checker\'s screen lights up by itself', await eventually(async () => Number((await lizaDash.locator('button[aria-label^="Notifications"] .badge').first().innerText().catch(() => '0')).replace(/\D/g, '') || 0) > bell0 || bell0 >= 99));
   await lizaDash.screenshot({ path: path.join(out, '1-checker-dashboard.png') });
@@ -73,7 +75,8 @@ try {
   await view(liza, r1);
   r1 = (await api(liza, 'POST', `/receipts/${r1.id}/check`, { version: r1.version, note: 'ok' })).data.receipt;
   ok('the approver\'s "To decide" count goes up without a refresh', await eventually(async () => (await num(paoloDash, 'To decide')) === toDecide0 + 1), `was ${toDecide0}`);
-  ok('the receipt shows in the approver\'s queue', await eventually(() => paoloDash.locator(`.row:has-text("${tag1}")`).count().then((n) => n === 1)));
+  if (toDecide0 < 6) ok('the receipt shows in the approver\'s queue', await eventually(() => paoloDash.locator(`.row:has-text("${tag1}")`).count().then((n) => n === 1)));
+  else console.log("  note: six or more receipts were already waiting for a decision, so the new one is not in the dashboard queue; the count above proves the live update");
   ok('the checker\'s own list moves it out of "waiting" by itself', await eventually(() => lizaList.locator(`a.row:has-text("${tag1}") .pill:has-text("Checked")`).count().then((n) => n === 1)));
 
   /* ============ 3. the approver approves: the Med Ref watching the receipt sees it happen ============ */
