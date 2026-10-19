@@ -16,6 +16,17 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
     await p.waitForSelector('.guide-img');
     ok(`${label}: the ${step} step opens the guide on "${tab}"`, (await p.locator('.issue.on').innerText()) === tab);
     ok(`${label}: the picture loads`, await p.locator('.guide-img').evaluate((i) => i.complete && i.naturalWidth > 0));
+    ok(`${label}: the part for this page is the first tab`, (await p.locator('.issue').first().innerText()) === tab);
+    const h0 = (await p.locator('.guide-img').boundingBox()).height;
+    await p.click('button[aria-label="Zoom in"]');
+    const h1 = (await p.locator('.guide-img').boundingBox()).height;
+    ok(`${label}: zoom in makes the picture bigger`, h1 > h0 * 1.3, h0 + ' -> ' + h1);
+    ok(`${label}: the zoom is shown`, (await p.locator('.guide-bar b').innerText()) === '150%');
+    await p.click('.guide-img');
+    await p.click('button:has-text("Fit")');
+    ok(`${label}: Fit puts it back`, Math.abs((await p.locator('.guide-img').boundingBox()).height - h0) < 2);
+    const vb = await p.locator('.guide-view').boundingBox(), tb = await p.locator('.guide-text').boundingBox();
+    ok(`${label}: the instruction sits under the picture`, tb.y >= vb.y + vb.height - 1, JSON.stringify([vb, tb]));
     await p.click('.issue:has-text("Discount")');
     ok(`${label}: another part can be chosen`, (await p.locator('.issue.on').innerText()) === 'Discount');
     ok(`${label}: nothing scrolls sideways`, (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
