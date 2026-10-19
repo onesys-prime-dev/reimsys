@@ -40,6 +40,8 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null); // the camera's own picture size
   const [fit, setFit] = useState<{ w: number; h: number } | null>(null); // how big it is drawn
   const [quad, setQuad] = useState<Quad | null>(null);
+  const target = useRef<Quad | null>(null); // where the receipt was last found; the outline glides there
+  const poly = useRef<SVGPolygonElement>(null);
   const [progress, setProgress] = useState(0);
   const [pages, setPages] = useState<ScanPage[]>([]);
   const [auto, setAuto] = useState(true);
@@ -102,6 +104,23 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
     window.setTimeout(() => { busy.current = false; }, 500);
   }, [maxPages]);
 
+  /* The receipt is looked for a few times a second, so the outline would jump. Glide it to the newest position on every screen frame instead. */
+  useEffect(() => {
+    let raf = 0, last = performance.now(), shown: Quad | null = null;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const t = target.current, el = poly.current;
+      const a = 1 - Math.exp(-(now - last) / 70);
+      last = now;
+      if (!t || !el) { shown = null; return; }
+      if (!shown) shown = t.map((p) => ({ ...p })) as Quad;
+      else for (let i = 0; i < 4; i++) { shown[i]!.x += (t[i]!.x - shown[i]!.x) * a; shown[i]!.y += (t[i]!.y - shown[i]!.y) * a; }
+      el.setAttribute('points', shown.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   /* look for the receipt a few times a second */
   useEffect(() => {
     if (!size) return;
@@ -119,6 +138,7 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
       const kx = v.videoWidth / w;
       const scaled = q ? (q.map((p: Pt) => ({ x: p.x * kx, y: p.y * kx })) as Quad) : null;
       liveQuad.current = scaled;
+      target.current = scaled;
       setQuad(scaled);
       // After a picture, wait until the receipt has gone or a different one is in view before taking the next.
       if (!armed.current) {
@@ -165,7 +185,7 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
           <video ref={video} playsInline muted />
           {size && (
             <svg className="live-svg" viewBox={`0 0 ${size.w} ${size.h}`} aria-hidden="true">
-              {quad && <polygon className={`live-poly ${progress > 0 ? 'steady' : ''}`} points={quad.map((p) => `${p.x},${p.y}`).join(' ')} />}
+              {quad && <polygon ref={poly} className={`live-poly ${progress > 0 ? 'steady' : ''}`} points="" />}
             </svg>
           )}
           {flash > 0 && <div className="live-flash" key={flash} />}
