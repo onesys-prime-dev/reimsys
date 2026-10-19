@@ -63,14 +63,32 @@ export function detectQuad(img: Raster): Quad {
  * `trim` is how far (as a share of the way to the middle) the corners are pulled inside the receipt's edge: 0 hugs it.
  */
 export function findQuad(img: Raster, trim = 0.03): Quad | null {
+  return locate(img, trim, false)?.quad ?? null;
+}
+
+/**
+ * For the live camera: the receipt, and whether it is a sure find. When no sure find is made, a fainter outline is offered
+ * with `sure: false`; the camera shows it only when it is found again in about the same place (a pattern on the table does not
+ * keep producing the same outline, a receipt does).
+ */
+export function findQuadLive(img: Raster, trim = 0.03): { quad: Quad; sure: boolean } | null {
+  return locate(img, trim, true);
+}
+
+function locate(img: Raster, trim: number, allowFaint: boolean): { quad: Quad; sure: boolean } | null {
   const { gray, w, h, k } = smallGray(img, 320);
   const edges = findEdges(gray, w, h);
   // 1. By the receipt's edges: the lines that make its sides. Works on a light table, in shadow, with a finger over a corner.
   let corners: Corners | null = edgeQuad(gray, w, h, edges)?.corners ?? null;
   // 2. By "the biggest bright shape", only trusted when real edges run along all four of its sides.
-  if (!corners) {
-    const blob = blobCorners(gray, w, h);
-    if (blob && scoreCorners(blob, edges) > 0) corners = blob;
+  const blob = corners ? null : blobCorners(gray, w, h);
+  if (!corners && blob && scoreCorners(blob, edges) > 0) corners = blob;
+  let sure = true;
+  // 3. Live only: a fainter outline, which the caller must see twice before trusting.
+  if (!corners && allowFaint) {
+    const faint = findEdges(gray, w, h, true);
+    corners = edgeQuad(gray, w, h, faint, true)?.corners ?? (blob && scoreCorners(blob, faint, true) > 0 ? blob : null);
+    sure = false;
   }
   if (!corners) return null;
   const up = (p: { x: number; y: number }): Pt => ({ x: Math.min(img.width - 1, Math.max(0, Math.round((p.x + 0.5) * k))), y: Math.min(img.height - 1, Math.max(0, Math.round((p.y + 0.5) * k))) });
@@ -78,7 +96,7 @@ export function findQuad(img: Raster, trim = 0.03): Quad | null {
   // The edge of a photographed receipt is soft and ragged, so cut a little inside it rather than keep a rim of the table.
   const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
   const pull = (p: Pt): Pt => ({ x: Math.round(p.x + (cx - p.x) * trim), y: Math.round(p.y + (cy - p.y) * trim) });
-  return q.map(pull) as Quad;
+  return { quad: q.map(pull) as Quad, sure };
 }
 
 /** The older method: the biggest bright patch in the picture and its four extreme points. Returns corners in the small picture. */
@@ -125,28 +143,6 @@ function blobCorners(gray: Uint8Array, w: number, h: number): Corners | null {
     if (x - y < bl) { bl = x - y; pBL = { x, y }; }
   }
   return [pTL, pTR, pBR, pBL];
-}
-
-const maxMove = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i]!.x, p.y - b[i]!.y)));
-
-/**
- * Tells the live camera when the receipt has been held still long enough to take the picture:
- * the same four corners (within `tolerance` of the frame's diagonal) for `frames` checks in a row.
- */
-export function steadyTracker({ frames, tolerance }: { frames: number; tolerance: number }) {
-  let window: Quad[] = [];
-  return {
-    push(q: Quad | null, w: number, h: number): boolean {
-      if (!q) { window = []; return false; }
-      if (window.length && maxMove(window[0]!, q) > tolerance * Math.hypot(w, h)) window = [];
-      window.push(q);
-      if (window.length > frames) window.shift();
-      return window.length >= frames;
-    },
-    /** 0 to 1, how close the picture is to being taken. */
-    progress: () => Math.min(1, window.length / frames),
-    reset() { window = []; },
-  };
 }
 
 /** Maps a point of the straight page, (0,0) top left to (1,1) bottom right, to where it is in the photo. Keeps perspective. */

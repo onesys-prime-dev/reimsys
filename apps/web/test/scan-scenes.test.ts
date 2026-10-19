@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { findQuad } from '../src/scan';
+import { findQuad, findQuadLive } from '../src/scan';
 import { SCENES, flat, inside, make, receipt, tolerance, worstCorner } from './scenes';
 import type { Pt, Quad } from '../src/scan';
 
@@ -57,5 +57,33 @@ describe('a real camera frame', () => {
     expect(found, 'it should find the receipt').not.toBeNull();
     const truth: Quad = [{ x: 107.5, y: 17.5 }, { x: 220, y: 27.5 }, { x: 212.5, y: 162.5 }, { x: 100, y: 152.5 }];
     expect(worstCorner(found, truth)).toBeLessThan(4);
+  });
+});
+
+describe('the live camera: a faint receipt is offered, an empty table never is', () => {
+  const faint = (contrast: number, seed: number) => ({ w: 480, h: 360, quad: receipt(240, 180, 230, 290, -9, 8), table: flat(226), paper: flat(226 + contrast), blur: 2, noise: 5, seed });
+  for (const contrast of [9, 7]) for (const seed of [1, 2, 3]) {
+    it(`offers a white receipt barely lighter than the desk (contrast ${contrast}, seed ${seed}), marked not sure`, () => {
+      const s = faint(contrast, seed), img = make(s);
+      expect(findQuad(img, 0), 'too faint for a sure find').toBeNull();
+      const live = findQuadLive(img, 0);
+      expect(live, 'the live camera should still offer it').not.toBeNull();
+      expect(live!.sure).toBe(false);
+      expect(worstCorner(live!.quad, s.quad)).toBeLessThan(tolerance(s.w, s.h));
+    });
+  }
+  it('finds a clear receipt as a sure find, the same as the saved-photo search', () => {
+    const { scene } = SCENES[0]!;
+    const img = make(scene), live = findQuadLive(img, 0);
+    expect(live?.sure).toBe(true);
+    expect(live!.quad).toEqual(findQuad(img, 0));
+  });
+  it('finds nothing at all, not even faintly, on any of the tables with no receipt on them', () => {
+    const invented: string[] = [];
+    for (const { name, scene } of SCENES) for (const noise of [2, 6]) {
+      const empty = { ...scene, paper: scene.table, text: false, overlay: undefined, shape: () => false, noise, seed: 11 };
+      if (findQuadLive(make(empty), 0)) invented.push(`${name} (noise ${noise})`);
+    }
+    expect(invented).toEqual([]);
   });
 });

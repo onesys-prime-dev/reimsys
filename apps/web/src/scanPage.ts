@@ -6,15 +6,19 @@ export interface ScanPage { id: number; raster: Raster; quad: Quad; mode: ScanMo
 const SOURCE_SIDE = 2400;
 export const OUTPUT_SIDE = 2000;
 
-const drawToRaster = (src: CanvasImageSource, sw: number, sh: number, maxSide: number): Raster => {
+const drawToCanvas = (src: CanvasImageSource, sw: number, sh: number, maxSide: number): HTMLCanvasElement => {
   const k = Math.min(1, maxSide / Math.max(sw, sh));
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
-  const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(src, 0, 0, c.width, c.height);
-  const d = g.getImageData(0, 0, c.width, c.height);
+  c.getContext('2d', { willReadFrequently: true })!.drawImage(src, 0, 0, c.width, c.height);
+  return c;
+};
+/** The pixels of a canvas. */
+export const rasterOfCanvas = (c: HTMLCanvasElement): Raster => {
+  const d = c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height);
   return { data: d.data, width: d.width, height: d.height };
 };
+const drawToRaster = (src: CanvasImageSource, sw: number, sh: number, maxSide: number): Raster => rasterOfCanvas(drawToCanvas(src, sw, sh, maxSide));
 
 /** Reads a photo file into pixels, shrunk so a 12-megapixel phone photo does not eat the phone's memory. Phone rotation is applied. Null if it cannot be read. */
 export async function readPhoto(file: File): Promise<Raster | null> {
@@ -28,8 +32,8 @@ export async function readPhoto(file: File): Promise<Raster | null> {
   }
 }
 
-/** The camera's picture right now, at the best resolution it gives. */
-export const rasterFromVideo = (v: HTMLVideoElement, maxSide = SOURCE_SIDE) => drawToRaster(v, v.videoWidth, v.videoHeight, maxSide);
+/** A quick copy of the camera's picture right now, read into pixels later with rasterOfCanvas (so the button reacts at once). */
+export const snapshotVideo = (v: HTMLVideoElement, maxSide = SOURCE_SIDE) => drawToCanvas(v, v.videoWidth, v.videoHeight, maxSide);
 
 export function putRaster(canvas: HTMLCanvasElement, r: Raster) {
   canvas.width = r.width; canvas.height = r.height;

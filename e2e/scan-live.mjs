@@ -18,8 +18,9 @@ async function makeClip(browser, name = 'receipt-clip', look = { table: '#1d2226
   const b64 = await p.evaluate((look) => {
     const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
     const g = c.getContext('2d'); g.fillStyle = look.table; g.fillRect(0, 0, 1280, 720);
-    g.fillStyle = look.paper; g.beginPath(); g.moveTo(430, 70); g.lineTo(880, 110); g.lineTo(850, 650); g.lineTo(400, 610); g.closePath(); g.fill();
-    g.fillStyle = '#2a2a2a'; for (let i = 0; i < 14; i++) g.fillRect(480 + i * 2, 170 + i * 30, 300 - i * 4, 8);
+    const [a, b, cc, d] = look.corners ?? [[430, 70], [880, 110], [850, 650], [400, 610]];
+    g.fillStyle = look.paper; g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.lineTo(...cc); g.lineTo(...d); g.closePath(); g.fill();
+    if (!look.corners) { g.fillStyle = '#2a2a2a'; for (let i = 0; i < 14; i++) g.fillRect(480 + i * 2, 170 + i * 30, 300 - i * 4, 8); }
     if (look.shadow) { const s = g.createLinearGradient(0, 0, 1280, 0); s.addColorStop(0, 'rgba(0,0,0,0)'); s.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = s; g.fillRect(0, 0, 1280, 720); }
     return c.toDataURL('image/jpeg', 0.85).split(',')[1];
   }, look);
@@ -32,6 +33,12 @@ async function makeClip(browser, name = 'receipt-clip', look = { table: '#1d2226
 const tmp = await chromium.launch({ channel: 'chrome' });
 const clip = await makeClip(tmp);
 const lightClip = await makeClip(tmp, 'light-desk-clip', { table: '#d6d2c8', paper: '#f3f2ec', shadow: true });
+// A long narrow shop receipt seen from further away, in a wide picture: it fills under a tenth of the frame.
+const NARROW = [[575, 60], [715, 66], [705, 660], [565, 654]];
+const narrowClip = await makeClip(tmp, 'narrow-clip', { table: '#3a3f44', paper: '#efefe9', shadow: false, corners: NARROW });
+// A white receipt on a white desk: barely lighter than the desk.
+const FAINT = [[440, 90], [860, 120], [835, 640], [415, 615]];
+const faintClip = await makeClip(tmp, 'faint-clip', { table: '#dededa', paper: '#e9e9e5', shadow: false, corners: FAINT });
 await tmp.close();
 
 const b = await chromium.launch({ channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${clip}`] });
@@ -59,26 +66,28 @@ ok('the live camera opens with the camera picture', await live.locator('video').
 const poly = live.locator('polygon.live-poly');
 await poly.waitFor({ timeout: 8000 });
 ok('it draws an outline around the receipt', (await poly.getAttribute('points'))?.split(' ').length === 4);
-// While the picture is not yet taken the hint must pass through "Hold still", and the progress bar must fill.
-const seen = new Set();
-let widest = 0;
-for (let i = 0; i < 40 && !seen.has('Got it. Show the next page, or press Done.'); i++) {
-  seen.add((await live.locator('.live-hint').innerText().catch(() => '')).trim());
-  widest = Math.max(widest, await live.locator('.live-bar i').evaluate((e) => e.getBoundingClientRect().width).catch(() => 0));
-  if (seen.has('Hold still…') && i === 1) await p.screenshot({ path: path.join(OUT, 'live-1-outline.png') });
-  await p.waitForTimeout(100);
-}
-ok('it says "Hold still" while it waits, and the progress bar fills', seen.has('Hold still…') && widest > 20, JSON.stringify([...seen, widest]));
-await live.getByRole('button', { name: 'Page 1' }).waitFor({ timeout: 12000 });
-ok('it takes the picture by itself once the receipt is steady', (await live.getByRole('button', { name: /^Page \d/ }).count()) === 1);
+await p.waitForTimeout(500);
+ok('it says the receipt is found and to press the button', /Receipt found\. Press the button/.test(await live.locator('.live-hint').innerText()), await live.locator('.live-hint').innerText());
+ok('the outline turns green once the receipt is found', await poly.evaluate((e) => e.classList.contains('steady')));
+ok('there is no auto-capture switch', (await live.getByRole('button', { name: 'Auto capture' }).count()) === 0);
+await p.screenshot({ path: path.join(OUT, 'live-1-outline.png') });
+// watch for the page freezing while the camera looks for the receipt
+await p.evaluate(() => { window.__long = []; new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long.push(Math.round(e.duration)); }).observe({ type: 'longtask', buffered: false }); });
+await p.waitForTimeout(4000);
+ok('nothing is taken by itself, even with the receipt held still for 4 seconds', (await live.getByRole('button', { name: /^Page \d/ }).count()) === 0);
+const longs = await p.evaluate(() => window.__long);
+ok('looking for the receipt never freezes the page (no task over 100 ms)', longs.every((d) => d <= 100), JSON.stringify(longs));
+const t0 = Date.now();
+await live.getByRole('button', { name: 'Take picture' }).click();
+await live.getByRole('button', { name: 'Page 1' }).waitFor();
+const took = Date.now() - t0;
+ok('the shutter takes the page at once (under 700 ms to the thumbnail)', took < 700, took + ' ms');
 ok('and offers Done with the page count', await live.getByRole('button', { name: 'Done (1)' }).isVisible());
-await p.waitForTimeout(3500);
-ok('it does not keep taking the same receipt over and over', (await live.getByRole('button', { name: /^Page \d/ }).count()) === 1);
 await p.screenshot({ path: path.join(OUT, 'live-2-first-page.png') });
-
+await p.waitForTimeout(400);
 await live.getByRole('button', { name: 'Take picture' }).click();
 await live.getByRole('button', { name: 'Page 2' }).waitFor();
-ok('the shutter button takes another page by hand', await live.getByRole('button', { name: 'Done (2)' }).isVisible());
+ok('the shutter button takes another page', await live.getByRole('button', { name: 'Done (2)' }).isVisible());
 
 await live.getByRole('button', { name: 'Page 1' }).click();
 const ed = p.locator('.modal.scan');
@@ -106,10 +115,12 @@ ok('the camera is switched off afterwards', stopped);
 console.log('Closing without keeping anything');
 await p.getByRole('button', { name: 'Scan receipt' }).click();
 await live.waitFor();
-await live.getByRole('button', { name: 'Page 1' }).waitFor({ timeout: 12000 });
+await live.locator('polygon.live-poly').waitFor({ timeout: 8000 });
+await live.getByRole('button', { name: 'Take picture' }).click();
+await live.getByRole('button', { name: 'Page 1' }).waitFor();
 await live.getByRole('button', { name: 'Close camera' }).click();
 ok('closing asks before throwing away scanned pages', await live.getByText(/Discard 1 page/).isVisible());
-await p.waitForTimeout(800); // the shutter ignores a second tap in the half second after a picture
+await p.waitForTimeout(500); // the shutter ignores a second tap straight after a picture
 await live.getByRole('button', { name: 'Take picture' }).click();
 await live.getByRole('button', { name: 'Page 2' }).waitFor();
 ok('changing your mind (taking another picture) takes the question away', (await live.getByText(/Discard/).count()) === 0);
@@ -157,10 +168,37 @@ const pts = (await lpoly.getAttribute('points')).split(' ').map((s) => s.split('
 const TRUE = [[430, 70], [880, 110], [850, 650], [400, 610]];
 ok('the outline sits on the receipt even on a light desk in shadow', pts.length === 4 && pts.every(([x, y], i) => Math.hypot(x - TRUE[i][0], y - TRUE[i][1]) < 30), JSON.stringify(pts));
 await l.screenshot({ path: path.join(OUT, 'live-4-light-desk.png') });
-await l.locator('.live-scan').getByRole('button', { name: 'Page 1' }).waitFor({ timeout: 12000 });
-ok('and it takes the picture by itself there too', true);
 ok('no browser errors on the light desk', l.errors.length === 0);
 await b2.close();
+
+/** Opens the scanner on a pretend camera playing `clip`, and returns the outline it settles on (null if none) and the hint. */
+async function outlineFor(clip, name) {
+  const br = await chromium.launch({ channel: 'chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${clip}`] });
+  const ctx = await br.newContext({ viewport: { width: 1280, height: 860 }, baseURL: process.env.WEB ?? 'http://localhost:5173', permissions: ['camera'] });
+  const pg = await ctx.newPage();
+  await pg.goto('/'); await pg.fill('input[type=email]', 'ana.reyes@example.com'); await pg.fill('input[type=password]', 'Reimsys#2026'); await pg.click('button[type=submit]'); await pg.waitForSelector('.shell');
+  await pg.goto('/receipts/new');
+  await fillQuickForm(pg, { payee: name + ' ' + Date.now().toString().slice(-6), amount: '9' });
+  await pg.getByRole('button', { name: 'Scan receipt' }).click();
+  const pl = pg.locator('.live-scan polygon.live-poly');
+  const there = await pl.waitFor({ timeout: 10000 }).then(() => true, () => false);
+  await pg.waitForTimeout(700); // let the outline glide into place
+  const pts = there ? (await pl.getAttribute('points')).split(' ').map((s) => s.split(',').map(Number)) : null;
+  const hint = await pg.locator('.live-hint').innerText();
+  await pg.screenshot({ path: path.join(OUT, `live-${name}.png`) });
+  await br.close();
+  return { pts, hint };
+}
+const near = (pts, truth, tol) => !!pts && pts.length === 4 && pts.every(([x, y], i) => Math.hypot(x - truth[i][0], y - truth[i][1]) < tol);
+
+console.log('A long narrow receipt further away');
+const nar = await outlineFor(narrowClip, 'narrow');
+ok('a narrow receipt filling under a tenth of the picture is still found', near(nar.pts, NARROW, 25), JSON.stringify(nar.pts));
+ok('and it suggests moving closer', /closer/.test(nar.hint), nar.hint);
+
+console.log('A white receipt on a white desk');
+const fa = await outlineFor(faintClip, 'faint');
+ok('a receipt barely lighter than the desk is found', near(fa.pts, FAINT, 25), JSON.stringify(fa.pts));
 
 ok('no browser errors', [p, m, n].every((x) => x.errors.length === 0), JSON.stringify([p, m, n].flatMap((x) => x.errors).slice(0, 3)));
 console.log(failed ? `\n${failed} FAILED. Screenshots in ${OUT}` : `\nAll checks passed. Screenshots in ${OUT}`);

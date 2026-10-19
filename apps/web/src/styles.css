@@ -164,8 +164,6 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .live-flash{position:absolute;inset:0;background:#fff;opacity:0;animation:liveflash .3s ease-out;pointer-events:none}
 @keyframes liveflash{from{opacity:.85}to{opacity:0}}
 .live-hint{text-align:center;padding:8px 14px 4px;font-weight:600;min-height:2.1em}
-.live-bar{height:4px;background:rgba(255,255,255,.2);border-radius:2px;margin:0 28px 6px}
-.live-bar i{display:block;height:100%;background:#3cdc8c;border-radius:2px;transition:width .2s}
 .live-bottom{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:6px 14px calc(env(safe-area-inset-bottom,0px) + 14px)}
 .live-thumbs{display:flex;gap:6px;overflow-x:auto;min-width:0}
 .live-thumb{position:relative;flex:none;width:46px;height:58px;border:2px solid #fff;border-radius:6px;overflow:hidden;padding:0;background:#222;cursor:pointer}
