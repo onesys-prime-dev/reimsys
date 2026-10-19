@@ -18,6 +18,11 @@ export function AppSettingsTab() {
   // Start from what is saved, and pick up changes made by someone else as long as this person has not started editing.
   useEffect(() => { if (q.data && draft === null) setDraft({ ...q.data.settings }); }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const remind = useMutation({
+    mutationFn: () => api<{ sent: number }>('/email-log/reminders-now', { method: 'POST', body: {} }),
+    onSuccess: (d) => toast(d.sent ? `Reminders sent to ${d.sent} ${d.sent === 1 ? 'person' : 'people'}.` : 'Nothing has waited long enough, so no reminders were sent.'),
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
   const done = (d: Data, msg: string) => { qc.setQueryData(['app-settings'], d); setDraft({ ...d.settings }); toast(msg); };
   const save = useMutation({
     mutationFn: (body: unknown) => api<Data>('/app-settings', { method: 'PUT', body }),
@@ -78,6 +83,13 @@ export function AppSettingsTab() {
           <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
         </span>
       </div>
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves at about 9am</small></div>
+        <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <span className="muted">Send the reminders now, using the days you have saved above.</span>
+          <button className="btn" type="button" disabled={remind.isPending} onClick={() => remind.mutate()}>Send reminders now</button>
+        </div>
+      </section>
       {confirmReset && (
         <Modal title="Reset every setting?" onClose={() => setConfirmReset(false)}>
           <p>All the settings on this page go back to their default values for everyone. Receipts already saved are not changed.</p>

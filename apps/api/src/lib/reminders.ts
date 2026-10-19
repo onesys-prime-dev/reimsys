@@ -34,12 +34,12 @@ async function overdue(now: Date): Promise<(Waiting & { stage: ReminderStage; da
 }
 
 /** One reminder per person, listing every overdue receipt they have to act on, longest wait first. */
-export async function reminderLines(now = new Date()): Promise<Map<number, string[]>> {
+export async function reminderLines(now = new Date()): Promise<Map<number, { id: number; line: string }[]>> {
   const list = await overdue(now);
-  const byUser = new Map<number, { days: number; line: string }[]>();
+  const byUser = new Map<number, { days: number; id: number; line: string }[]>();
   const add = (userId: number, w: (typeof list)[number]) => {
     const l = byUser.get(userId) ?? [];
-    l.push({ days: w.days, line: `${w.refNo} · ${w.payee} (${peso(w.amount)}): ${REMINDER_LABEL[w.stage]} for ${w.days} day${w.days === 1 ? '' : 's'}` });
+    l.push({ days: w.days, id: w.id, line: `${w.refNo} · ${w.payee} (${peso(w.amount)}): ${REMINDER_LABEL[w.stage]} for ${w.days} day${w.days === 1 ? '' : 's'}` });
     byUser.set(userId, l);
   };
   const holders = new Map<string, number[]>();
@@ -58,7 +58,7 @@ export async function reminderLines(now = new Date()): Promise<Map<number, strin
       add(id, w);
     }
   }
-  return new Map([...byUser].map(([id, l]) => [id, l.sort((a, b) => b.days - a.days).map((x) => x.line)]));
+  return new Map([...byUser].map(([id, l]) => [id, l.sort((a, b) => b.days - a.days).map((x) => ({ id: x.id, line: x.line }))]));
 }
 
 /** Sends each person their reminder (a notice, and an email). Returns how many people were reminded. */
@@ -68,7 +68,8 @@ export async function sendReminders(now = new Date()): Promise<number> {
   const users = await prisma.user.findMany({ where: { id: { in: [...map.keys()] } }, select: { id: true, name: true, email: true } });
   for (const u of users) {
     const lines = map.get(u.id)!;
-    await notify({ userIds: [u.id], type: 'reminder', text: `${lines.length} receipt${lines.length === 1 ? ' has' : 's have'} been waiting a while: ${lines.map((l) => l.split(' · ')[0]).join(', ')}` });
+    // The notice opens the receipt that has waited longest.
+    await notify({ userIds: [u.id], type: 'reminder', receiptId: lines[0]!.id, text: `${lines.length} receipt${lines.length === 1 ? ' has' : 's have'} been waiting a while: ${lines.map((l) => l.line.split(' · ')[0]).join(', ')}` });
     const mail = await renderEmail({ key: 'reminder', data: { recipientName: u.name.split(' ')[0]!, summary: lines.map((l) => `• ${l}`).join('\n') }, link: config.webOrigin });
     await queueEmail({ userId: u.id, to: u.email, template: 'reminder', subject: mail.subject, html: mail.html });
   }

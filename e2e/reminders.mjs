@@ -34,6 +34,9 @@ ok('nobody is reminded about a receipt that has not waited long', ![liza, paolo,
 ok('the Approver is not reminded about things only the Checker can do', !paolo.includes(waitCheck.refNo));
 ok('the Med Ref is not reminded about stages that are not theirs', !ana.includes(waitCheck.refNo) && !ana.includes(waitDecide.refNo));
 
+const anaNotes = (await call(U.ana, 'GET', '/notifications')).d.items.filter((n) => n.type === 'reminder');
+ok('the notice opens a receipt when clicked', anaNotes.some((n) => Number.isInteger(n.receiptId)));
+
 const mails = (await call(U.admin, 'GET', '/email-log')).d.items;
 ok('the reminder went out as an email too', mails.some((e) => e.template === 'reminder' && e.to === 'liza.santos@example.com'));
 done();
