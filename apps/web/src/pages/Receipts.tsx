@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, TRANSACTION_LABEL, TRANSACTION_TYPES, type ReceiptStatus } from '@reimsys/shared';
 import { ago, api, errMsg, fmtDate, money } from '../api';
 import { useAuth } from '../auth';
@@ -36,7 +36,8 @@ export function ReceiptsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkNote, setBulkNote] = useState('');
   const [bulkResult, setBulkResult] = useState<{ done: number; results: { id: number; refNo: string | null; ok: boolean; message: string }[] } | null>(null);
-  const [status, setStatus] = useState<ReceiptStatus | ''>('');
+  const [sp] = useSearchParams();
+  const [status, setStatus] = useState<ReceiptStatus | ''>(() => { const s = sp.get('status'); return (RECEIPT_STATUSES as readonly string[]).includes(s ?? '') ? (s as ReceiptStatus) : ''; });
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [from, setFrom] = useState('');

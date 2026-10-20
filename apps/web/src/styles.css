@@ -594,3 +594,7 @@ input,select,textarea{border-radius:10px}
 @media(min-width:821px){
   .page.dash .ph{margin-bottom:16px}.page.dash .tiles{margin-bottom:16px}.page.dash .tile{padding:14px 20px}
 }
+.dchips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none}
+a.chip{text-decoration:none}
+a.chip:hover{border-color:var(--accent);color:var(--ink)}
+.dchips{gap:6px;padding:10px 20px}.dchips .chip{padding:4px 10px;font-size:.8rem}
