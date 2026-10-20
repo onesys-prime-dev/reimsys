@@ -16,3 +16,4 @@ backups/
 
 # Screenshots the UI test scripts rewrite in the project root on every run.
 /*.png
+.env.before-app-user
