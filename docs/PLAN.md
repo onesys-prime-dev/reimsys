@@ -324,50 +324,21 @@ Everything still open, in the order to do it. Each step ends with typecheck + te
 All boxes in "Still missing" ticked, privacy notice live and accepted by every user, a restore test passed, and a nightly backup visible in `backups/`.
 
 ## Plan for today (2026-10-20)
-Order matters: safe clean-up first, then the database login, then privacy, then go-live settings. Each step ends with `pnpm typecheck` and `pnpm test`.
 
-### 1. Tidy the repo (10 min)
-- [ ] Decide on `scripts/setup-db-users.mjs`: restore it (`git checkout scripts/setup-db-users.mjs`). It is needed for step 2.
-- [ ] Screenshots in the project root: add them to `.gitignore` (or commit once) so they stop showing as modified.
+REIMSYS — October 20, 2026
 
-### 2. Limited database login (20 min)
-- [ ] Take a backup: `node scripts/backup.mjs`.
-- [ ] Dry run: `node scripts/setup-db-users.mjs`, then `node scripts/setup-db-users.mjs --yes`. Restart the API.
-- [ ] Check sign-in, a receipt submit and the audit log still work. Confirm the app login cannot UPDATE or DELETE audit rows.
-- [ ] Add the script to `docs/DEPLOY.md` and `docs/SECURITY.md`.
+1. Restore scripts/setup-db-users.mjs and stop the screenshots in the project root showing as modified.
+2. Back up, then run setup-db-users.mjs (dry run, then --yes) so the system stops using root. Restart the API.
+3. Test sign-in, submitting a receipt and the audit log; confirm the app login cannot change or delete audit rows.
+4. Add setup-db-users.mjs to docs/DEPLOY.md and docs/SECURITY.md.
+5. Write the Privacy notice (what is collected, why, retention, contact, the one sign-in cookie, acceptable-use lines). (Needs client's lawyer or data protection officer to confirm)
+6. Add the Privacy page (linked from sign-in and sidebar) and the first sign-in "I understand" step, with a test.
+7. Set NODE_ENV=production, real https WEB_ORIGIN, TLS or Nginx, and real MAIL_FROM. (Needs the real values)
+8. Configure SMTP and perform a test send; then switch on forgot-password and invitation emails and test both.
+9. Back up the live database before clearing test data. (Wait for approval before clearing)
+10. Create the first real users, then deactivate the seeded dev accounts.
+11. Set up nightly backups in Task Scheduler, copy them off the machine, and rehearse a restore.
+12. Run pnpm typecheck, pnpm test, then test:api and test:ui against a staging copy; check /api/health over https.
+13. Ask the client for: document and report layouts, final categories and branding, retention period, data protection contact.
 
-### 3. Privacy notice, cookie line and acknowledgement (1 to 2 hours)
-No cookie banner is needed: the only cookie is the sign-in session cookie, which is strictly necessary. Confirm the web app has no analytics or third-party scripts. Terms and conditions are optional for a staff-only system, so a short acceptable-use line goes inside the notice.
-- [ ] Write a one-page Privacy notice: what is collected (names, emails, receipt images, vendor TINs, the history log), why, who sees it, how long it is kept (retention period still to come from the client), a data protection officer contact, and the line "We use one cookie to keep you signed in."
-- [ ] Add the acceptable-use lines: submit only genuine receipts, do not share your login, all actions are recorded.
-- [ ] Add a Privacy page linked from the sign-in page and the sidebar footer.
-- [ ] Add an "I understand" acknowledgement on first sign-in (next to the forced password change), storing the date and notice version.
-- [ ] Add a unit test and update the UI test for the new first sign-in step.
-- [ ] Have the client's lawyer or data protection officer confirm the wording.
-
-### 4. Go-live settings (30 min, needs the real values)
-- [ ] `NODE_ENV=production`, real https `WEB_ORIGIN`, `TLS_CERT` and `TLS_KEY` (or Nginx), real `MAIL_FROM`.
-- [ ] SMTP details filled in, then send one test email.
-- [ ] Switch on forgot-password and invitation emails once the https address exists, and test both.
-
-### 5. Data and accounts (20 min, only when ready for real use)
-- [ ] Backup, then `data:clear` to remove test receipts.
-- [ ] Deactivate the seeded accounts (shared password `Reimsys#2026`) and create the real users.
-
-### 6. Backups (30 min)
-- [ ] Schedule the nightly backup from `docs/BACKUP.md`.
-- [ ] Copy backups off the machine.
-- [ ] Do one test restore with `node scripts/restore.mjs backups/<folder> --yes --db reimsys_restore_test --files C:/temp/restored-files`.
-
-### 7. Checks (30 min)
-- [ ] Run `pnpm test:api` and `pnpm test:ui` against a staging copy, never live data.
-- [ ] Check `/api/health` over https.
-
-### Ask the client today
-- [ ] Their reimbursement document and liquidation report layouts.
-- [ ] Final category list and branding.
-- [ ] Data retention period (feeds the privacy notice and the retention clean-up).
-- [ ] Who is the data protection contact.
-
-### Not for today
-Retention clean-up (needs the period), monitoring and alerts, and the user guide stay on the "Still missing" list above.
+Not for today: retention clean-up, monitoring and alerts, user guide.
