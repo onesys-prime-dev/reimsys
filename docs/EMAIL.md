@@ -89,3 +89,14 @@ Links in emails: the button only appears when REIMSYS has a normal `https://` ad
 ## Demo and example addresses
 
 Addresses on `example.com`, `example.org`, `example.net`, `.test`, `.invalid` and `localhost` can never be real mailboxes, so REIMSYS does not try to send to them. They show as **logged** in Audit log, Emails ("Example address, not a real mailbox, so it was not sent"). This stops the seeded demo users from producing bounce messages in your inbox, for example from the morning summary. A local test mailbox (`localhost`) can still receive them, so testing is unaffected. Real users on real addresses are not affected.
+
+## Email works here but not on the live server: what to check
+Open **Audit log → Email log** on the live system. Every email has a status, and the text next to it says why.
+1. **"Example address, not a real mailbox, so it was not sent"** (status *logged*). Addresses on example.com, .test and similar are never sent to. The demo accounts (admin@example.com and the others) will never get email. Use real addresses on the live system.
+2. **"No mail account is set up yet"** (*logged*). The live database has no mail account. The account is saved in the database, so a new server starts without one. Enter it in **Access → Email** (or in `.env`).
+3. **"The saved mail password cannot be unlocked on this server"** (*failed*, and a red box above the log). The database was moved to a new server without the key that locks the password (`storage/.settings-key`, or `SETTINGS_KEY` if you set it). Enter the mail password again in Access → Email, then save. To avoid it next time, set `SETTINGS_KEY` in `.env` before saving the password, and keep it with your other secrets.
+4. **"The server rejected the username or password"** (*failed*). For Gmail use an App password (see above), not the normal password.
+5. **"Could not connect…" or "did not answer in time"** (*failed*). The live server cannot reach the mail server. Many hosting providers block outgoing mail ports (25, and sometimes 465 or 587). Ask the provider, or use a mail service that offers port 2525 or an API relay.
+6. **Sent, but nothing arrives.** The log says "Accepted for…" (the mail server took it). Check the spam folder. Mail from a company address needs SPF and DKIM set up for that domain, and a "from" address on a domain you control. Gmail rewrites the From address to the signed-in account.
+7. **Nothing is queued at all.** `node scripts/healthcheck.mjs` reports emails stuck for more than 30 minutes, and the API process must be running (the sender is part of it).
+`node scripts/preflight.mjs` checks that a mail account exists and warns when `SETTINGS_KEY` is not set.

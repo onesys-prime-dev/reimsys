@@ -148,7 +148,7 @@ emailLogRouter.post('/:id/retry', async (req, res) => {
 
 emailLogRouter.get('/status', async (_req, res) => {
   const mail = await resolveMail();
-  res.json({ configured: !!mail.smtp, source: mail.source, testRedirect: mail.redirectTo ?? null, host: mail.smtp?.host ?? null, port: mail.smtp?.port ?? null, from: mail.from });
+  res.json({ configured: !!mail.smtp, source: mail.source, testRedirect: mail.redirectTo ?? null, passwordUnreadable: !!mail.passwordUnreadable, host: mail.smtp?.host ?? null, port: mail.smtp?.port ?? null, from: mail.from });
 });
 
 /** Sends a short message so an administrator can confirm the mail settings work. It goes through the same queue as real emails. */

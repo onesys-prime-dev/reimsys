@@ -102,7 +102,7 @@ function Emails() {
     onSuccess: () => { toast('Queued again.'); qc.invalidateQueries({ queryKey: ['email-log'] }); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
-  const status2 = useQuery({ queryKey: ['email-status'], queryFn: () => api<{ configured: boolean; host: string | null; port: number | null; from: string }>('/email-log/status') });
+  const status2 = useQuery({ queryKey: ['email-status'], queryFn: () => api<{ configured: boolean; passwordUnreadable?: boolean; host: string | null; port: number | null; from: string }>('/email-log/status') });
   const [testTo, setTestTo] = useState('');
   const sendTest = useMutation({
     mutationFn: () => api('/email-log/test', { method: 'POST', body: { to: testTo } }),
@@ -113,9 +113,10 @@ function Emails() {
   const tone = (s: string) => (s === 'sent' ? 's-app' : s === 'failed' ? 's-dis' : s === 'logged' ? 's-ret' : 's-sub');
   return (
     <>
-      {status2.data && (status2.data.configured
+      {status2.data?.passwordUnreadable && <div className="callout bad" role="alert" style={{ marginTop: 0 }}><Icon name="info" /><div><b>Emails cannot be sent: the saved mail password cannot be unlocked</b><span>This server does not have the key the password was saved with (for example after moving the database to a new server). Open Access, then Email, and enter the mail password again.</span></div></div>}
+      {status2.data && !status2.data.passwordUnreadable && (status2.data.configured
         ? <div className="callout ok" style={{ marginTop: 0 }}><Icon name="check" /><div><b>Sending through {status2.data.host}:{status2.data.port}</b><span>Messages go out as {status2.data.from}.</span></div></div>
-        : <div className="callout warn" style={{ marginTop: 0 }}><Icon name="info" /><div><b>Emails marked "logged" were not sent</b><span>No SMTP server is configured, so messages are only recorded here. Add the SMTP settings to the server environment to send them.</span></div></div>)}
+        : <div className="callout warn" style={{ marginTop: 0 }}><Icon name="info" /><div><b>Emails marked "logged" were not sent</b><span>No mail account is set up, so messages are only recorded here. Open Access, then Email, and enter the mail account.</span></div></div>)}
       <form className="tools" onSubmit={(e) => { e.preventDefault(); if (testTo) sendTest.mutate(); }}>
         <div style={{ flex: '1 1 260px', maxWidth: 380 }}><input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="Send a test email to…" aria-label="Test email address" /></div>
         <button className="btn pri" type="submit" disabled={!testTo || sendTest.isPending}>Send test email</button>

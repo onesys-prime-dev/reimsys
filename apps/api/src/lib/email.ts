@@ -87,6 +87,9 @@ export function explainMailError(err: unknown): string {
   return (msg || code || 'Could not reach the mail server').slice(0, 250);
 }
 
+/** The saved mail password was locked with a key this server does not have (a restored database without its storage folder, or a different SETTINGS_KEY). */
+export const PASSWORD_UNREADABLE = 'The saved mail password cannot be unlocked on this server (the key it was saved with is missing). Open Access, then Email, and enter the mail password again.';
+
 /** Records the email and queues it. Sending happens in the worker, with retries. */
 export async function queueEmail(input: { userId?: number; to: string; template: string; subject: string; html: string }) {
   const row = await prisma.emailLog.create({
@@ -103,6 +106,11 @@ registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
   if (!mail.smtp) {
     console.log(`[email not sent: no mail account is set up] to=${row.toEmail} subject="${row.subject}"`);
     await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'logged', error: 'No mail account is set up yet' } });
+    return;
+  }
+  if (mail.passwordUnreadable) {
+    // Retrying cannot help: someone has to enter the mail password again on this server.
+    await prisma.emailLog.update({ where: { id: row.id }, data: { status: 'failed', error: PASSWORD_UNREADABLE } });
     return;
   }
   try {

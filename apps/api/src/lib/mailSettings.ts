@@ -12,6 +12,8 @@ export interface ResolvedMail {
   from: string;
   /** Test mode: every email is delivered here instead of to its real recipient. */
   redirectTo?: string;
+  /** A mail password is saved, but this server cannot unlock it (the key in storage/.settings-key or SETTINGS_KEY is not the one it was saved with). */
+  passwordUnreadable?: boolean;
 }
 
 const fromHeader = (name: string, address: string) => (name ? `"${name.replace(/"/g, '')}" <${address}>` : address);
@@ -32,8 +34,9 @@ export async function resolveMail(): Promise<ResolvedMail> {
   let value: ResolvedMail;
   if (s) {
     let pass: string | undefined;
-    try { pass = s.passEnc ? decrypt(s.passEnc) : undefined; } catch { pass = undefined; }
-    value = { source: 'database', smtp: { host: s.host, port: s.port, secure: s.secure, user: s.user || undefined, pass }, from: fromHeader(s.fromName, s.fromAddress), redirectTo: s.testRedirect || undefined };
+    let unreadable = false;
+    try { pass = s.passEnc ? decrypt(s.passEnc) : undefined; } catch { pass = undefined; unreadable = true; }
+    value = { source: 'database', smtp: { host: s.host, port: s.port, secure: s.secure, user: s.user || undefined, pass }, from: fromHeader(s.fromName, s.fromAddress), redirectTo: s.testRedirect || undefined, passwordUnreadable: unreadable || undefined };
   } else if (config.smtp) {
     value = { source: 'environment', smtp: config.smtp, from: config.mailFrom };
   } else {
