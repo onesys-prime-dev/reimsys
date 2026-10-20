@@ -425,3 +425,9 @@ Retention clean-up (needs the period), monitoring and alerts, user guide.
 - **Still to do:** remove Check, Approve, Pay and Create receipt from the Super Admin role (Access → Roles and permissions). Not done: it needs the administrator's own say-so.
 - Still needs real values: https address, SMTP, From address (Phase C); first real Super Admin, real users, then `demo:off` (Phase D); phone camera and real inbox tests.
 - Done (later): Check, Approve, Pay and Create receipt removed from the Super Admin role (audited). Super Admin now has 11 rights and sees Dashboard, Receipts, Reports, Access and Audit log. Role sweep: no problems.
+
+### Production readiness work (2026-10-20, evening)
+Target: a Linux server / VPS (`docs/DEPLOY.md`, new "Go-live runbook").
+- Done: fonts bundled with the app (no Google requests; CSP tightened to the app's own address; checked in Chrome through the API port with no CSP errors); `scripts/preflight.mjs` (go-live gate, lists blockers and advice); `scripts/healthcheck.mjs` (API, disk, backup age, stuck emails, optional webhook); `BACKUP_COPY_TO` / `--copy-to` off-disk backup copy (tested); `SEED_DEMO=false` seed and `pnpm --filter @reimsys/api admin:create` so a real server never has demo accounts (tested on a spare database); runbook, BACKUP and SECURITY docs updated.
+- On this dev PC `node scripts/preflight.mjs` reports 6 blockers: production mode, https address, SMTP, real From address, demo accounts active, no real Super Admin. These only clear on the real server.
+- Still needs from you: the server and domain, SMTP details and From address, the first real admin's name (email given: onesysprimedev@gmail.com), the retention period and data protection contact, lawyer sign-off on the notice, document/report layouts, categories and branding.

@@ -35,7 +35,8 @@ async function main() {
 
   // A live system that has switched the demo accounts off (pnpm demo:off) gets none back when it is re-seeded during an upgrade.
   const retired = (await prisma.auditLog.count({ where: { action: 'user.demo_retired' } })) > 0;
-  const demo = demoUsersToCreate(retired);
+  // SEED_DEMO=false (a real server): no demo accounts at all. Create the first Super Admin with pnpm admin:create.
+  const demo = demoUsersToCreate(retired || process.env.SEED_DEMO === 'false');
   const passwordHash = await hashPassword(DEV_PASSWORD);
   for (const u of demo) {
     await prisma.user.upsert({

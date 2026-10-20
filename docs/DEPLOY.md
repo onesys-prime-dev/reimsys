@@ -29,11 +29,12 @@ git clone <repo> /srv/reimsys && cd /srv/reimsys
 pnpm install --frozen-lockfile
 cp apps/api/.env.example apps/api/.env      # edit it, see below
 pnpm --filter @reimsys/api exec prisma migrate deploy
-pnpm --filter @reimsys/api db:seed           # creates roles, permissions, categories and the demo users
+SEED_DEMO=false pnpm --filter @reimsys/api db:seed   # roles, permissions, categories; SEED_DEMO=false = no demo accounts
+pnpm --filter @reimsys/api admin:create -- --email you@company.com --name "Your Name"   # the first real Super Admin (temporary password shown once)
 pnpm build
 ```
 
-After seeding, sign in as `admin@example.com`, create the real users on the Access page, then deactivate every `@example.com` demo account. The demo password is public, so do not skip this.
+On a real server seed with `SEED_DEMO=false` and create the first Super Admin with `admin:create`, so no account with the public demo password ever exists. (If you seeded without it, create the real admin, sign in as them, and run `demo:off` as described under Going live.) Sign in, choose a password, accept the privacy notice, then create the other users on the Access page.
 
 `apps/api/.env` for production:
 
@@ -204,3 +205,21 @@ Everyone sees the privacy notice once after signing in (after choosing a passwor
 3. The demo accounts from the seed start with the notice accepted, so the test scripts can sign in. Real users always see it. Each acceptance is in the history log (`privacy.accepted`).
 4. To go back: `docs/rollback-privacy-notice.sql`, or restore the backup.
 5. Checks: `node e2e/privacy-flow.mjs` (API) and `node e2e/privacy-ui.mjs` (browser, computer and phone).
+
+## Go-live runbook (Linux server)
+Do these in order. Step 9 is the gate: it must report no blockers.
+
+1. Server: Node 20+, pnpm, MariaDB/MySQL, Nginx, a DNS name and a certificate (`certbot --nginx`).
+2. Database and users: section 2, then `docs/db-grants.sql`, or on one machine `node scripts/setup-db-users.mjs --yes`. Give the MySQL `root` account a password (`mysql_secure_installation`).
+3. Build and configure: section 3. Set `NODE_ENV=production`, the real `WEB_ORIGIN`, `STORAGE_DIR` outside the code folder, SMTP and `MAIL_FROM`. Add `BACKUP_COPY_TO=/mnt/offsite` (another disk, a mounted network or cloud-synced folder).
+4. Migrate with the full-rights login, seed with `SEED_DEMO=false`, create the first admin with `admin:create`.
+5. Run it (section 4 PM2) behind Nginx (section 5). Open `https://<host>/api/health`.
+6. Email: sign in, Access → Email, send a test; then check forgot-password and an invitation end to end.
+7. Backups: add to cron `0 2 * * * cd /srv/reimsys && node scripts/backup.mjs >> /var/log/reimsys-backup.log 2>&1`, run it once by hand, and rehearse a restore into a spare database (`docs/BACKUP.md`).
+8. Monitoring: add `*/5 * * * * cd /srv/reimsys && node scripts/healthcheck.mjs --webhook <your chat or ntfy.sh URL>`. It checks the API, free disk space, backup age and stuck emails, and posts only when something is wrong.
+9. Gate: `node scripts/preflight.mjs`. Fix every BLOCKER (production mode, https address, SMTP, real From address, no demo accounts, a real Super Admin, a recent backup). Read the advice lines.
+10. Phone check: open the https address on a phone, sign in, and use "Scan receipt" (the live camera only works on https).
+11. Fill in the retention period and data protection contact in `apps/web/src/pages/Privacy.tsx`, raise `PRIVACY_VERSION`, rebuild, and have the client's lawyer or data protection officer approve the wording.
+12. Before the first real receipt: if any test receipts exist, back up, then `data:clear`.
+
+Fonts are bundled with the app, so no visitor's address is sent to Google. Everything the page loads comes from your own server.

@@ -5,7 +5,7 @@
   --info:#2457c5;--info-soft:#e3ecfc;--ok:#1b7b4a;--ok-soft:#dff3e7;--bad:#b5352e;--bad-soft:#fbe6e4;
   --warn:#8a5a00;--warn-soft:#fbf0d3;--hold:#6d45b8;--hold-soft:#ece6f8;
   --shadow:0 1px 2px rgba(18,35,43,.06),0 4px 14px rgba(18,35,43,.05);
-  --sans:'Public Sans',system-ui,sans-serif;--display:'Bricolage Grotesque','Public Sans',system-ui,sans-serif;
+  --sans:'Public Sans Variable','Public Sans',system-ui,sans-serif;--display:'Bricolage Grotesque Variable','Bricolage Grotesque','Public Sans Variable',system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0c1519;--surface:#132127;--ink:#e6eef0;--muted:#92a7ae;--line:#24373e;--soft:#192a31;

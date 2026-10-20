@@ -18,6 +18,7 @@ What is protected, how it was checked, and what still needs a decision from whoe
 | Secrets | The saved email password is encrypted. It is never shown, logged or returned, not even to administrators. `.env` and the storage folder are not in the repository. |
 | Audit | Every sign-in, failed sign-in, action, evidence view, download, print and settings change is recorded with who, what and when. With `docs/db-grants.sql` applied, the app cannot change or delete audit rows. |
 | Password links | One-time, hashed, short-lived, only the newest works, and the "forgot password" page answers identically for every address, in the same time. |
+| Outside requests | The page loads its fonts from the app itself and makes no requests to other companies; the content security policy allows only the app's own address. |
 | Privacy notice | Everyone must accept the current privacy notice after their first sign-in; until then the server refuses everything except reading their own profile, changing their password, accepting and signing out. Each acceptance is recorded with the version. REIMSYS sets one cookie (the sign-in session) and loads no analytics or outside scripts. |
 | Dependencies | No known vulnerabilities in what ships (`pnpm audit --prod`). A few notices remain in build-only tools that do not run in production. |
 

@@ -1,5 +1,5 @@
 // Backs up the database and the uploaded files into backups/<date-time>/. Run it every night (see docs/BACKUP.md).
-// Usage: node scripts/backup.mjs [--keep 14] [--to D:\backups]
+// Usage: node scripts/backup.mjs [--keep 14] [--to D:/backups] [--copy-to E:/offsite]
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -34,4 +34,16 @@ fs.writeFileSync(path.join(dir, 'about.json'), JSON.stringify({ made: new Date()
 // Keep the newest `keep` backups, delete older ones.
 const all = fs.readdirSync(target).filter((n) => /^\d{8}-\d{6}$/.test(n)).sort();
 for (const old of all.slice(0, Math.max(0, all.length - keep))) fs.rmSync(path.join(target, old), { recursive: true, force: true });
+// A second copy somewhere else (another disk, a synced or network folder): BACKUP_COPY_TO in apps/api/.env or --copy-to. A failed copy fails the whole run so the scheduler shows it.
+const copyTo = arg('--copy-to', env.BACKUP_COPY_TO);
+if (copyTo) {
+  try {
+    const dest = path.resolve(copyTo);
+    fs.mkdirSync(dest, { recursive: true });
+    fs.cpSync(dir, path.join(dest, stamp), { recursive: true });
+    const there = fs.readdirSync(dest).filter((n) => /^d{8}-d{6}$/.test(n)).sort();
+    for (const old of there.slice(0, Math.max(0, there.length - keep))) fs.rmSync(path.join(dest, old), { recursive: true, force: true });
+    console.log(`Copied to ${path.join(dest, stamp)}`);
+  } catch (e) { console.error('Backup made, but the copy to ' + copyTo + ' FAILED: ' + e.message); process.exitCode = 1; }
+}
 console.log(`Backup done: ${dir}\n  database ${(fs.statSync(sqlFile).size / 1024).toFixed(0)} KB, ${fileCount} uploaded files. Keeping the newest ${keep}.`);
