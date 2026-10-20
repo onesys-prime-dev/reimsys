@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { detectQuad, type Pt, type Quad, type ScanMode } from '../scan';
 import { putRaster, readPhoto, renderPage, type ScanPage } from '../scanPage';
+import { ZoomPan } from './ZoomPan';
 
 const CORNERS = ['Top left corner', 'Top right corner', 'Bottom right corner', 'Bottom left corner'];
 const MODES: { key: ScanMode; label: string }[] = [{ key: 'document', label: 'Document' }, { key: 'original', label: 'Original' }, { key: 'bw', label: 'Black & white' }];
@@ -88,7 +89,7 @@ export function ScanDialog({ file, page, onCancel, onRetake, onApply, onDelete, 
                   ))}
                 </svg>
               </div>
-              <div className="scan-out"><canvas ref={resultCanvas} className="result" aria-label="The page as it will be saved" /></div>
+              <div className="scan-out"><ZoomPan label="The page as it will be saved" className="scanzp"><canvas ref={resultCanvas} className="result" aria-label="The page as it will be saved" /></ZoomPan></div>
             </div>
           )}
           <div className="seg" role="radiogroup" aria-label="Look" style={{ marginTop: 12 }}>

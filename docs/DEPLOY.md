@@ -214,7 +214,7 @@ Do these in order. Step 9 is the gate: it must report no blockers.
 3. Build and configure: section 3. Set `NODE_ENV=production`, the real `WEB_ORIGIN`, `STORAGE_DIR` outside the code folder, SMTP and `MAIL_FROM`. Add `BACKUP_COPY_TO=/mnt/offsite` (another disk, a mounted network or cloud-synced folder).
 4. Migrate with the full-rights login, seed with `SEED_DEMO=false`, create the first admin with `admin:create`.
 5. Run it (section 4 PM2) behind Nginx (section 5). Open `https://<host>/api/health`.
-6. Email: sign in, Access → Email, send a test; then check forgot-password and an invitation end to end.
+6. Email: sign in, Access → Email, send a test; then check forgot-password and an invitation end to end. If nothing arrives, run `pnpm --filter @reimsys/api mail:check -- --to you@company.com` on the server: it shows whether the server can reach the mail ports (many VPS providers block them) and whether the login works.
 7. Backups: add to cron `0 2 * * * cd /srv/reimsys && node scripts/backup.mjs >> /var/log/reimsys-backup.log 2>&1`, run it once by hand, and rehearse a restore into a spare database (`docs/BACKUP.md`).
 8. Monitoring: add `*/5 * * * * cd /srv/reimsys && node scripts/healthcheck.mjs --webhook <your chat or ntfy.sh URL>`. It checks the API, free disk space, backup age and stuck emails, and posts only when something is wrong.
 9. Gate: `node scripts/preflight.mjs`. Fix every BLOCKER (production mode, https address, SMTP, real From address, no demo accounts, a real Super Admin, a recent backup). Read the advice lines.

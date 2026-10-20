@@ -51,11 +51,12 @@ function otsu(gray: Uint8Array) {
 
 /**
  * Looks for the receipt: the biggest bright patch in the photo. Returns its four corners in the photo's own pixels.
- * When nothing stands out (a white receipt on a white desk, a photo of only the receipt) it returns the whole photo,
- * and the person drags the corners themselves.
+ * When nothing stands out at all (a photo of only the receipt, or a plain table) it returns the whole photo,
+ * and the person drags the corners themselves. A white receipt on a light desk gets the fainter search first.
  */
 export function detectQuad(img: Raster): Quad {
-  return findQuad(img) ?? wholePhoto(img.width, img.height);
+  // A person looks at this one and can drag the corners, so a fainter outline (a white receipt on a light desk) is better than nothing.
+  return locate(img, 0.03, true)?.quad ?? wholePhoto(img.width, img.height);
 }
 
 /**

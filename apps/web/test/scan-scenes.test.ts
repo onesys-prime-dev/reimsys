@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { findQuad, findQuadLive } from '../src/scan';
+import { detectQuad, findQuad, findQuadLive } from '../src/scan';
 import { SCENES, flat, inside, make, receipt, tolerance, worstCorner } from './scenes';
 import type { Pt, Quad } from '../src/scan';
 
@@ -85,5 +85,22 @@ describe('the live camera: a faint receipt is offered, an empty table never is',
       if (findQuadLive(make(empty), 0)) invented.push(`${name} (noise ${noise})`);
     }
     expect(invented).toEqual([]);
+  });
+});
+
+describe('a saved photo of a white receipt on a light desk', () => {
+  const faint = (contrast: number, seed: number) => ({ w: 480, h: 360, quad: receipt(240, 180, 230, 290, -9, 8), table: flat(226), paper: flat(226 + contrast), blur: 2, noise: 5, seed });
+  for (const contrast of [14, 9, 7]) for (const seed of [1, 2, 3]) {
+    it(`is outlined, not given up on as "the whole photo" (contrast ${contrast}, seed ${seed})`, () => {
+      const s = faint(contrast, seed), q = detectQuad(make(s));
+      expect(worstCorner(q, s.quad), 'the outline should sit on the receipt').toBeLessThan(tolerance(s.w, s.h));
+    });
+  }
+  it('still gives the whole photo when there is no receipt to find', () => {
+    for (const { scene } of SCENES) {
+      const empty = { ...scene, paper: scene.table, text: false, overlay: undefined, shape: () => false, noise: 4, seed: 11 };
+      const q = detectQuad(make(empty));
+      expect([q[0].x, q[0].y, q[2].x, q[2].y]).toEqual([0, 0, scene.w - 1, scene.h - 1]);
+    }
   });
 });
