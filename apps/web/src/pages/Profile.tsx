@@ -9,6 +9,26 @@ import { Avatar, Empty, Field, Icon, Switch, useToast } from '../ui';
 const TABS = [['details', 'Details'], ['security', 'Security'], ['notify', 'Notifications'], ['access', 'My access'], ['look', 'Appearance'], ['activity', 'Activity']] as const;
 type Tab = (typeof TABS)[number][0];
 
+/**
+ * Phone photos are often 4 to 10 MB, more than the 2 MB the server accepts. This crops the picture to a square, scales it to 512 px and saves it as a
+ * JPEG (about 100 KB) before it is sent. If the browser cannot read the file, the original is sent and the server says what is wrong.
+ */
+async function shrinkPhoto(f: File): Promise<File> {
+  try {
+    const bmp = await createImageBitmap(f);
+    const side = Math.min(bmp.width, bmp.height);
+    const out = Math.min(512, side);
+    const canvas = document.createElement('canvas');
+    canvas.width = out; canvas.height = out;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return f;
+    ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.88));
+    return blob ? new File([blob], 'photo.jpg', { type: 'image/jpeg' }) : f;
+  } catch { return f; }
+}
+
 export function ProfilePage() {
   const { me } = useAuth();
   const [tab, setTab] = useState<Tab>('details');
@@ -43,7 +63,7 @@ function Details() {
     onError: (e) => toast(errMsg(e), 'bad'),
   });
   const photo = useMutation({
-    mutationFn: (f: File) => { const form = new FormData(); form.append('photo', f); return api<MeResponse>('/me/photo', { method: 'POST', form }); },
+    mutationFn: async (f: File) => { const form = new FormData(); const small = await shrinkPhoto(f); form.append('photo', small, small.name); return api<MeResponse>('/me/photo', { method: 'POST', form }); },
     onSuccess: (d) => { setMe(d); setVer((v) => v + 1); toast('Photo updated.'); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
@@ -53,7 +73,7 @@ function Details() {
     <section className="card">
       <form className="card-b" onSubmit={submit}>
         <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
-          <Avatar name={me!.name} userId={me!.id} hasPhoto={me!.hasPhoto} size={72} version={ver} />
+          <Avatar name={me!.name} userId={me!.id} hasPhoto={me!.hasPhoto} photoV={me!.photoV} size={72} version={ver} />
           <div>
             <b style={{ fontSize: '1.1rem' }}>{me!.name}</b><br />
             <span className="muted">{me!.role.name}</span><br />

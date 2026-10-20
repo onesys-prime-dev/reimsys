@@ -65,7 +65,7 @@ function Shell() {
         <NavLink to="/" className="brand" aria-label="Go to the dashboard" style={{ textDecoration: 'none', color: 'inherit' }}><Logo size={34} /></NavLink>
         <nav className="nav" aria-label="Main">{items.map(link)}</nav>
         <button className="who" onClick={() => nav('/profile')}>
-          <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} />
+          <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} />
           <span><b>{me.name}</b><small>{me.role.name}</small></span>
         </button>
         <NavLink to="/privacy" className="privacy-link">Privacy notice</NavLink>
@@ -75,7 +75,7 @@ function Shell() {
           <div className="t">{titleFor(loc.pathname)}</div>
           <LiveLight state={live} />
           <NotificationBell />
-          <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} size={30} /></button>
+          <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} size={30} /></button>
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />

@@ -144,7 +144,7 @@ export interface RoleSummary { id: number; code: string; name: string; rank: num
 export interface MeResponse {
   user: {
     id: number; name: string; email: string; phone: string | null; branch: string | null;
-    hasPhoto: boolean; theme: 'light' | 'dark' | 'system'; mustChangePassword: boolean;
+    hasPhoto: boolean; photoV: number | null; theme: 'light' | 'dark' | 'system'; mustChangePassword: boolean;
     /** True until the person accepts the current privacy notice (shown after the password step). */
     privacyRequired: boolean;
     prefs: { dailyDigest: boolean; reservationReleased: boolean };

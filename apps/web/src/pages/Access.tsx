@@ -10,7 +10,7 @@ import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '..
 
 interface UserRow {
   id: number; name: string; email: string; isActive: boolean; mustChangePassword: boolean;
-  lockedUntil: string | null; lastLoginAt: string | null; hasPhoto: boolean; role: RoleSummary;
+  lockedUntil: string | null; lastLoginAt: string | null; hasPhoto: boolean; photoV: number | null; role: RoleSummary;
   privacyAcceptedVersion: number | null; privacyAcceptedAt: string | null;
 }
 
@@ -78,7 +78,7 @@ function UsersTab() {
           return (
             <div className="urow x" key={u.id}>
               <div className="nm">
-                <Avatar name={u.name} userId={u.id} hasPhoto={u.hasPhoto} />
+                <Avatar name={u.name} userId={u.id} hasPhoto={u.hasPhoto} photoV={u.photoV} />
                 <div><b>{u.name}{self && <span className="muted"> (you)</span>}</b><small className="em">{u.email}</small></div>
               </div>
               <span className="em muted stt2">
