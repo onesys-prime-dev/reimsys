@@ -79,7 +79,7 @@ function Shell() {
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />
-        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${isForm(loc.pathname) ? 'narrow' : ''}`}>
+        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${loc.pathname === '/reports' ? 'rfit' : ''} ${isForm(loc.pathname) ? 'narrow' : ''}`}>
           <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
