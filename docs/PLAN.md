@@ -250,3 +250,28 @@ Plan: `docs/superpowers/plans/2026-10-16-return-issues.md`.
 - **Fix:** opens `/receipts/<id>/edit?step=<step>`, only for the owner while the receipt can be edited. The form skips steps the answers make unnecessary, so a step that does not exist (for example VAT on a receipt with no BIR invoice) falls back to Invoice details; an unknown or misplaced `?step=` is ignored. Receipts returned before this feature show their note as before, with no Fix buttons.
 - **Data:** one additive nullable column (migration `20261016010000_return_issues`), undone by `docs/rollback-return-issues.sql`.
 - **Tests:** `packages/shared/test/returnIssues.test.ts`, `e2e/return-issues-flow.mjs` (API), `e2e/return-ui.mjs` (browser, computer and phone).
+
+## Still missing (review of 2026-10-20)
+Code, typecheck and the 189 unit tests are fine. These are the gaps between "built" and "live". Tick them off as they are done.
+
+### Must do before real receipts
+- [ ] **Limited database login.** Run `node scripts/setup-db-users.mjs --yes` so the system stops using `root` and the history log is append-only at the database level. It has never been run. (The script is deleted in the working tree: restore it or commit the deletion.) Add it to `docs/DEPLOY.md` and `docs/SECURITY.md`.
+- [ ] **Production settings.** `NODE_ENV=production`, real https address in `WEB_ORIGIN`, `TLS_CERT`/`TLS_KEY` or Nginx, real `MAIL_FROM`.
+- [ ] **Real email.** Fill in the SMTP details; until then emails are only written to the email log.
+- [ ] **Remove dev accounts.** Deactivate the seeded accounts (shared password `Reimsys#2026`) and create the real users.
+- [ ] **Clear test data.** Back up, then `data:clear` (keeps users, roles, settings, categories; restarts reference numbers).
+- [ ] **Nightly backup + restore test.** Schedule `scripts/backup.mjs` (see `docs/BACKUP.md`), copy backups off the machine, and do one test restore.
+
+### Needs the client
+- [ ] Their own reimbursement document and liquidation report layouts (current ones are placeholders).
+- [ ] The real category list, branding (logo, name), and a data retention period (then build the retention clean-up).
+
+### Not built yet
+- [ ] **Forgot-password and invitation emails.** Waiting for a public https address; then switch them on and test.
+- [ ] **Retention clean-up.** Nothing deletes or archives old records yet; build once the client sets the period.
+- [ ] **Monitoring.** Something that checks `/api/health` and tells someone when the API, worker or email queue stops, and when the disk is nearly full.
+- [ ] **Run the end-to-end checks against a staging copy.** `e2e/api-flow.mjs` and the UI scripts were not part of this review; run them with `API=https://<host>/api` before go-live.
+- [ ] **User guide / training notes** for Med Refs, Checkers, Approvers and Accounting.
+
+### Housekeeping
+- [ ] The test screenshots in the project root (`bulk-*.png`, `comments*.png`, `undo-*.png`) change on every UI test run: commit them once or move them to a git-ignored folder.
