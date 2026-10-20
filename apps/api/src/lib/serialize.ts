@@ -48,6 +48,8 @@ export const userRow = (u: User & { role: Role }) => ({
   mustChangePassword: u.mustChangePassword,
   lockedUntil: u.lockedUntil,
   lastLoginAt: u.lastLoginAt,
+  privacyAcceptedVersion: u.privacyAcceptedVersion,
+  privacyAcceptedAt: u.privacyAcceptedAt,
   phone: u.phone,
   branch: u.branch,
   hasPhoto: !!u.photoFile,

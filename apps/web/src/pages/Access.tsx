@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { PERMISSIONS, isLockedGrant, type RoleSummary } from '@reimsys/shared';
+import { PERMISSIONS, isLockedGrant, needsPrivacy, type RoleSummary } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';
@@ -11,6 +11,7 @@ import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '..
 interface UserRow {
   id: number; name: string; email: string; isActive: boolean; mustChangePassword: boolean;
   lockedUntil: string | null; lastLoginAt: string | null; hasPhoto: boolean; role: RoleSummary;
+  privacyAcceptedVersion: number | null; privacyAcceptedAt: string | null;
 }
 
 export function AccessPage() {
@@ -79,6 +80,7 @@ function UsersTab() {
               </div>
               <span className="em muted stt2">
                 {!u.isActive ? 'Deactivated' : locked ? 'Locked' : u.mustChangePassword ? 'Invited' : (u.lastLoginAt ? `Last sign in ${fmtDateTime(u.lastLoginAt)}` : "Never signed in")}
+                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
               </span>
               <select className="rl" value={u.role.id} disabled={self || above} aria-label={`Role for ${u.name}`}
                 onChange={(e) => patch.mutate({ id: u.id, body: { roleId: Number(e.target.value) } })}>
