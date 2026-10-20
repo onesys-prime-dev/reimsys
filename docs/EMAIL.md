@@ -91,7 +91,9 @@ Links in emails: the button only appears when REIMSYS has a normal `https://` ad
 Addresses on `example.com`, `example.org`, `example.net`, `.test`, `.invalid` and `localhost` can never be real mailboxes, so REIMSYS does not try to send to them. They show as **logged** in Audit log, Emails ("Example address, not a real mailbox, so it was not sent"). This stops the seeded demo users from producing bounce messages in your inbox, for example from the morning summary. A local test mailbox (`localhost`) can still receive them, so testing is unaffected. Real users on real addresses are not affected.
 
 ## Email works here but not on the live server: what to check
-Open **Audit log → Email log** on the live system. Every email has a status, and the text next to it says why.
+**Fastest: run the check on the live server.** In the app folder: `pnpm --filter @reimsys/api mail:check` (add `-- --to you@company.com` to also send one real test). It tests the saved account, the password key, the server name, each mail port (hosting providers often block them) and the login, and says which step fails and what to do. It changes nothing.
+
+Or open **Audit log → Email log** on the live system. Every email has a status, and the text next to it says why.
 1. **"Example address, not a real mailbox, so it was not sent"** (status *logged*). Addresses on example.com, .test and similar are never sent to. The demo accounts (admin@example.com and the others) will never get email. Use real addresses on the live system.
 2. **"No mail account is set up yet"** (*logged*). The live database has no mail account. The account is saved in the database, so a new server starts without one. Enter it in **Access → Email** (or in `.env`).
 3. **"The saved mail password cannot be unlocked on this server"** (*failed*, and a red box above the log). The database was moved to a new server without the key that locks the password (`storage/.settings-key`, or `SETTINGS_KEY` if you set it). Enter the mail password again in Access → Email, then save. To avoid it next time, set `SETTINGS_KEY` in `.env` before saving the password, and keep it with your other secrets.
