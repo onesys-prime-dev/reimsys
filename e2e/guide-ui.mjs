@@ -25,7 +25,9 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
     ok(`${label}: zoom in makes the picture bigger`, h1 > h0 * 1.3, h0 + ' -> ' + h1);
     ok(`${label}: the zoom is shown`, parseInt(await p.locator('.guide-bar b').innerText()) > z0);
     if (step !== 'invoice') { await p.click('button[aria-label="Zoom in"]'); await p.waitForTimeout(150); const sc = await p.locator('.guide-view').evaluate((v) => v.scrollTop); ok(`${label}: zoomed in, it jumps to the marked place`, sc > 100, String(sc)); }
+    await p.click('button:has-text("Fit")');
     await p.click('.guide-img');
+    ok(`${label}: tapping the picture opens it at a readable size`, (await p.locator('.guide-img').evaluate((i) => i.clientWidth / i.naturalWidth)) > 0.8, String(await p.locator('.guide-img').evaluate((i) => i.clientWidth / i.naturalWidth)));
     await p.click('button:has-text("Fit")');
     ok(`${label}: Fit puts it back`, Math.abs((await p.locator('.guide-img').boundingBox()).height - h0) < 2);
     const vb = await p.locator('.guide-view').boundingBox(), tb = await p.locator('.guide-text').boundingBox();
@@ -33,6 +35,8 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
     await p.click('.issue:has-text("Discount")');
     ok(`${label}: another part can be chosen`, (await p.locator('.issue.on').innerText()) === 'Discount');
     ok(`${label}: nothing scrolls sideways`, (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
+    const tx = await p.locator('.guide-text').boundingBox(), cl = await p.locator('.modal .btn:has-text("Close")').boundingBox();
+    ok(`${label}: the whole instruction is readable, not hidden behind Close`, tx.y + tx.height <= cl.y + 1, JSON.stringify([tx, cl]));
     ok(`${label}: Close is in view`, await p.locator('.modal .btn:has-text("Close")').evaluate((b) => { const r = b.getBoundingClientRect(); return r.bottom <= innerHeight + 1; }));
     await p.keyboard.press('Escape');
     ok(`${label}: Escape closes it`, (await p.locator('.guide-img').count()) === 0);

@@ -465,7 +465,10 @@ a.btn.ghost{color:var(--muted)}
 
 .modal.guide-modal{width:min(760px,100%)}
 .guide-bar{display:flex;align-items:center;gap:8px;margin:12px 0 8px}.guide-bar b{min-width:3.2em;text-align:center}
-.guide-view{height:clamp(220px,calc(100vh - 430px),62vh);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;-webkit-overflow-scrolling:touch}
+.guide-view{height:clamp(220px,calc(100vh - 405px),74vh);overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;-webkit-overflow-scrolling:touch}
 .guide-img{display:block;margin:0 auto;max-width:none;width:auto;cursor:zoom-in;background:#fff}.guide-view[data-zoom="3"] .guide-img,.guide-view[data-zoom="2"] .guide-img{cursor:zoom-out}
 .guide-text{margin:12px 0 0;padding:10px 12px;background:var(--soft);border-radius:10px;line-height:1.45}
 .issue.other:not(.on){opacity:.7}
+.guide-modal .issues{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.guide-modal .issue{flex:none;white-space:nowrap}
+.guide-tip{margin-left:auto;font-size:.82rem}
+@media(max-width:520px){.guide-tip{display:none}}

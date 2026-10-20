@@ -22,7 +22,7 @@ const RELEVANT: Record<GuideStep, Tab[]> = {
   wht: ['withholding'],
 };
 const ALL: Tab[] = ['overview', 'total', 'vatable', 'vat', 'exempt', 'discount', 'withholding'];
-const ZOOMS = [1, 1.5, 2, 3];
+const ZOOMS = [1, 2, 3]; // 1: the whole invoice; 2: about its real size, where the small print can be read
 
 /** A button that opens the sample invoice with each place to look marked. It opens on the part that matches the page, and the picture can be zoomed. */
 export function InvoiceGuide({ step }: { step: GuideStep }) {
@@ -41,6 +41,13 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
     v.scrollTo({ top: Math.max(0, TABS[t].at * i.clientHeight - v.clientHeight / 2), left: Math.max(0, (i.clientWidth - v.clientWidth) * 0.45) });
   };
   const go = (t: Tab) => { setTab(t); setZi(0); };
+  /** A tap on the picture: from the whole invoice to the first zoom at which the small print is about its real size (and back). */
+  const readable = () => {
+    const i = img.current;
+    if (!i || zi !== 0) { setZi(0); return; }
+    const fitScale = i.clientHeight / (i.naturalHeight || 1);
+    setZi(Math.max(1, ZOOMS.findIndex((z) => fitScale * z >= 0.9) === -1 ? ZOOMS.length - 1 : ZOOMS.findIndex((z) => fitScale * z >= 0.9)));
+  };
   const by = (d: number) => setZi((i) => Math.max(0, Math.min(ZOOMS.length - 1, i + d)));
   // after every tab change or zoom, once the picture has its new size, go back to the marked place
   useEffect(() => { if (open) requestAnimationFrame(() => showMark()); }, [open, tab, zi]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -69,10 +76,11 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
             <b aria-live="polite">{Math.round(zoom * 100)}%</b>
             <button type="button" className="btn sm" aria-label="Zoom in" disabled={zi === ZOOMS.length - 1} onClick={() => by(1)}>+</button>
             <button type="button" className="btn sm" disabled={zi === 0} onClick={() => setZi(0)}>Fit</button>
+            <span className="muted guide-tip">Tap the picture to read the small print</span>
           </div>
           <div className="guide-view" ref={view} data-zoom={zoom}>
             <img ref={img} className="guide-img" src={`/guide/${cur.image}.png`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%` }} onLoad={() => showMark()}
-              onClick={() => setZi((i) => (i >= ZOOMS.length - 1 ? 0 : i + 1))} />
+              onClick={readable} />
           </div>
           <p className="guide-text"><b>{cur.label}.</b> {cur.text}</p>
           <div className="btns"><button className="btn pri" type="button" onClick={() => setOpen(false)}>Close</button></div>
