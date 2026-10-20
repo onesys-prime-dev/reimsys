@@ -105,7 +105,7 @@ export function ReceiptsPage() {
         ))}
       </div>
 
-      <section className="card">
+      <section className="card scroll">
         <div className="thead"><span>Vendor</span><span>Type · invoice</span><span>Date</span><span className="c-amt">Amount</span><span>Status</span></div>
         {pickable.length > 1 && (
           <label className="selall"><input type="checkbox" checked={pickable.every((r) => picked.includes(r.id))} onChange={(e) => setPicked(e.target.checked ? pickable.slice(0, BULK_MAX).map((r) => r.id) : [])} />Select all {pickable.length} ready to {bulkKind === 'check' ? 'check' : 'decide'}</label>

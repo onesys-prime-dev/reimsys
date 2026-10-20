@@ -67,7 +67,7 @@ function UsersTab() {
         )}
         <button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}><Icon name="plus" size={18} />Add user</button>
       </div>
-      <section className="card">
+      <section className="card scroll">
         {shown.map((u) => {
           const self = u.id === me!.id;
           const above = u.role.rank > myRank;

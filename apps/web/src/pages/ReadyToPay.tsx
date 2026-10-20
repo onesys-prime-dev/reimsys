@@ -54,7 +54,7 @@ export function ReadyToPayPage() {
       <ExportPayments />
       {!q.data && <div className="empty">Loading…</div>}
       {q.data && !groups.length && <Empty title="Nothing to pay">Every approved receipt has been paid.</Empty>}
-      <div className="stack">
+      <div className="stack scroll">
         {groups.map((g) => (
           <section key={g.payee.id} className="card">
             <div className="card-h">

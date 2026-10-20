@@ -52,7 +52,7 @@ function Activity() {
         <input type="date" style={{ width: 'auto' }} value={to} aria-label="To date" onChange={(e) => { setTo(e.target.value); reset(); }} />
         <a className="btn" style={{ marginLeft: 'auto' }} href={`/api/audit/export?${ex}`}><Icon name="download" size={18} />Export CSV</a>
       </div>
-      <section className="card">
+      <section className="card scroll">
         {data.data?.items.map((a) => (
           <div key={a.id} className="aud">
             <button className="aud-h" onClick={() => setOpen(open === a.id ? null : a.id)} aria-expanded={open === a.id}>
@@ -117,7 +117,7 @@ function Emails() {
         <button className="btn pri" type="submit" disabled={!testTo || sendTest.isPending}>Send test email</button>
       </form>
       <div className="tools"><select style={{ width: 'auto' }} value={status} aria-label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="sent">Sent</option><option value="logged">Logged only</option><option value="failed">Failed</option><option value="queued">Queued</option></select></div>
-      <section className="card">
+      <section className="card scroll">
         {data.data?.items.map((e) => (
           <div className="pref" style={{ padding: '12px 18px' }} key={e.id}>
             <div style={{ minWidth: 0 }}><b>{e.subject}</b><br /><small className="muted">To {e.to} · {e.template} · {fmtDateTime(e.createdAt)}{e.error ? ` · ${e.error}` : ''}</small>{e.response && <small className="muted" style={{ display: 'block' }}>{e.response}</small>}</div>
