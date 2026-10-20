@@ -33,15 +33,14 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
   const view = useRef<HTMLDivElement>(null);
   const zoom = ZOOMS[zi]!;
   const img = useRef<HTMLImageElement>(null);
-  /** Scrolls so the marked place is in the middle of the view. */
+  /** Zoomed out, the whole invoice is in view. Zoomed in, scrolls so the marked place is in the middle of the view. */
   const showMark = (t: Tab = tab) => {
     const v = view.current, i = img.current;
     if (!v || !i) return;
+    if (zi === 0) { v.scrollTo({ top: 0, left: 0 }); return; }
     v.scrollTo({ top: Math.max(0, TABS[t].at * i.clientHeight - v.clientHeight / 2), left: Math.max(0, (i.clientWidth - v.clientWidth) * 0.45) });
   };
-  /** On a narrow screen the picture starts zoomed in, so the print is readable without pressing anything. */
-  const home = () => (window.innerWidth < 600 ? 2 : 0);
-  const go = (t: Tab) => { setTab(t); setZi(home()); };
+  const go = (t: Tab) => { setTab(t); setZi(0); };
   const by = (d: number) => setZi((i) => Math.max(0, Math.min(ZOOMS.length - 1, i + d)));
   // after every tab change or zoom, once the picture has its new size, go back to the marked place
   useEffect(() => { if (open) requestAnimationFrame(() => showMark()); }, [open, tab, zi]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -56,7 +55,7 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
   const cur = TABS[tab];
   return (
     <>
-      <button type="button" className="btn sm" onClick={() => { setTab(order[0]!); setZi(home()); setOpen(true); }}><Icon name="info" size={16} />How to read the invoice</button>
+      <button type="button" className="btn sm" onClick={() => { setTab(order[0]!); setZi(0); setOpen(true); }}><Icon name="info" size={16} />How to read the invoice</button>
       {open && (
         <Modal title="How to read the invoice" onClose={() => setOpen(false)} className="guide-modal">
           <div className="issues" role="tablist" aria-label="Part of the invoice">
@@ -69,10 +68,10 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
             <button type="button" className="btn sm" aria-label="Zoom out" disabled={zi === 0} onClick={() => by(-1)}>−</button>
             <b aria-live="polite">{Math.round(zoom * 100)}%</b>
             <button type="button" className="btn sm" aria-label="Zoom in" disabled={zi === ZOOMS.length - 1} onClick={() => by(1)}>+</button>
-            <button type="button" className="btn sm" disabled={zi === home()} onClick={() => setZi(home())}>Reset</button>
+            <button type="button" className="btn sm" disabled={zi === 0} onClick={() => setZi(0)}>Fit</button>
           </div>
           <div className="guide-view" ref={view} data-zoom={zoom}>
-            <img ref={img} className="guide-img" src={`/guide/${cur.image}.png`} alt={`Sample invoice: ${cur.label}`} style={{ width: `${zoom * 100}%` }} onLoad={() => showMark()}
+            <img ref={img} className="guide-img" src={`/guide/${cur.image}.png`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%` }} onLoad={() => showMark()}
               onClick={() => setZi((i) => (i >= ZOOMS.length - 1 ? 0 : i + 1))} />
           </div>
           <p className="guide-text"><b>{cur.label}.</b> {cur.text}</p>
