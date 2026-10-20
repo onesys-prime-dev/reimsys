@@ -615,3 +615,10 @@ a.chip:hover{border-color:var(--accent);color:var(--ink)}
   .page .ph p{margin:0;font-size:.9rem}
   .page:not(.narrow){padding-top:16px}
 }
+/* Dashboard queue: status chips stay on one line (they scroll sideways if they ever do not fit) and dates never wrap. */
+.dchips{flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 20px;scrollbar-width:none}
+.dchips::-webkit-scrollbar{display:none}
+.dchips .chip{flex:none;padding:3px 10px}
+.row .c-date{white-space:nowrap}
+.dchips{gap:5px;padding:8px 16px}.dchips .chip{padding:3px 8px;font-size:.76rem}.dchips .chip .n{margin-left:3px}
+@media(min-width:821px) and (max-width:1500px){.dchips{flex-wrap:wrap;overflow:visible}}
