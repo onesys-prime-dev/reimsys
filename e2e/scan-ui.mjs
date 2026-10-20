@@ -51,6 +51,7 @@ ok('it found the four corners of the receipt by itself', corners.length === 4 &&
 ok('it offers Document, Original and Black & white, with Document chosen', (await dlg.getByRole('radio', { name: 'Document' }).getAttribute('aria-checked')) === 'true' && await dlg.getByRole('radio', { name: 'Original' }).isVisible() && await dlg.getByRole('radio', { name: 'Black & white' }).isVisible());
 await p.screenshot({ path: path.join(OUT, 'scan-1-dialog.png') });
 await dlg.getByRole('radio', { name: 'Black & white' }).click();
+await p.waitForTimeout(400); // the page is redrawn on the next frame
 const onlyBW = await dlg.locator('canvas.result').evaluate((c) => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) if (d[i] !== 0 && d[i] !== 255) return false; return d.length > 0; });
 ok('Black & white shows only black and white', onlyBW);
 await dlg.getByRole('radio', { name: 'Document' }).click();
