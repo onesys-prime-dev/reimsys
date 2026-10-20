@@ -275,3 +275,50 @@ Code, typecheck and the 189 unit tests are fine. These are the gaps between "bui
 
 ### Housekeeping
 - [ ] The test screenshots in the project root (`bulk-*.png`, `comments*.png`, `undo-*.png`) change on every UI test run: commit them once or move them to a git-ignored folder.
+
+## Go-live plan (2026-10-20)
+Everything still open, in the order to do it. Each step ends with typecheck + tests. "Owner" is who has to act.
+
+### Step 1. Privacy notice and first-sign-in acknowledgement (build)  · Owner: developer, wording from client
+- **Page:** `/privacy`, readable without signing in, linked from the sign-in page and the sidebar footer. It says: what is collected (name, email, receipts and evidence images, vendor TINs, the history log including who viewed what), why, who can see it (by role), how long it is kept, that REIMSYS uses one cookie only to keep people signed in (no analytics, no third-party scripts), how to ask for a correction, and who the data protection officer is.
+- **Acceptable-use line** on the same page: submit only genuine receipts, do not share your login, every action is recorded. No separate Terms page (staff only).
+- **Acknowledgement:** after sign-in, a user who has not accepted the current version sees a short "I understand" screen (next to the forced password change). Stored on the user as `privacyAcceptedVersion` and `privacyAcceptedAt` (one additive migration, with a rollback in `docs/`). Accepting is written to the history log. Changing the version in one place makes everyone accept again.
+- **Cookie:** no banner. Check the web app for any analytics or outside scripts before go-live.
+- **Tests:** shared unit test for the version check, API flow (blocked until accepted, then allowed), browser check on computer and phone.
+
+### Step 2. Database login and production settings  · Owner: developer + server admin
+1. Back up (`node scripts/backup.mjs`).
+2. Restore `scripts/setup-db-users.mjs`, run it without `--yes` to review, then with `--yes`. Restart the API. Confirm the app works and that the history log cannot be changed (try an UPDATE as `reimsys_app`: it must be refused).
+3. Document the script in `docs/DEPLOY.md` and `docs/SECURITY.md`.
+4. Set `NODE_ENV=production`, `WEB_ORIGIN` to the real https address, `TLS_CERT`/`TLS_KEY` or Nginx, and a real `MAIL_FROM`.
+
+### Step 3. Email  · Owner: client gives SMTP details
+1. Fill `SMTP_*` in `.env`, send a test from Settings, check the email log.
+2. With the https address in place, switch on and test forgot-password and invitation emails (currently left out).
+
+### Step 4. Client inputs  · Owner: client
+1. Reimbursement document and liquidation report layouts: replace the placeholders and have the client sign off a sample PDF/XLSX.
+2. Real category list and branding (logo, name): enter in Access → Settings.
+3. Data retention period: write it into the privacy notice, then build the retention clean-up (Step 6).
+
+### Step 5. Users and clean data  · Owner: developer + client
+1. Create the real users and roles; deactivate every seeded account (shared password `Reimsys#2026`).
+2. Run the end-to-end checks (`e2e/api-flow.mjs`, payment, return and UI scripts) against a staging copy, never live data.
+3. Back up, then `data:clear` to remove test receipts and files (keeps users, roles, settings, categories).
+
+### Step 6. Safety nets  · Owner: developer + server admin
+1. **Backups:** schedule `scripts/backup.mjs` nightly (`docs/BACKUP.md`), copy off the machine, do one test restore with `scripts/restore.mjs` into a spare database.
+2. **Monitoring:** a check on `/api/health` every few minutes, plus alerts for a stopped worker or email queue and low disk space; the alert goes to one named person.
+3. **Retention clean-up:** a scheduled job that archives or deletes records older than the agreed period, audited, with a dry-run mode.
+
+### Step 7. Training and launch  · Owner: client + developer
+1. Short guide per role (Med Ref, Checker, Approver, Accounting) with the existing screenshots.
+2. Pilot with a few Med Refs for a week; fix what they find.
+3. Launch day: backup, confirm health check, confirm first real receipt flows through to a reimbursement document.
+
+### Housekeeping (any time)
+- Decide on `scripts/setup-db-users.mjs` (restore or commit the deletion).
+- Commit the regenerated test screenshots once, or move them to a git-ignored folder.
+
+### Done means
+All boxes in "Still missing" ticked, privacy notice live and accepted by every user, a restore test passed, and a nightly backup visible in `backups/`.
