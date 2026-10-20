@@ -3,7 +3,7 @@
 //   node scripts/setup-db-users.mjs --yes    does it
 // It creates two MySQL users with new random passwords:
 //   reimsys_app      what the running system uses; it can read and append to the history log but never change or delete it (docs/db-grants.sql)
-//   reimsys_migrate  full rights on the reimsys database; for migrations, the seed and data:clear only
+//   reimsys_migrate  full rights on the reimsys database (and on a spare reimsys_restore_test one); for migrations, the seed, data:clear, backups and restores only
 // Then it saves the old apps/api/.env next to it as .env.before-app-user, points DATABASE_URL at reimsys_app and adds MIGRATE_DATABASE_URL.
 // The passwords are never printed. Restart the API afterwards. To go back, copy .env.before-app-user over .env.
 import crypto from 'node:crypto';
@@ -31,6 +31,7 @@ const sql = [
   `CREATE USER IF NOT EXISTS 'reimsys_migrate'@'localhost' IDENTIFIED BY '${migPw}';`,
   `ALTER USER 'reimsys_migrate'@'localhost' IDENTIFIED BY '${migPw}';`,
   `GRANT ALL ON \`${db.database}\`.* TO 'reimsys_migrate'@'localhost';`,
+  `GRANT ALL ON \`${db.database}\\_restore\\_test\`.* TO 'reimsys_migrate'@'localhost';`, // lets restore.mjs rehearse a restore into a spare database
   grants.replace('CHANGE_ME_STRONG_PASSWORD', appPw).replaceAll('reimsys.', `\`${db.database}\`.`),
   `ALTER USER 'reimsys_app'@'localhost' IDENTIFIED BY '${appPw}';`,
   'FLUSH PRIVILEGES;',
