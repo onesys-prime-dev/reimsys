@@ -13,3 +13,6 @@ coverage/
 # Backups (scripts/backup.mjs) hold real data. Never commit them.
 backups/
 .scratch-*/
+
+# Screenshots the UI test scripts rewrite in the project root on every run.
+/*.png

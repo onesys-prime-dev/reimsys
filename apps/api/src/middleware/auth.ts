@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { needsPrivacy } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
@@ -41,12 +42,16 @@ export async function loadAuth(req: Request, _res: Response, next: NextFunction)
 }
 
 const ALLOWED_WHILE_LOCKED = ['/api/me', '/api/me/password', '/api/auth/logout'];
+const ALLOWED_BEFORE_PRIVACY = ['/api/me', '/api/me/password', '/api/me/privacy', '/api/auth/logout'];
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   if (!req.auth) return next(unauthorized());
   const path = (req.baseUrl + req.path).replace(/\/$/, '');
   if (req.auth.user.mustChangePassword && !ALLOWED_WHILE_LOCKED.includes(path)) {
     return next(forbidden('Change your password to continue.', 'PASSWORD_CHANGE_REQUIRED'));
+  }
+  if (needsPrivacy(req.auth.user.privacyAcceptedVersion) && !ALLOWED_BEFORE_PRIVACY.includes(path)) {
+    return next(forbidden('Read and accept the privacy notice to continue.', 'PRIVACY_REQUIRED'));
   }
   next();
 }

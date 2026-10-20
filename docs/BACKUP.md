@@ -30,3 +30,6 @@ node scripts/restore.mjs backups/<folder> --yes --db reimsys_restore_test --file
 ```
 
 It prints how many receipts were restored. Compare with the live count, open a few files from the restored folder, then `DROP DATABASE reimsys_restore_test` and delete the folder. This was rehearsed on this system: 672 of 672 receipts and 2,223 of 2,223 uploaded files came back.
+
+## Which database login is used
+Backups and restores need more rights than the running system has. When `apps/api/.env` has `MIGRATE_DATABASE_URL` (added by `node scripts/setup-db-users.mjs`), `backup.mjs` and `restore.mjs` use that full-rights login; otherwise they use `DATABASE_URL`. After switching to the limited login, run one backup and one restore rehearsal (see above) to confirm both work.

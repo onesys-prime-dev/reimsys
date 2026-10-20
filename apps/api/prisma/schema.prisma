@@ -59,6 +59,8 @@ model User {
   theme              String    @default("light") @db.VarChar(10)
   dailyDigest        Boolean   @default(true)
   reservationReleased Boolean  @default(false)
+  privacyAcceptedVersion Int?
+  privacyAcceptedAt  DateTime?
   sessions           Session[]
   auditLogs          AuditLog[]
   receipts           Receipt[]          @relation("Encoder")

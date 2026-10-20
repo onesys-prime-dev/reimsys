@@ -18,6 +18,7 @@ What is protected, how it was checked, and what still needs a decision from whoe
 | Secrets | The saved email password is encrypted. It is never shown, logged or returned, not even to administrators. `.env` and the storage folder are not in the repository. |
 | Audit | Every sign-in, failed sign-in, action, evidence view, download, print and settings change is recorded with who, what and when. With `docs/db-grants.sql` applied, the app cannot change or delete audit rows. |
 | Password links | One-time, hashed, short-lived, only the newest works, and the "forgot password" page answers identically for every address, in the same time. |
+| Privacy notice | Everyone must accept the current privacy notice after their first sign-in; until then the server refuses everything except reading their own profile, changing their password, accepting and signing out. Each acceptance is recorded with the version. REIMSYS sets one cookie (the sign-in session) and loads no analytics or outside scripts. |
 | Dependencies | No known vulnerabilities in what ships (`pnpm audit --prod`). A few notices remain in build-only tools that do not run in production. |
 
 ## How it was checked
@@ -29,7 +30,7 @@ Also covered by automated tests: `e2e/session.mjs` (idle and maximum session rul
 ## Still needs doing by whoever hosts it
 
 1. **Serve it only over HTTPS** and set `NODE_ENV=production` so the session cookie is marked Secure and HSTS is on. Put the real address in `WEB_ORIGIN`.
-2. **Apply `docs/db-grants.sql`** with a separate, restricted database user. Until then the "audit entries cannot be changed" promise depends on the application code, not the database.
+2. **Apply `docs/db-grants.sql`** with a separate, restricted database user (on one computer, `node scripts/setup-db-users.mjs --yes` does this and keeps a full-rights login for migrations, backups and `data:clear`; see `docs/DEPLOY.md`). Until then the "audit entries cannot be changed" promise depends on the application code, not the database.
 3. **Switch off the demo accounts** (`pnpm --filter @reimsys/api demo:off`). They share a public password, which is also written in the README and test scripts.
 4. **Keep the `storage` folder private and backed up** together with the database. It holds the evidence and the key that unlocks the saved email password. To keep that key elsewhere, set `SETTINGS_KEY`.
 5. **Email from your own domain** and publish SPF, DKIM and DMARC records, so approval and reset emails are trusted and cannot be forged easily.

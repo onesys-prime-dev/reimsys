@@ -89,6 +89,7 @@ const blocked = await listen(await login(`live.${stamp}@example.com`, ptemp));
 ok('a new person must choose their own password before anything live starts', blocked.status === 403);
 const newCookie = await login(`live.${stamp}@example.com`, ptemp);
 await api(newCookie, 'POST', '/me/password', { currentPassword: ptemp, newPassword: 'LiveTest12345' });
+await api(newCookie, 'POST', '/me/privacy', {});
 const sNew = await listen(await login(`live.${stamp}@example.com`, 'LiveTest12345'));
 ok('after that the new person can listen too', sNew.status === 200);
 await sleep(300);

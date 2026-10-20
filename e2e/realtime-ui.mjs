@@ -118,6 +118,7 @@ try {
   const made = await api(admin, 'POST', '/users', { name: 'Live Watcher', email, roleId: medref.id });
   const ck = await login(email, made.data.temporaryPassword);
   await api(ck, 'POST', '/me/password', { currentPassword: made.data.temporaryPassword, newPassword: 'LiveWatch12345' });
+  await api(ck, 'POST', '/me/privacy', {});
   const gone = await watcher(email, '/', { width: 1280, height: 860 }, 'LiveWatch12345');
   await api(admin, 'PATCH', `/users/${made.data.user.id}`, { isActive: false });
   ok('their screen returns to the sign-in page by itself', await eventually(() => gone.locator('input[type=password]').count().then((n) => n === 1)));

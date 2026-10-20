@@ -191,3 +191,16 @@ A new database is built with `pnpm db:migrate` and ends up identical to the sche
    ```
    It keeps users, roles, rights, settings and categories, restarts the reference numbers, and refuses to run unless you type the database name. Set up the nightly backup from `docs/BACKUP.md` before the first real receipt.
 7. Check who holds which rights on the Access page. One person must never be able to check, approve and pay the same receipt: the system now refuses it (a checker cannot decide on a receipt they checked, and nobody can pay a receipt they encoded, checked or approved), but the Super Admin should not be handed all three roles anyway.
+
+## Limited database login on one computer (XAMPP or a single server)
+Instead of typing the SQL by hand, run `node scripts/setup-db-users.mjs` (it only shows what it would do) and then `node scripts/setup-db-users.mjs --yes`. It creates `reimsys_app` (what the running system uses; it can read and append to the history log but never change or delete it, see `docs/db-grants.sql`) and `reimsys_migrate` (full rights on the database), saves the old `.env` as `.env.before-app-user`, points `DATABASE_URL` at `reimsys_app` and adds `MIGRATE_DATABASE_URL`. Restart the API afterwards. To go back, copy `.env.before-app-user` over `.env`.
+
+After that, anything that changes the structure or clears data uses the full-rights login automatically when `MIGRATE_DATABASE_URL` is in `.env`: `pnpm db:migrate`, `pnpm db:seed`, `pnpm --filter @reimsys/api data:clear`, `node scripts/backup.mjs` and `node scripts/restore.mjs`. The running API and `demo:off` use `reimsys_app`. `prisma migrate deploy` run by hand reads the same file, so it also uses the full-rights login.
+
+## Privacy notice (added 2026-10-20)
+Everyone sees the privacy notice once after signing in (after choosing a password) and must tick "I understand" before the app opens. It is also readable before signing in (link on the sign-in page) and from the sidebar.
+1. Back up. Run `pnpm --filter @reimsys/api db:deploy` (adds two nullable columns to `user`, migration `20261020010000_privacy_notice`). `docs/db-grants.sql` needs no change.
+2. The wording is in `apps/web/src/pages/Privacy.tsx`. Replace the two "To be confirmed by your administrator" lines (retention period, data protection contact) when the client decides, then raise `PRIVACY_VERSION` in `packages/shared/src/privacy.ts` so everyone reads it again.
+3. The demo accounts from the seed start with the notice accepted, so the test scripts can sign in. Real users always see it. Each acceptance is in the history log (`privacy.accepted`).
+4. To go back: `docs/rollback-privacy-notice.sql`, or restore the backup.
+5. Checks: `node e2e/privacy-flow.mjs` (API) and `node e2e/privacy-ui.mjs` (browser, computer and phone).

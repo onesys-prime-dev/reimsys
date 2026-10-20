@@ -5,6 +5,7 @@
  *   pnpm --filter @reimsys/api data:clear -- --confirm <database name>
  * The database name must be typed so this can never be run against the wrong system by accident. Make a backup first (docs/BACKUP.md).
  */
+import './migrateLogin.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { prisma } from '../src/db.js';

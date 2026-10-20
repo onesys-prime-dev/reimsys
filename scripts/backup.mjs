@@ -3,13 +3,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { root, readEnv, dbConfig, storageDir, tool, connArgs, withPassword } from './backup-lib.mjs';
+import { root, readEnv, adminDbConfig, storageDir, tool, connArgs, withPassword } from './backup-lib.mjs';
 
 const arg = (n, d) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : d; };
 const keep = Number(arg('--keep', 14));
 const target = path.resolve(arg('--to', path.join(root, 'backups')));
 const env = readEnv();
-const db = dbConfig(env);
+const db = adminDbConfig(env);
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const dir = path.join(target, stamp);
 fs.mkdirSync(dir, { recursive: true });

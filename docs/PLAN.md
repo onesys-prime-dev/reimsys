@@ -267,7 +267,7 @@ Code, typecheck and the 189 unit tests are fine. These are the gaps between "bui
 - [ ] The real category list, branding (logo, name), and a data retention period (then build the retention clean-up).
 
 ### Not built yet
-- [ ] **Forgot-password and invitation emails.** Waiting for a public https address; then switch them on and test.
+- [ ] **Forgot-password and invitation emails.** Already built; the button link is left out of emails until `WEB_ORIGIN` is a public https address. Set it, then test both end to end.
 - [ ] **Retention clean-up.** Nothing deletes or archives old records yet; build once the client sets the period.
 - [ ] **Monitoring.** Something that checks `/api/health` and tells someone when the API, worker or email queue stops, and when the disk is nearly full.
 - [ ] **Run the end-to-end checks against a staging copy.** `e2e/api-flow.mjs` and the UI scripts were not part of this review; run them with `API=https://<host>/api` before go-live.
@@ -408,3 +408,8 @@ Retention clean-up (needs the period), monitoring and alerts, user guide.
 | Tests fail because of the gate | Shared login helper accepts the notice |
 | Real data cleared by mistake | Backup first, approval first, `data:clear` needs the database name typed |
 | Locked out of admin when turning off demo accounts | `demo:off` already refuses without another active Super Admin |
+
+### Phase A progress (2026-10-20)
+- Done: setup script restored; screenshots untracked and git-ignored; backup, restore, seed, `data:clear` and migrations use `MIGRATE_DATABASE_URL` when present; privacy notice built (migration `20261020010000_privacy_notice`, rollback `docs/rollback-privacy-notice.sql`, shared version rule, API gate and `POST /api/me/privacy`, public `/privacy`, first-sign-in acceptance, sidebar link); `e2e/privacy-flow.mjs` and `e2e/privacy-ui.mjs` pass; `realtime-api` and `realtime-ui` accept the notice for the users they create; docs updated (`DEPLOY.md`, `SECURITY.md`, `BACKUP.md`).
+- Found by the new test: the gate must also let the password change through (it comes first). Fixed.
+- Left for later phases: the live limited-login switch (Phase B), production settings and email (C), data and accounts (D), nightly backup and the full run on a staging copy (E).
