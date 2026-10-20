@@ -40,9 +40,9 @@ export function Icon({ name, size = 20 }: { name: keyof typeof PATHS | string; s
 }
 
 /* ---------- avatar ---------- */
-export function Avatar({ name, userId, hasPhoto, size = 34, version }: { name: string; userId: number; hasPhoto?: boolean; size?: number; version?: number }) {
+export function Avatar({ name, userId, hasPhoto, size = 34, version, photoV }: { name: string; userId: number; hasPhoto?: boolean; size?: number; version?: number; photoV?: number | null }) {
   const style = { width: size, height: size, fontSize: size > 50 ? '1.4rem' : size < 32 ? '.7rem' : '.8rem' };
-  if (hasPhoto) return <img className="av" style={{ ...style, objectFit: 'cover' }} src={`/api/users/${userId}/photo?v=${version ?? 0}`} alt="" />;
+  if (hasPhoto) return <img className="av" style={{ ...style, objectFit: 'cover' }} src={`/api/users/${userId}/photo?v=${photoV ?? 0}.${version ?? 0}`} alt="" />;
   return <span className="av" style={style}>{initials(name)}</span>;
 }
 

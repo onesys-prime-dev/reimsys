@@ -5,13 +5,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readEnv, dbConfig, storageDir, tool, connArgs, withPassword } from './backup-lib.mjs';
+import { readEnv, adminDbConfig, storageDir, tool, connArgs, withPassword } from './backup-lib.mjs';
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : undefined; };
 const folder = process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 if (!folder || !fs.existsSync(path.join(folder, 'database.sql'))) { console.error('Give the backup folder, e.g.  node scripts/restore.mjs backups/20261016-020000 --yes'); process.exit(1); }
 const env = readEnv();
-const db = dbConfig(env, arg('--db'));
+const db = adminDbConfig(env, arg('--db'));
 const files = arg('--files') ? path.resolve(arg('--files')) : storageDir(env);
 const live = !arg('--db');
 if (!process.argv.includes('--yes')) {

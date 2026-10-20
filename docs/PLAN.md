@@ -250,3 +250,184 @@ Plan: `docs/superpowers/plans/2026-10-16-return-issues.md`.
 - **Fix:** opens `/receipts/<id>/edit?step=<step>`, only for the owner while the receipt can be edited. The form skips steps the answers make unnecessary, so a step that does not exist (for example VAT on a receipt with no BIR invoice) falls back to Invoice details; an unknown or misplaced `?step=` is ignored. Receipts returned before this feature show their note as before, with no Fix buttons.
 - **Data:** one additive nullable column (migration `20261016010000_return_issues`), undone by `docs/rollback-return-issues.sql`.
 - **Tests:** `packages/shared/test/returnIssues.test.ts`, `e2e/return-issues-flow.mjs` (API), `e2e/return-ui.mjs` (browser, computer and phone).
+
+## Still missing (review of 2026-10-20)
+Code, typecheck and the 189 unit tests are fine. These are the gaps between "built" and "live". Tick them off as they are done.
+
+### Must do before real receipts
+- [ ] **Limited database login.** Run `node scripts/setup-db-users.mjs --yes` so the system stops using `root` and the history log is append-only at the database level. It has never been run. (The script is deleted in the working tree: restore it or commit the deletion.) Add it to `docs/DEPLOY.md` and `docs/SECURITY.md`.
+- [ ] **Production settings.** `NODE_ENV=production`, real https address in `WEB_ORIGIN`, `TLS_CERT`/`TLS_KEY` or Nginx, real `MAIL_FROM`.
+- [ ] **Real email.** Fill in the SMTP details; until then emails are only written to the email log.
+- [ ] **Remove dev accounts.** Deactivate the seeded accounts (shared password `Reimsys#2026`) and create the real users.
+- [ ] **Clear test data.** Back up, then `data:clear` (keeps users, roles, settings, categories; restarts reference numbers).
+- [ ] **Nightly backup + restore test.** Schedule `scripts/backup.mjs` (see `docs/BACKUP.md`), copy backups off the machine, and do one test restore.
+
+### Needs the client
+- [ ] Their own reimbursement document and liquidation report layouts (current ones are placeholders).
+- [ ] The real category list, branding (logo, name), and a data retention period (then build the retention clean-up).
+
+### Not built yet
+- [ ] **Forgot-password and invitation emails.** Already built; the button link is left out of emails until `WEB_ORIGIN` is a public https address. Set it, then test both end to end.
+- [ ] **Retention clean-up.** Nothing deletes or archives old records yet; build once the client sets the period.
+- [ ] **Monitoring.** Something that checks `/api/health` and tells someone when the API, worker or email queue stops, and when the disk is nearly full.
+- [ ] **Run the end-to-end checks against a staging copy.** `e2e/api-flow.mjs` and the UI scripts were not part of this review; run them with `API=https://<host>/api` before go-live.
+- [ ] **User guide / training notes** for Med Refs, Checkers, Approvers and Accounting.
+
+### Housekeeping
+- [ ] The test screenshots in the project root (`bulk-*.png`, `comments*.png`, `undo-*.png`) change on every UI test run: commit them once or move them to a git-ignored folder.
+
+## Go-live plan (2026-10-20)
+Everything still open, in the order to do it. Each step ends with typecheck + tests. "Owner" is who has to act.
+
+### Step 1. Privacy notice and first-sign-in acknowledgement (build)  · Owner: developer, wording from client
+- **Page:** `/privacy`, readable without signing in, linked from the sign-in page and the sidebar footer. It says: what is collected (name, email, receipts and evidence images, vendor TINs, the history log including who viewed what), why, who can see it (by role), how long it is kept, that REIMSYS uses one cookie only to keep people signed in (no analytics, no third-party scripts), how to ask for a correction, and who the data protection officer is.
+- **Acceptable-use line** on the same page: submit only genuine receipts, do not share your login, every action is recorded. No separate Terms page (staff only).
+- **Acknowledgement:** after sign-in, a user who has not accepted the current version sees a short "I understand" screen (next to the forced password change). Stored on the user as `privacyAcceptedVersion` and `privacyAcceptedAt` (one additive migration, with a rollback in `docs/`). Accepting is written to the history log. Changing the version in one place makes everyone accept again.
+- **Cookie:** no banner. Check the web app for any analytics or outside scripts before go-live.
+- **Tests:** shared unit test for the version check, API flow (blocked until accepted, then allowed), browser check on computer and phone.
+
+### Step 2. Database login and production settings  · Owner: developer + server admin
+1. Back up (`node scripts/backup.mjs`).
+2. Restore `scripts/setup-db-users.mjs`, run it without `--yes` to review, then with `--yes`. Restart the API. Confirm the app works and that the history log cannot be changed (try an UPDATE as `reimsys_app`: it must be refused).
+3. Document the script in `docs/DEPLOY.md` and `docs/SECURITY.md`.
+4. Set `NODE_ENV=production`, `WEB_ORIGIN` to the real https address, `TLS_CERT`/`TLS_KEY` or Nginx, and a real `MAIL_FROM`.
+
+### Step 3. Email  · Owner: client gives SMTP details
+1. Fill `SMTP_*` in `.env`, send a test from Settings, check the email log.
+2. With the https address in place, switch on and test forgot-password and invitation emails (currently left out).
+
+### Step 4. Client inputs  · Owner: client
+1. Reimbursement document and liquidation report layouts: replace the placeholders and have the client sign off a sample PDF/XLSX.
+2. Real category list and branding (logo, name): enter in Access → Settings.
+3. Data retention period: write it into the privacy notice, then build the retention clean-up (Step 6).
+
+### Step 5. Users and clean data  · Owner: developer + client
+1. Create the real users and roles; deactivate every seeded account (shared password `Reimsys#2026`).
+2. Run the end-to-end checks (`e2e/api-flow.mjs`, payment, return and UI scripts) against a staging copy, never live data.
+3. Back up, then `data:clear` to remove test receipts and files (keeps users, roles, settings, categories).
+
+### Step 6. Safety nets  · Owner: developer + server admin
+1. **Backups:** schedule `scripts/backup.mjs` nightly (`docs/BACKUP.md`), copy off the machine, do one test restore with `scripts/restore.mjs` into a spare database.
+2. **Monitoring:** a check on `/api/health` every few minutes, plus alerts for a stopped worker or email queue and low disk space; the alert goes to one named person.
+3. **Retention clean-up:** a scheduled job that archives or deletes records older than the agreed period, audited, with a dry-run mode.
+
+### Step 7. Training and launch  · Owner: client + developer
+1. Short guide per role (Med Ref, Checker, Approver, Accounting) with the existing screenshots.
+2. Pilot with a few Med Refs for a week; fix what they find.
+3. Launch day: backup, confirm health check, confirm first real receipt flows through to a reimbursement document.
+
+### Housekeeping (any time)
+- Decide on `scripts/setup-db-users.mjs` (restore or commit the deletion).
+- Commit the regenerated test screenshots once, or move them to a git-ignored folder.
+
+### Done means
+All boxes in "Still missing" ticked, privacy notice live and accepted by every user, a restore test passed, and a nightly backup visible in `backups/`.
+
+## Plan for today (2026-10-20)
+
+REIMSYS — October 20, 2026
+
+1. Restore scripts/setup-db-users.mjs and stop the screenshots in the project root showing as modified.
+2. Back up, then run setup-db-users.mjs (dry run, then --yes) so the system stops using root. Restart the API.
+3. Test sign-in, submitting a receipt and the audit log; confirm the app login cannot change or delete audit rows.
+4. Add setup-db-users.mjs to docs/DEPLOY.md and docs/SECURITY.md.
+5. Write the Privacy notice (what is collected, why, retention, contact, the one sign-in cookie, acceptable-use lines). (Needs client's lawyer or data protection officer to confirm)
+6. Add the Privacy page (linked from sign-in and sidebar) and the first sign-in "I understand" step, with a test.
+7. Set NODE_ENV=production, real https WEB_ORIGIN, TLS or Nginx, and real MAIL_FROM. (Needs the real values)
+8. Configure SMTP and perform a test send; then switch on forgot-password and invitation emails and test both.
+9. Back up the live database before clearing test data. (Wait for approval before clearing)
+10. Create the first real users, then deactivate the seeded dev accounts.
+11. Set up nightly backups in Task Scheduler, copy them off the machine, and rehearse a restore.
+12. Run pnpm typecheck, pnpm test, then test:api and test:ui against a staging copy; check /api/health over https.
+13. Ask the client for: document and report layouts, final categories and branding, retention period, data protection contact.
+
+Not for today: retention clean-up, monitoring and alerts, user guide.
+
+## Implementation plan (full review, 2026-10-20)
+This replaces "Go-live plan" and "Plan for today" above where they differ. Nothing in it has been built or run yet.
+
+### What the review found
+1. **Forgot-password and invitation emails are already built** (`routes/auth.ts`, `lib/passwordLinks.ts`). Only the button link is left out of emails until `WEB_ORIGIN` is a public address (`isPublicLink` in `lib/email.ts`). So this is a test after `WEB_ORIGIN` and SMTP are set, not a build. The "Not built yet" line in "Still missing" is wrong.
+2. **Switching to the limited database login will break the maintenance tools.** `scripts/backup.mjs`, `scripts/restore.mjs` and `prisma/clear-test-data.ts` all read `DATABASE_URL`, which becomes `reimsys_app` (no DROP, CREATE, or UPDATE/DELETE on the audit log and payments). Nothing in the code reads `MIGRATE_DATABASE_URL`, which the setup script adds. `pnpm db:migrate` and `db:seed` have the same problem. `mysqldump --routines` may also be refused. Fix before switching: those tools use `MIGRATE_DATABASE_URL` when it is set.
+3. **Order matters for the new privacy columns.** A migration needs the full-rights login. Run it while `.env` still uses root, then switch users. `docs/db-grants.sql` needs no change, because the columns go on the existing `user` table.
+4. **The first-sign-in gate already has a pattern to copy.** `middleware/auth.ts` blocks everything except `/api/me`, `/api/me/password` and `/api/auth/logout` while `mustChangePassword` is set, and `App.tsx` shows `ForcePasswordPage`. The privacy step follows the same shape, after the password step.
+5. **Every e2e script that signs in will be blocked by the new gate** until the user has accepted. A shared helper must accept the notice after login, or the tests fail for the wrong reason. Also stop the live-update connection (`useLive`) from starting before acceptance.
+6. **`demo:off` refuses to run without another active Super Admin**, so create the real admin first.
+7. **No analytics or outside scripts and one cookie (`reimsys_sid`)** were found, so no cookie banner. The privacy page must say this and only this.
+8. **Nothing in the app mentions privacy yet** (`/privacy` does not exist). It must be reachable before sign-in (`App.tsx` signed-out routes).
+9. `docs/PLAN.md` has overlapping sections; this one is the source of truth.
+
+### Phase A: build and fix locally (no approval needed, nothing live changes)
+Each step ends with `pnpm typecheck` and `pnpm test`.
+1. **Repo:** `git checkout scripts/setup-db-users.mjs`; add the root screenshots to `.gitignore`.
+2. **Maintenance tools use the migrate login.** In `scripts/backup-lib.mjs` (`dbConfig`) and `prisma/clear-test-data.ts`, prefer `MIGRATE_DATABASE_URL`, else `DATABASE_URL`. Add `--no-tablespaces` if mysqldump asks for it. Document the PowerShell line for `db:migrate` and `db:seed`. Test by running a backup and a restore into `reimsys_restore_test` with only the migrate login.
+3. **Privacy columns.** `User.privacyAcceptedVersion Int?` and `privacyAcceptedAt DateTime?`; migration `20261020010000_privacy_notice`; `docs/rollback-privacy-notice.sql`.
+4. **Shared:** `PRIVACY_VERSION = 1` and `needsPrivacy(user)` in `packages/shared`, with a unit test (null, old version, current). `me` returns `privacyRequired`.
+5. **API:** `POST /api/me/privacy` records version and time and writes an audit entry (`privacy.accepted`). Extend `requireAuth` so a user who must accept can only call `/api/me`, `/api/me/privacy`, `/api/auth/logout` (code `PRIVACY_REQUIRED`), after the password rule. Add `/api/privacy` as a public read of the version if the page needs it.
+6. **Web:** `pages/Privacy.tsx` (the notice text, one place); public route `/privacy` in the signed-out routes and a signed-in route; links on `Login.tsx` and the sidebar footer; `PrivacyAcceptPage` shown after `ForcePasswordPage` in `App.tsx`; `useLive` waits for acceptance.
+7. **Notice text:** what is collected, why, who sees it by role, retention (placeholder "to be confirmed by the client"), the one sign-in cookie and no analytics, how to ask for a correction, the data protection contact (placeholder), and the three acceptable-use lines.
+8. **Tests:** update the shared e2e login helper to accept the notice; add `e2e/privacy-flow.mjs` (blocked until accepted, then allowed, audit entry written, new version asks again); add a browser check on computer and phone. Run `pnpm test:api`, `pnpm test:ui`, and `node e2e/security.mjs` on the dev copy.
+9. **Docs:** `DEPLOY.md` (setup script, the migrate-login commands, privacy rollout and rollback), `SECURITY.md` (database login, privacy gate), `BACKUP.md` (which login backups use), fix the "Not built yet" line above.
+
+### Phase B: database login (needs your go-ahead, changes the live setup)
+1. `node scripts/backup.mjs`; confirm the newest folder in `backups/` has `database.sql` and `files.tar.gz`.
+2. `node scripts/setup-db-users.mjs` (dry run), then `--yes`; restart the API.
+3. Check: sign in, submit a receipt, open the audit log. As `reimsys_app` an UPDATE or DELETE on `auditlog` and `payment` must be refused.
+4. Re-run a backup and the restore rehearsal with the new login.
+To go back: copy `apps/api/.env.before-app-user` over `.env`.
+
+### Phase C: production settings and email (needs real values from you)
+Needed: the https address, certificate or Nginx, SMTP host/user/password, the From address.
+1. `NODE_ENV=production`, `WEB_ORIGIN`, `TLS_CERT`/`TLS_KEY` (or Nginx), `MAIL_FROM`. Check `/api/health` over https.
+2. SMTP in Settings; send a test; check the email log.
+3. Test forgot-password and an invitation end to end (the button must now appear). Publish SPF/DKIM/DMARC for the sending domain.
+4. On a phone over https, test the live scanner.
+
+### Phase D: data and accounts (needs your approval for each step)
+1. Back up the live database. **Wait for approval before clearing.**
+2. `data:clear` with the migrate login.
+3. Create the first real Super Admin, sign in as them, then create the other real users.
+4. `pnpm --filter @reimsys/api demo:off`.
+5. Each real user accepts the notice on first sign-in; confirm in the audit log.
+
+### Phase E: safety nets
+1. Nightly backup in Windows Task Scheduler (`docs/BACKUP.md`), a copy off the machine, one restore rehearsal.
+2. Run `pnpm typecheck`, `pnpm test`, `test:api`, `test:ui` and `e2e/security.mjs` against a staging copy.
+
+### Waiting on the client (blocks the privacy wording, not the build)
+Retention period, data protection contact, lawyer sign-off on the notice, document and report layouts, final categories and branding.
+
+### Later
+Retention clean-up (needs the period), monitoring and alerts, user guide.
+
+### Risks and how each is handled
+| Risk | Handling |
+|---|---|
+| Backup or restore fails after the user switch | Phase A step 2, rehearsed in Phase B step 4 |
+| Everyone is locked out by the privacy gate | Gate allows `/api/me`, accept and logout only; tested; rollback SQL; the version constant is the single switch |
+| Tests fail because of the gate | Shared login helper accepts the notice |
+| Real data cleared by mistake | Backup first, approval first, `data:clear` needs the database name typed |
+| Locked out of admin when turning off demo accounts | `demo:off` already refuses without another active Super Admin |
+
+### Phase A progress (2026-10-20)
+- Done: setup script restored; screenshots untracked and git-ignored; backup, restore, seed, `data:clear` and migrations use `MIGRATE_DATABASE_URL` when present; privacy notice built (migration `20261020010000_privacy_notice`, rollback `docs/rollback-privacy-notice.sql`, shared version rule, API gate and `POST /api/me/privacy`, public `/privacy`, first-sign-in acceptance, sidebar link); `e2e/privacy-flow.mjs` and `e2e/privacy-ui.mjs` pass; `realtime-api` and `realtime-ui` accept the notice for the users they create; docs updated (`DEPLOY.md`, `SECURITY.md`, `BACKUP.md`).
+- Found by the new test: the gate must also let the password change through (it comes first). Fixed.
+- Left for later phases: the live limited-login switch (Phase B), production settings and email (C), data and accounts (D), nightly backup and the full run on a staging copy (E).
+
+### Phase B done (2026-10-20)
+- The system now runs as `reimsys_app`; `reimsys_migrate` is used by migrations, seed, `data:clear`, backup and restore (`MIGRATE_DATABASE_URL`). Checked as `reimsys_app`: reading the history log works; UPDATE and DELETE on `auditlog`, UPDATE on `payment` and DROP TABLE are refused. `api-flow` (128 checks) and `privacy-flow` pass on the limited login.
+- A backup and a restore into `reimsys_restore_test` (881 receipts) both worked with the new login. The setup script now also grants `reimsys_migrate` that one spare database name, so restores can be rehearsed. The "REIMSYS nightly backup" scheduled task (02:00, `node scripts/backup.mjs`) already exists and last ran OK; it now uses the migrate login. Backups are still on the same disk: copy them elsewhere.
+- **XAMPP MariaDB had damaged its own system tables** while this was being done (not reimsys data). Repaired: `mysql.global_priv`, `columns_priv`, `procs_priv`, `proxies_priv`, `roles_mapping`, `db`, `gtid_slave_pos` (recreated). `multi-master.info` held 487 lines of error-log text, which made MariaDB refuse to start; it was emptied (original kept in `C:\xampp\mysql\data_quarantine_20261020`, with 1,120 stray `master-*`, `relay-log-*` files moved there). Raw copy of the data folder before repairs: `C:\xampp\mysql\data_before_repair_20261020`.
+- **Check your other XAMPP projects.** Repairing `mysql.db` dropped 5 per-database permission rows. `hris_test` and `pma` now show only USAGE. If an app fails with "access denied", grant it again on its own database. When everything works, the two safety folders can be deleted.
+
+### Review follow-up (2026-10-20, later)
+- Done: the Access user list shows who has accepted the privacy notice (`e2e/access-tabs.mjs` opens every Access tab on computer and phone: all pass); test data cleared with `data:clear` (backup `backups/20261020-021040` first) and all test users deactivated, leaving only the six demo accounts; live scanner (`scan-ui`, `scan-live`), `reminders`, `api-flow`, `privacy-flow`, `payment-flow`, `return-issues-flow` and `ui-flow` pass on the clean database.
+- **Still to do:** remove Check, Approve, Pay and Create receipt from the Super Admin role (Access → Roles and permissions). Not done: it needs the administrator's own say-so.
+- Still needs real values: https address, SMTP, From address (Phase C); first real Super Admin, real users, then `demo:off` (Phase D); phone camera and real inbox tests.
+- Done (later): Check, Approve, Pay and Create receipt removed from the Super Admin role (audited). Super Admin now has 11 rights and sees Dashboard, Receipts, Reports, Access and Audit log. Role sweep: no problems.
+
+### Production readiness work (2026-10-20, evening)
+Target: a Linux server / VPS (`docs/DEPLOY.md`, new "Go-live runbook").
+- Done: fonts bundled with the app (no Google requests; CSP tightened to the app's own address; checked in Chrome through the API port with no CSP errors); `scripts/preflight.mjs` (go-live gate, lists blockers and advice); `scripts/healthcheck.mjs` (API, disk, backup age, stuck emails, optional webhook); `BACKUP_COPY_TO` / `--copy-to` off-disk backup copy (tested); `SEED_DEMO=false` seed and `pnpm --filter @reimsys/api admin:create` so a real server never has demo accounts (tested on a spare database); runbook, BACKUP and SECURITY docs updated.
+- On this dev PC `node scripts/preflight.mjs` reports 6 blockers: production mode, https address, SMTP, real From address, demo accounts active, no real Super Admin. These only clear on the real server.
+- Still needs from you: the server and domain, SMTP details and From address, the first real admin's name (email given: onesysprimedev@gmail.com), the retention period and data protection contact, lawyer sign-off on the notice, document/report layouts, categories and branding.

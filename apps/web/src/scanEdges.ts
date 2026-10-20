@@ -30,7 +30,8 @@ function blur(gray: Uint8Array, w: number, h: number): Float32Array {
   return out;
 }
 
-function findEdges(gray: Uint8Array, w: number, h: number): Edges {
+/** `sensitive` also keeps fainter edges (a white receipt on a light desk); used only for the live camera's second look. */
+function findEdges(gray: Uint8Array, w: number, h: number, sensitive = false): Edges {
   const p = blur(gray, w, h), n = w * h;
   const mag = new Float32Array(n), angf = new Float32Array(n);
   let maxMag = 0;
@@ -50,8 +51,8 @@ function findEdges(gray: Uint8Array, w: number, h: number): Edges {
   // An edge counts when it is clearly above the picture's own noise. This must NOT depend on how many strong edges there
   // are (a receipt full of black print would otherwise push the bar so high that its faint border is thrown away).
   // Weak edges (down to Tlow) are kept only when they join up with a strong one.
-  const Tlow = Math.max(6, 2.5 * med);
-  const T = Math.max(14, 2.2 * Tlow);
+  const Tlow = sensitive ? Math.max(4, 1.8 * med) : Math.max(6, 2.5 * med);
+  const T = sensitive ? Math.max(9, 1.7 * Tlow) : Math.max(14, 2.2 * Tlow);
 
   // the thin ridge of every edge (compare with the two neighbours along the direction the edge mostly runs)
   const cand: number[] = [], strong: boolean[] = [];
@@ -254,16 +255,20 @@ const cross = (o: P, a: P, b: P) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b
 const areaOf = (c: Corners) => Math.abs(c.reduce((s, p, i) => s + p.x * c[(i + 1) % 4]!.y - c[(i + 1) % 4]!.x * p.y, 0)) / 2;
 const convex = (c: Corners) => { const s = [0, 1, 2, 3].map((i) => Math.sign(cross(c[i]!, c[(i + 1) % 4]!, c[(i + 2) % 4]!))); return s.every((v) => v === s[0] && v !== 0); };
 
-/** How good a four-cornered shape is as a receipt, 0 (not at all) to 1, judged by the edges along its sides. */
-export function scoreCorners(c: Corners, e: Edges): number {
+/**
+ * How good a four-cornered shape is as a receipt, 0 (not at all) to 1, judged by the edges along its sides.
+ * `relaxed` accepts fainter borders. Alone that would also accept the odd pattern on a table, so the live camera only trusts a
+ * relaxed find when it turns up in the same place twice in a row.
+ */
+export function scoreCorners(c: Corners, e: Edges, relaxed = false): number {
   if (!convex(c)) return 0;
   const frame = e.w * e.h, area = areaOf(c);
   if (area < 0.08 * frame || area > 1.4 * frame) return 0;
   // a quick rough look first, so shapes that are plainly wrong are dropped cheaply
   const rough = sideSupport(c, e, 6);
-  if (rough.reduce((s, v) => s + v, 0) / 4 < 0.3 || Math.min(...rough) < 0.1) return 0;
+  if (rough.reduce((s, v) => s + v, 0) / 4 < (relaxed ? 0.22 : 0.3) || Math.min(...rough) < (relaxed ? 0.06 : 0.1)) return 0;
   const rep = sideReport(c, e), sup = rep.map((r) => r.support), mean = sup.reduce((s, v) => s + v, 0) / 4, min = Math.min(...sup);
-  if (mean < 0.42 || min < 0.2) return 0;
+  if (mean < (relaxed ? 0.3 : 0.42) || min < (relaxed ? 0.12 : 0.2)) return 0;
   // a receipt is brighter (or darker) than what is around it all the way round, never brighter on one side and darker on another
   if (rep.some((r) => r.sign !== rep[0]!.sign)) return 0;
   // corners should be near square (a tilted camera squeezes them, but not past ~35 degrees)
@@ -293,7 +298,7 @@ export type { Edges };
  * The receipt's four corners in the small picture, found from its edges, with a score; null when no receipt-shaped
  * outline has enough real edge along it.
  */
-export function edgeQuad(gray: Uint8Array, w: number, h: number, edges = findEdges(gray, w, h)): { corners: Corners; score: number } | null {
+export function edgeQuad(gray: Uint8Array, w: number, h: number, edges = findEdges(gray, w, h), relaxed = false): { corners: Corners; score: number } | null {
   if (w < 40 || h < 40 || edges.strongCount < 30) return null;
   const lines = chooseLines(findLines(edges, 80));
   if (lines.length < 4) return null;
@@ -313,11 +318,11 @@ export function edgeQuad(gray: Uint8Array, w: number, h: number, edges = findEdg
     if (pts.some((v) => !v)) continue;
     const corners = pts as Corners;
     if (corners.some((v) => v.x < -0.12 * w || v.x > 1.12 * w || v.y < -0.12 * h || v.y > 1.12 * h)) continue;
-    const score = scoreCorners(corners, edges);
+    const score = scoreCorners(corners, edges, relaxed);
     if (score > 0) found.push({ corners, score, area: areaOf(corners), lines: [lines[a]!, lines[c]!, lines[b]!, lines[d]!] });
   }
   if (!found.length) return null;
   const top = found.reduce((a, b) => (b.score > a.score ? b : a));
-  if (top.score < 0.28) return null;
+  if (top.score < (relaxed ? 0.17 : 0.28)) return null;
   return { corners: orderCorners(refine(top.corners, top.lines, edges)), score: top.score };
 }

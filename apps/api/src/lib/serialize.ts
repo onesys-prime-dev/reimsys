@@ -1,5 +1,5 @@
 import type { Role, Session, User } from '@prisma/client';
-import type { MeResponse, RoleSummary } from '@reimsys/shared';
+import { needsPrivacy, type MeResponse, type RoleSummary } from '@reimsys/shared';
 import { config } from '../config.js';
 
 export const roleSummary = (r: Role, userCount?: number): RoleSummary => ({
@@ -20,6 +20,9 @@ export function sessionInfo(s: Pick<Session, 'expiresAt' | 'createdAt'>) {
   };
 }
 
+/** Changes whenever the photo changes, so every avatar on screen can load the new picture instead of a cached one. */
+export const photoVersion = (file: string | null) => { const m = file ? /-(\d+)\./.exec(file) : null; return m ? Number(m[1]) : null; };
+
 export function meResponse(user: User & { role: Role }, permissions: Iterable<string>, session?: Pick<Session, 'expiresAt' | 'createdAt'>): MeResponse {
   return {
     user: {
@@ -29,8 +32,10 @@ export function meResponse(user: User & { role: Role }, permissions: Iterable<st
       phone: user.phone,
       branch: user.branch,
       hasPhoto: !!user.photoFile,
+      photoV: photoVersion(user.photoFile),
       theme: (user.theme as 'light' | 'dark' | 'system') ?? 'light',
       mustChangePassword: user.mustChangePassword,
+      privacyRequired: needsPrivacy(user.privacyAcceptedVersion),
       prefs: { dailyDigest: user.dailyDigest, reservationReleased: user.reservationReleased },
       role: roleSummary(user.role),
     },
@@ -47,9 +52,12 @@ export const userRow = (u: User & { role: Role }) => ({
   mustChangePassword: u.mustChangePassword,
   lockedUntil: u.lockedUntil,
   lastLoginAt: u.lastLoginAt,
+  privacyAcceptedVersion: u.privacyAcceptedVersion,
+  privacyAcceptedAt: u.privacyAcceptedAt,
   phone: u.phone,
   branch: u.branch,
   hasPhoto: !!u.photoFile,
+  photoV: photoVersion(u.photoFile),
   createdAt: u.createdAt,
   role: roleSummary(u.role),
 });

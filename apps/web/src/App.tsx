@@ -7,6 +7,7 @@ import { Suspense, lazy } from 'react';
 import { DashboardPage } from './pages/Dashboard';
 import { ForcePasswordPage } from './pages/ForcePassword';
 import { LoginPage } from './pages/Login';
+import { PrivacyAcceptPage, PrivacyInAppPage, PrivacyPublicPage } from './pages/Privacy';
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordLink';
 import { ReceiptDetailPage } from './pages/ReceiptDetail';
 import { ReceiptsPage } from './pages/Receipts';
@@ -23,6 +24,8 @@ const ReportViewPage = lazy(() => import('./pages/ReportView').then((m) => ({ de
 import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
 
+const isForm = (p: string) => p === '/receipts/new' || /^\/receipts\/\d+\/edit$/.test(p);
+
 function titleFor(path: string) {
   if (path === '/') return 'Dashboard';
   if (path === '/receipts/new') return 'New receipt';
@@ -36,7 +39,7 @@ function Shell() {
   const { me, can, signOut } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
-  const live = useLive(!!me && !me.mustChangePassword);
+  const live = useLive(!!me && !me.mustChangePassword && !me.privacyRequired);
   if (!me) return null;
   const own = can('receipt.create') && !can('receipt.view_all');
   const items = [
@@ -62,20 +65,21 @@ function Shell() {
         <NavLink to="/" className="brand" aria-label="Go to the dashboard" style={{ textDecoration: 'none', color: 'inherit' }}><Logo size={34} /></NavLink>
         <nav className="nav" aria-label="Main">{items.map(link)}</nav>
         <button className="who" onClick={() => nav('/profile')}>
-          <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} />
+          <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} />
           <span><b>{me.name}</b><small>{me.role.name}</small></span>
         </button>
+        <NavLink to="/privacy" className="privacy-link">Privacy notice</NavLink>
       </aside>
       <div className="main">
         <header className="top">
           <div className="t">{titleFor(loc.pathname)}</div>
           <LiveLight state={live} />
           <NotificationBell />
-          <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} size={30} /></button>
+          <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} size={30} /></button>
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />
-        <main className="page">
+        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${loc.pathname === '/reports' ? 'rfit' : ''} ${isForm(loc.pathname) ? 'narrow' : ''}`}>
           <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
@@ -88,6 +92,7 @@ function Shell() {
             <Route path="/reports/:id" element={can('report.generate') ? <ReportViewPage /> : <Navigate to="/" replace />} />
             <Route path="/reports" element={can('report.generate') ? <ReportsPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/privacy" element={<PrivacyInAppPage />} />
             <Route path="/access" element={can('user.manage') || can('role.manage') ? <AccessPage /> : <Navigate to="/" replace />} />
             <Route path="/audit" element={can('audit.view') ? <AuditPage /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -111,10 +116,12 @@ export function App() {
       <Routes>
         <Route path="/forgot" element={<ForgotPasswordPage />} />
         <Route path="/reset" element={<ResetPasswordPage />} />
+        <Route path="/privacy" element={<PrivacyPublicPage />} />
         <Route path="*" element={<LoginPage />} />
       </Routes>
     );
   }
   if (me.mustChangePassword) return <ForcePasswordPage />;
+  if (me.privacyRequired) return pathname === '/privacy' ? <PrivacyPublicPage /> : <PrivacyAcceptPage />;
   return <Shell />;
 }

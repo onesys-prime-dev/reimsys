@@ -30,3 +30,9 @@ node scripts/restore.mjs backups/<folder> --yes --db reimsys_restore_test --file
 ```
 
 It prints how many receipts were restored. Compare with the live count, open a few files from the restored folder, then `DROP DATABASE reimsys_restore_test` and delete the folder. This was rehearsed on this system: 672 of 672 receipts and 2,223 of 2,223 uploaded files came back.
+
+## A copy somewhere else
+Set `BACKUP_COPY_TO` in `apps/api/.env` (or pass `--copy-to <folder>`) and every run also copies the new backup to that folder (another disk, a mounted network share or a cloud-synced folder) and keeps the newest `--keep` there too. If the copy fails the run exits with an error, so the scheduler shows it. `node scripts/healthcheck.mjs` warns when the newest backup is more than 30 hours old.
+
+## Which database login is used
+Backups and restores need more rights than the running system has. When `apps/api/.env` has `MIGRATE_DATABASE_URL` (added by `node scripts/setup-db-users.mjs`), `backup.mjs` and `restore.mjs` use that full-rights login; otherwise they use `DATABASE_URL`. After switching to the limited login, run one backup and one restore rehearsal (see above) to confirm both work.

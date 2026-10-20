@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { PERMISSIONS, isLockedGrant, type RoleSummary } from '@reimsys/shared';
+import { PERMISSIONS, isLockedGrant, needsPrivacy, type RoleSummary } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';
@@ -10,7 +10,8 @@ import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '..
 
 interface UserRow {
   id: number; name: string; email: string; isActive: boolean; mustChangePassword: boolean;
-  lockedUntil: string | null; lastLoginAt: string | null; hasPhoto: boolean; role: RoleSummary;
+  lockedUntil: string | null; lastLoginAt: string | null; hasPhoto: boolean; photoV: number | null; role: RoleSummary;
+  privacyAcceptedVersion: number | null; privacyAcceptedAt: string | null;
 }
 
 export function AccessPage() {
@@ -59,6 +60,8 @@ function UsersTab() {
   const shown = showOff ? all : all.filter((u) => u.isActive);
   return (
     <>
+      <section className="card tcard">
+      <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" aria-label="Search users" /></div>
         {off > 0 && (
@@ -66,7 +69,8 @@ function UsersTab() {
         )}
         <button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}><Icon name="plus" size={18} />Add user</button>
       </div>
-      <section className="card">
+      </div>
+      <div className="panel-body">
         {shown.map((u) => {
           const self = u.id === me!.id;
           const above = u.role.rank > myRank;
@@ -74,11 +78,12 @@ function UsersTab() {
           return (
             <div className="urow x" key={u.id}>
               <div className="nm">
-                <Avatar name={u.name} userId={u.id} hasPhoto={u.hasPhoto} />
+                <Avatar name={u.name} userId={u.id} hasPhoto={u.hasPhoto} photoV={u.photoV} />
                 <div><b>{u.name}{self && <span className="muted"> (you)</span>}</b><small className="em">{u.email}</small></div>
               </div>
               <span className="em muted stt2">
                 {!u.isActive ? 'Deactivated' : locked ? 'Locked' : u.mustChangePassword ? 'Invited' : (u.lastLoginAt ? `Last sign in ${fmtDateTime(u.lastLoginAt)}` : "Never signed in")}
+                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
               </span>
               <select className="rl" value={u.role.id} disabled={self || above} aria-label={`Role for ${u.name}`}
                 onChange={(e) => patch.mutate({ id: u.id, body: { roleId: Number(e.target.value) } })}>
@@ -91,6 +96,8 @@ function UsersTab() {
         })}
         {users.data && !shown.length && <Empty title="No users found">{off > 0 && !showOff ? `Only deactivated users match. Turn on "Show deactivated" to see them.` : 'Try a different search.'}</Empty>}
         {!users.data && <div className="empty">Loading…</div>}
+      </div>
+      <div className="panel-foot"><span className="muted">{shown.length} user{shown.length === 1 ? '' : 's'}</span></div>
       </section>
       {adding && roles.data && <AddUser roles={roles.data.roles.filter((r) => r.rank <= myRank)} onClose={() => setAdding(false)} onDone={refresh} />}
       {managing && <ManageUser user={managing} onClose={() => setManaging(null)} onDone={refresh} />}
@@ -228,7 +235,7 @@ function PermsTab() {
 
   return (
     <>
-      <section className="card">
+      <section className="card scroll">
         <div className="card-h">
           <h2>Roles and permissions</h2>
           {canEdit && <button className="btn sm" onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add role</button>}

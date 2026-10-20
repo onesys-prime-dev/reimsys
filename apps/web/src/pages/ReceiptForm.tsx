@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { InvoiceGuide } from '../components/InvoiceGuide';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
@@ -9,6 +10,9 @@ import { LiveScanner } from '../components/LiveScanner';
 import { ScanDialog } from '../components/ScanDialog';
 import { pageToFile } from '../scanPage';
 import { Field, Icon, useToast } from '../ui';
+
+/** Back to the top of the screen. On a computer the area beside the menu scrolls, not the browser window. */
+const toTop = () => { document.querySelector('.main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); };
 
 const kb = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
@@ -178,9 +182,9 @@ export function ReceiptFormPage() {
     setErrors((e) => ({ ...e, ...mine }));
     if (Object.keys(mine).length) { window.setTimeout(() => document.querySelector('.err')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     setStepIx((i) => Math.min(i + 1, steps.length - 1));
-    window.scrollTo({ top: 0 });
+    toTop();
   }
-  const back = () => { setStepIx((i) => Math.max(0, i - 1)); window.scrollTo({ top: 0 }); };
+  const back = () => { setStepIx((i) => Math.max(0, i - 1)); toTop(); };
 
   function addFiles(list: FileList | File[]) {
     const incoming = Array.from(list);
@@ -298,6 +302,7 @@ export function ReceiptFormPage() {
 
           {step === 'invoice' && (
             <div className="form">
+              {required && <div className="full"><InvoiceGuide step="invoice" /></div>}
               <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
               {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
               <Field label="Vendor complete name" className="full" error={e.payee}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
@@ -315,6 +320,7 @@ export function ReceiptFormPage() {
 
           {step === 'vat' && (
             <div className="form">
+              <div className="full"><InvoiceGuide step="vat" /></div>
               <div className="full">
                 <div className="q">Vatable or non-vatable? <i>*</i></div>
                 <Choice name="VAT type" value={f.vatType} onChange={(v) => set('vatType', v, 'vatType')} options={[{ value: 'vatable', label: 'Vatable', sub: '"VAT" can be seen in the letterhead of the invoice' }, { value: 'non_vatable', label: 'Non-vatable', sub: '"NON-VAT" appeared in the letterhead of the invoice' }]} />
@@ -333,6 +339,7 @@ export function ReceiptFormPage() {
 
           {step === 'wht' && (
             <div className="form">
+              <div className="full"><InvoiceGuide step="wht" /></div>
               <Field label="Withholding tax rate (%)" error={e.whtRate}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
               <Field label="Withholding tax amount (PHP)" error={e.whtAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" /></Field>
               {warnings.filter((w) => w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}

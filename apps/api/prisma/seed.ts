@@ -1,8 +1,10 @@
-import { DEFAULT_GRANTS, DEFAULT_ROLES, PERMISSIONS } from '@reimsys/shared';
+import './migrateLogin.js';
+import { DEFAULT_GRANTS, DEFAULT_ROLES, PERMISSIONS, PRIVACY_VERSION } from '@reimsys/shared';
 import { prisma } from '../src/db.js';
 import { hashPassword } from '../src/lib/password.js';
 import { demoUsersToCreate } from './demoUsers.js';
 
+/** The demo accounts start with the privacy notice already accepted so the test scripts can sign in; real users always see it (see e2e/privacy-flow.mjs). */
 /** Development password for the seeded accounts. Change or remove before any real deployment. */
 const DEV_PASSWORD = 'Reimsys#2026';
 const CATEGORIES = ['Medicine', 'Transport', 'Meals', 'Supplies', 'Lodging'];
@@ -33,13 +35,14 @@ async function main() {
 
   // A live system that has switched the demo accounts off (pnpm demo:off) gets none back when it is re-seeded during an upgrade.
   const retired = (await prisma.auditLog.count({ where: { action: 'user.demo_retired' } })) > 0;
-  const demo = demoUsersToCreate(retired);
+  // SEED_DEMO=false (a real server): no demo accounts at all. Create the first Super Admin with pnpm admin:create.
+  const demo = demoUsersToCreate(retired || process.env.SEED_DEMO === 'false');
   const passwordHash = await hashPassword(DEV_PASSWORD);
   for (const u of demo) {
     await prisma.user.upsert({
       where: { email: u.email },
       update: {},
-      create: { email: u.email, name: u.name, branch: u.branch, roleId: roleId.get(u.role)!, passwordHash, mustChangePassword: false },
+      create: { email: u.email, name: u.name, branch: u.branch, roleId: roleId.get(u.role)!, passwordHash, mustChangePassword: false, privacyAcceptedVersion: PRIVACY_VERSION, privacyAcceptedAt: new Date() },
     });
   }
   console.log(`Seeded ${PERMISSIONS.length} permissions, ${DEFAULT_ROLES.length} roles, ${CATEGORIES.length} categories, ${demo.length} users.`);

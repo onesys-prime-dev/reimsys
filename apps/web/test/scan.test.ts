@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectQuad, enhance, findQuad, quadMapper, steadyTracker, warpToRect, type Pt, type Quad, type Raster } from '../src/scan';
+import { detectQuad, enhance, findQuad, quadMapper, warpToRect, type Pt, type Quad, type Raster } from '../src/scan';
 
 const raster = (width: number, height: number, fn: (x: number, y: number) => number | [number, number, number]): Raster => {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -153,36 +153,6 @@ describe('knowing whether a receipt is really in view', () => {
 
   it('keeps detectQuad answering with the whole photo when nothing is found', () => {
     expect(detectQuad(raster(400, 300, () => 120))[2]).toEqual({ x: 399, y: 299 });
-  });
-});
-
-describe('waiting until the receipt holds still', () => {
-  const base: Quad = [{ x: 90, y: 40 }, { x: 330, y: 70 }, { x: 305, y: 270 }, { x: 60, y: 245 }];
-  const shift = (q: Quad, dx: number, dy: number): Quad => q.map((p) => ({ x: p.x + dx, y: p.y + dy })) as Quad;
-
-  it('says steady after enough frames in nearly the same place', () => {
-    const t = steadyTracker({ frames: 5, tolerance: 0.02 });
-    const results = [0, 1, 2, 3, 4].map((i) => t.push(shift(base, i % 2, 0), 400, 300));
-    expect(results).toEqual([false, false, false, false, true]);
-  });
-
-  it('starts counting again when the receipt moves or disappears', () => {
-    const t = steadyTracker({ frames: 4, tolerance: 0.02 });
-    for (let i = 0; i < 3; i++) t.push(base, 400, 300);
-    expect(t.push(shift(base, 40, 0), 400, 300)).toBe(false);
-    for (let i = 0; i < 2; i++) t.push(shift(base, 40, 0), 400, 300);
-    expect(t.push(null, 400, 300)).toBe(false);
-    for (let i = 0; i < 3; i++) expect(t.push(base, 400, 300)).toBe(false);
-    expect(t.push(base, 400, 300)).toBe(true);
-  });
-
-  it('reports how far along it is, for the progress ring', () => {
-    const t = steadyTracker({ frames: 4, tolerance: 0.02 });
-    expect(t.progress()).toBe(0);
-    t.push(base, 400, 300); t.push(base, 400, 300);
-    expect(t.progress()).toBeCloseTo(0.5, 5);
-    t.push(null, 400, 300);
-    expect(t.progress()).toBe(0);
   });
 });
 

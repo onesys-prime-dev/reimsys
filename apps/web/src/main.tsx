@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { AuthProvider } from './auth';
+import '@fontsource-variable/bricolage-grotesque/index.css';
+import '@fontsource-variable/public-sans/index.css';
 import './styles.css';
 import { ToastProvider } from './ui';
 

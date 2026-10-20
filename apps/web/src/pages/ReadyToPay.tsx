@@ -54,18 +54,23 @@ export function ReadyToPayPage() {
       <ExportPayments />
       {!q.data && <div className="empty">Loading…</div>}
       {q.data && !groups.length && <Empty title="Nothing to pay">Every approved receipt has been paid.</Empty>}
-      <div className="stack">
+      {groups.length > 0 && (
+      <section className="card tcard">
+      <div className="panel-body">
         {groups.map((g) => (
-          <section key={g.payee.id} className="card">
+          <div key={g.payee.id} className="paygrp">
             <div className="card-h">
               <h2>{g.payee.name}</h2>
               <small>{g.payee.branch ? `${g.payee.branch} · ` : ''}{g.count} receipt{g.count === 1 ? '' : 's'} · {money(g.total)}</small>
               {g.count > 1 && <button className="btn sm ghost" onClick={() => selectAll(g.payee.id, g.receipts.map((r) => r.id))}>Select all</button>}
             </div>
             {g.receipts.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={false} pick={{ on: picked?.payeeId === g.payee.id && picked.ids.includes(r.id), toggle: () => toggle(g.payee.id, r.id) }} />)}
-          </section>
+          </div>
         ))}
       </div>
+      <div className="panel-foot"><span className="muted">{groups.length} {groups.length === 1 ? 'person' : 'people'} · {groups.reduce((n, g) => n + g.count, 0)} receipts · {money(groups.reduce((n, g) => n + g.total, 0))} to pay</span></div>
+      </section>
+      )}
       {group && chosen.length > 0 && (
         <div className="savebar" role="region" aria-label="Selected receipts">
           <span>{chosen.length} selected · {group.payee.name} · {money(totalOf(chosen))}</span>

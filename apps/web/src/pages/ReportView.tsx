@@ -72,7 +72,7 @@ export function ReportViewPage() {
         </section>
       )}
 
-      <section className="card">
+      <section className="card scroll">
         <div className="matrix">
           <table style={{ minWidth: 820 }}>
             <thead>

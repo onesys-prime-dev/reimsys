@@ -22,6 +22,11 @@ export function dbConfig(env, dbOverride) {
   return { host: u.hostname, port: u.port || '3306', user: decodeURIComponent(u.username), password: decodeURIComponent(u.password), database: dbOverride ?? u.pathname.slice(1) };
 }
 
+/** The login for backup and restore: the full-rights one when the system has its own limited login (MIGRATE_DATABASE_URL), else DATABASE_URL. */
+export function adminDbConfig(env, dbOverride) {
+  return dbConfig(env.MIGRATE_DATABASE_URL ? { ...env, DATABASE_URL: env.MIGRATE_DATABASE_URL } : env, dbOverride);
+}
+
 export function storageDir(env) {
   return path.resolve(apiDir, env.STORAGE_DIR ?? './storage');
 }

@@ -1,21 +1,29 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { detectQuad, findQuad, steadyTracker, type Pt, type Quad } from '../scan';
-import { pageThumb, rasterFromVideo, type ScanPage } from '../scanPage';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { detectQuad, findQuadLive, type Quad } from '../scan';
+import { pageThumb, rasterOfCanvas, snapshotVideo, type ScanPage } from '../scanPage';
 import { Icon } from '../ui';
 import { ScanDialog } from './ScanDialog';
 
-const LOOK_EVERY_MS = 200;
-const STEADY_CHECKS = 6; // about a second and a quarter
-const STEADY_TOLERANCE = 0.02;
-const MIN_AREA = 0.2; // the receipt must fill at least a fifth of the picture
+const LOOK_SIDE = 300; // the short side of the small picture the receipt is looked for in
+const MIN_GAP_MS = 70; // shortest pause between two looks; slower phones get a longer one (see below)
+const CLOSER_AREA = 0.12; // below this, suggest moving closer
+const KEEP_MISSES = 3; // keep showing the outline through this many looks that miss it, so it does not flicker
+const SAVE_TRIM = 0.026; // the saved page is cut this much further inside the outline, past the receipt's soft edge
 
 const area = (q: Quad) => Math.abs(q.reduce((s, p, i) => s + (p.x * q[(i + 1) % 4]!.y - q[(i + 1) % 4]!.x * p.y), 0)) / 2;
 const moved = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i]!.x, p.y - b[i]!.y)));
+const scale = (q: Quad, k: number) => q.map((p) => ({ x: p.x * k, y: p.y * k })) as Quad;
+const pullIn = (q: Quad, t: number) => {
+  const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4, cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+  return q.map((p) => ({ x: p.x + (cx - p.x) * t, y: p.y + (cy - p.y) * t })) as Quad;
+};
 let nextPage = 1;
+const thumbCache = new WeakMap<ScanPage, string>();
+const thumbOf = (p: ScanPage) => { let t = thumbCache.get(p); if (!t) { t = pageThumb(p); thumbCache.set(p, t); } return t; };
 
 /**
- * The live scanner, like a document-scanner app: the camera fills the screen, the receipt is found and outlined as you hold it
- * in view, and the picture is taken by itself once it is held still. Keep going for more pages, tap a page to adjust it, then Done.
+ * The live scanner, like a document-scanner app: the camera fills the screen and the receipt is found and outlined as you hold
+ * it in view. The person presses the button to take each page (nothing is taken by itself), taps a page to adjust it, then Done.
  */
 export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
   maxPages: number;
@@ -27,35 +35,31 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
   const holder = useRef<HTMLDivElement>(null);
   const grab = useRef<HTMLCanvasElement | null>(null);
   const track = useRef<MediaStreamTrack | null>(null);
-  const steady = useRef(steadyTracker({ frames: STEADY_CHECKS, tolerance: STEADY_TOLERANCE }));
-  const liveQuad = useRef<Quad | null>(null);
-  const lastShot = useRef<Quad | null>(null);
-  const armed = useRef(true);
-  const gone = useRef(0);
+  const target = useRef<Quad | null>(null); // where the receipt is, in the camera's own pixels; the outline glides there
+  const candidate = useRef<Quad | null>(null); // the last faint find, to confirm the next one against
+  const misses = useRef(0);
+  const poly = useRef<SVGPolygonElement>(null);
   const busy = useRef(false);
   const pagesRef = useRef<ScanPage[]>([]);
-  const autoRef = useRef(true);
   const editingRef = useRef(false);
 
   const [size, setSize] = useState<{ w: number; h: number } | null>(null); // the camera's own picture size
   const [fit, setFit] = useState<{ w: number; h: number } | null>(null); // how big it is drawn
-  const [quad, setQuad] = useState<Quad | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [found, setFound] = useState<'none' | 'far' | 'yes'>('none');
   const [pages, setPages] = useState<ScanPage[]>([]);
-  const [auto, setAuto] = useState(true);
   const [torch, setTorch] = useState<boolean | null>(null); // null: this camera has no flash
   const [editing, setEditing] = useState<ScanPage | null>(null);
   const [flash, setFlash] = useState(0);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  pagesRef.current = pages; autoRef.current = auto; editingRef.current = !!editing;
+  pagesRef.current = pages; editingRef.current = !!editing;
   const full = pages.length >= maxPages;
 
   /* open and close the camera */
   useEffect(() => {
     let stopped = false;
     let stream: MediaStream | null = null;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false })
       .then(async (s) => {
         if (stopped) { s.getTracks().forEach((t) => t.stop()); return; }
         stream = s;
@@ -85,54 +89,84 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
     return () => ro.disconnect();
   }, [size]);
 
+  /* Taking a page: copy the camera frame at once (cheap), flash, and do the heavy pixel work a moment later so nothing freezes. */
   const capture = useCallback(() => {
     const v = video.current;
     if (!v || !v.videoWidth || busy.current || pagesRef.current.length >= maxPages) return;
     busy.current = true;
-    const raster = rasterFromVideo(v);
-    const k = raster.width / v.videoWidth;
-    const live = liveQuad.current;
-    const q = findQuad(raster) ?? (live ? (live.map((p) => ({ x: p.x * k, y: p.y * k })) as Quad) : detectQuad(raster));
-    lastShot.current = live;
-    armed.current = false; gone.current = 0;
-    steady.current.reset(); setProgress(0);
-    setPages((ps) => [...ps, { id: nextPage++, raster, quad: q, mode: 'document' }]);
+    const shot = snapshotVideo(v);
+    const live = target.current;
+    const vw = v.videoWidth;
     setFlash((n) => n + 1);
     setConfirmClose(false); // another picture means they changed their mind about leaving
-    window.setTimeout(() => { busy.current = false; }, 500);
+    requestAnimationFrame(() => window.setTimeout(() => {
+      const raster = rasterOfCanvas(shot);
+      // the outline already on screen is where the receipt is; only look again when there was none
+      const quad = live ? pullIn(scale(live, raster.width / vw), SAVE_TRIM) : detectQuad(raster);
+      setPages((ps) => [...ps, { id: nextPage++, raster, quad, mode: 'document' }]);
+      window.setTimeout(() => { busy.current = false; }, 250);
+    }, 0));
   }, [maxPages]);
 
-  /* look for the receipt a few times a second */
+  /* The outline glides to the newest position on every screen frame, instead of jumping each time the receipt is looked for. */
+  useEffect(() => {
+    let raf = 0, last = performance.now(), shown: Quad | null = null;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const t = target.current, el = poly.current;
+      const dt = now - last;
+      last = now;
+      if (!t || !el) { shown = null; return; }
+      const a = 1 - Math.exp(-dt / 45);
+      const diag = size ? Math.hypot(size.w, size.h) : 1;
+      if (!shown || moved(t, shown) > 0.25 * diag) shown = t.map((p) => ({ ...p })) as Quad; // a big jump: go straight there
+      else for (let i = 0; i < 4; i++) { shown[i]!.x += (t[i]!.x - shown[i]!.x) * a; shown[i]!.y += (t[i]!.y - shown[i]!.y) * a; }
+      el.setAttribute('points', shown.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [size]);
+
+  /* Look for the receipt again and again. Each look waits a little after the last one finished, longer on a slow phone, so the camera picture never stutters. */
   useEffect(() => {
     if (!size) return;
-    const id = window.setInterval(() => {
+    let timer = 0, stopped = false;
+    const look = () => {
+      if (stopped) return;
+      const started = performance.now();
       const v = video.current;
-      if (!v || !v.videoWidth || editingRef.current || busy.current) return;
-      const w = 320, h = Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth));
-      const c = (grab.current ??= document.createElement('canvas'));
-      c.width = w; c.height = h;
-      const g = c.getContext('2d', { willReadFrequently: true })!;
-      g.drawImage(v, 0, 0, w, h);
-      const d = g.getImageData(0, 0, w, h);
-      let q = findQuad({ data: d.data, width: w, height: h }, 0.004); // hug the paper for the outline you see
-      if (q && area(q) < MIN_AREA * w * h) q = null;
-      const kx = v.videoWidth / w;
-      const scaled = q ? (q.map((p: Pt) => ({ x: p.x * kx, y: p.y * kx })) as Quad) : null;
-      liveQuad.current = scaled;
-      setQuad(scaled);
-      // After a picture, wait until the receipt has gone or a different one is in view before taking the next.
-      if (!armed.current) {
-        gone.current = q ? 0 : gone.current + 1;
-        if (gone.current >= 3 || (scaled && lastShot.current && moved(scaled, lastShot.current) > 0.15 * Math.hypot(v.videoWidth, v.videoHeight))) armed.current = true;
+      if (v && v.videoWidth && !editingRef.current && !busy.current && !document.hidden) {
+        const k = LOOK_SIDE / Math.min(v.videoWidth, v.videoHeight);
+        const w = Math.max(1, Math.round(v.videoWidth * k)), h = Math.max(1, Math.round(v.videoHeight * k));
+        const c = (grab.current ??= document.createElement('canvas'));
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+        const g = c.getContext('2d', { willReadFrequently: true })!;
+        g.drawImage(v, 0, 0, w, h);
+        const d = g.getImageData(0, 0, w, h);
+        const r = findQuadLive({ data: d.data, width: w, height: h }, 0.004); // hug the paper for the outline you see
+        let q: Quad | null = r ? r.quad : null;
+        // A faint find counts only when the last look found about the same outline: a receipt stays put, a table pattern does not.
+        if (q && !r!.sure) {
+          const prev = candidate.current;
+          candidate.current = q;
+          if (!prev || moved(q, prev) > 0.05 * Math.hypot(w, h)) q = null;
+        } else candidate.current = q;
+        if (q) {
+          misses.current = 0;
+          target.current = scale(q, 1 / k);
+          setFound(area(q) < CLOSER_AREA * w * h ? 'far' : 'yes');
+        } else if (++misses.current > KEEP_MISSES) {
+          target.current = null;
+          setFound('none');
+        }
       }
-      const hold = steady.current.push(armed.current ? q : null, w, h);
-      setProgress(armed.current ? steady.current.progress() : 0);
-      if (hold && autoRef.current && armed.current && pagesRef.current.length < maxPages) capture();
-    }, LOOK_EVERY_MS);
-    return () => window.clearInterval(id);
-  }, [size, capture, maxPages]);
+      const took = performance.now() - started;
+      timer = window.setTimeout(look, Math.max(MIN_GAP_MS, took * 1.5));
+    };
+    timer = window.setTimeout(look, 0);
+    return () => { stopped = true; window.clearTimeout(timer); };
+  }, [size]);
 
-  const thumbs = useMemo(() => pages.map((p) => pageThumb(p)), [pages]);
   const requestClose = () => {
     if (pages.length && !confirmClose) { setConfirmClose(true); return; }
     onClose();
@@ -149,15 +183,15 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
   const hint = confirmClose ? `Discard ${pages.length} page${pages.length === 1 ? '' : 's'}? Press the cross again.`
     : full ? 'That is the most pages this receipt can have.'
     : !size ? 'Opening the camera…'
-    : !auto ? (quad ? 'Press the button to take the picture' : 'Show the whole receipt')
-    : !armed.current && pages.length ? 'Got it. Show the next page, or press Done.'
-    : !quad ? 'Show the whole receipt' : progress > 0 ? 'Hold still…' : 'Receipt found';
+    : found === 'yes' ? 'Receipt found. Press the button to take the picture.'
+    : found === 'far' ? 'Move a little closer to the receipt.'
+    : pages.length ? 'Show the next page, or press Done.'
+    : 'Show the whole receipt';
 
   return (
     <div className="live-scan" role="dialog" aria-modal="true" aria-label="Scan receipt camera">
       <div className="live-top">
         <button type="button" className="live-btn" aria-label="Close camera" onClick={requestClose}><Icon name="x" /></button>
-        <button type="button" className={`live-btn auto ${auto ? 'on' : ''}`} aria-pressed={auto} aria-label="Auto capture" onClick={() => setAuto((a) => !a)}>Auto {auto ? 'on' : 'off'}</button>
         {torch !== null ? <button type="button" className={`live-btn ${torch ? 'on' : ''}`} aria-pressed={torch} aria-label="Flash" onClick={toggleTorch}>Flash</button> : <span style={{ width: 48 }} />}
       </div>
       <div className="live-view" ref={holder}>
@@ -165,17 +199,16 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
           <video ref={video} playsInline muted />
           {size && (
             <svg className="live-svg" viewBox={`0 0 ${size.w} ${size.h}`} aria-hidden="true">
-              {quad && <polygon className={`live-poly ${progress > 0 ? 'steady' : ''}`} points={quad.map((p) => `${p.x},${p.y}`).join(' ')} />}
+              {found !== 'none' && <polygon ref={poly} className={`live-poly ${found === 'yes' ? 'steady' : ''}`} points="" />}
             </svg>
           )}
           {flash > 0 && <div className="live-flash" key={flash} />}
         </div>
       </div>
       <div className="live-hint" role="status">{hint}</div>
-      <div className="live-bar"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
       <div className="live-bottom">
         <div className="live-thumbs">
-          {pages.map((p, i) => <button key={p.id} type="button" className="live-thumb" aria-label={`Page ${i + 1}`} onClick={() => { setConfirmClose(false); setEditing(p); }}><img src={thumbs[i]} alt="" /><b>{i + 1}</b></button>)}
+          {pages.map((p, i) => <button key={p.id} type="button" className="live-thumb" aria-label={`Page ${i + 1}`} onClick={() => { setConfirmClose(false); setEditing(p); }}><img src={thumbOf(p)} alt="" /><b>{i + 1}</b></button>)}
         </div>
         <button type="button" className="live-shutter" aria-label="Take picture" disabled={!size || full} onClick={capture}><i /></button>
         <button type="button" className="live-done" disabled={!pages.length} onClick={() => onDone(pages)}>Done ({pages.length})</button>
@@ -192,4 +225,3 @@ export function LiveScanner({ maxPages, onDone, onClose, onUnavailable }: {
     </div>
   );
 }
-

@@ -29,11 +29,12 @@ git clone <repo> /srv/reimsys && cd /srv/reimsys
 pnpm install --frozen-lockfile
 cp apps/api/.env.example apps/api/.env      # edit it, see below
 pnpm --filter @reimsys/api exec prisma migrate deploy
-pnpm --filter @reimsys/api db:seed           # creates roles, permissions, categories and the demo users
+SEED_DEMO=false pnpm --filter @reimsys/api db:seed   # roles, permissions, categories; SEED_DEMO=false = no demo accounts
+pnpm --filter @reimsys/api admin:create -- --email you@company.com --name "Your Name"   # the first real Super Admin (temporary password shown once)
 pnpm build
 ```
 
-After seeding, sign in as `admin@example.com`, create the real users on the Access page, then deactivate every `@example.com` demo account. The demo password is public, so do not skip this.
+On a real server seed with `SEED_DEMO=false` and create the first Super Admin with `admin:create`, so no account with the public demo password ever exists. (If you seeded without it, create the real admin, sign in as them, and run `demo:off` as described under Going live.) Sign in, choose a password, accept the privacy notice, then create the other users on the Access page.
 
 `apps/api/.env` for production:
 
@@ -191,3 +192,34 @@ A new database is built with `pnpm db:migrate` and ends up identical to the sche
    ```
    It keeps users, roles, rights, settings and categories, restarts the reference numbers, and refuses to run unless you type the database name. Set up the nightly backup from `docs/BACKUP.md` before the first real receipt.
 7. Check who holds which rights on the Access page. One person must never be able to check, approve and pay the same receipt: the system now refuses it (a checker cannot decide on a receipt they checked, and nobody can pay a receipt they encoded, checked or approved), but the Super Admin should not be handed all three roles anyway.
+
+## Limited database login on one computer (XAMPP or a single server)
+Instead of typing the SQL by hand, run `node scripts/setup-db-users.mjs` (it only shows what it would do) and then `node scripts/setup-db-users.mjs --yes`. It creates `reimsys_app` (what the running system uses; it can read and append to the history log but never change or delete it, see `docs/db-grants.sql`) and `reimsys_migrate` (full rights on the database), saves the old `.env` as `.env.before-app-user`, points `DATABASE_URL` at `reimsys_app` and adds `MIGRATE_DATABASE_URL`. Restart the API afterwards. To go back, copy `.env.before-app-user` over `.env`.
+
+After that, anything that changes the structure or clears data uses the full-rights login automatically when `MIGRATE_DATABASE_URL` is in `.env`: `pnpm db:migrate`, `pnpm db:seed`, `pnpm --filter @reimsys/api data:clear`, `node scripts/backup.mjs` and `node scripts/restore.mjs`. The running API and `demo:off` use `reimsys_app`. `prisma migrate deploy` run by hand reads the same file, so it also uses the full-rights login.
+
+## Privacy notice (added 2026-10-20)
+Everyone sees the privacy notice once after signing in (after choosing a password) and must tick "I understand" before the app opens. It is also readable before signing in (link on the sign-in page) and from the sidebar.
+1. Back up. Run `pnpm --filter @reimsys/api db:deploy` (adds two nullable columns to `user`, migration `20261020010000_privacy_notice`). `docs/db-grants.sql` needs no change.
+2. The wording is in `apps/web/src/pages/Privacy.tsx`. Replace the two "To be confirmed by your administrator" lines (retention period, data protection contact) when the client decides, then raise `PRIVACY_VERSION` in `packages/shared/src/privacy.ts` so everyone reads it again.
+3. The demo accounts from the seed start with the notice accepted, so the test scripts can sign in. Real users always see it. Each acceptance is in the history log (`privacy.accepted`).
+4. To go back: `docs/rollback-privacy-notice.sql`, or restore the backup.
+5. Checks: `node e2e/privacy-flow.mjs` (API) and `node e2e/privacy-ui.mjs` (browser, computer and phone).
+
+## Go-live runbook (Linux server)
+Do these in order. Step 9 is the gate: it must report no blockers.
+
+1. Server: Node 20+, pnpm, MariaDB/MySQL, Nginx, a DNS name and a certificate (`certbot --nginx`).
+2. Database and users: section 2, then `docs/db-grants.sql`, or on one machine `node scripts/setup-db-users.mjs --yes`. Give the MySQL `root` account a password (`mysql_secure_installation`).
+3. Build and configure: section 3. Set `NODE_ENV=production`, the real `WEB_ORIGIN`, `STORAGE_DIR` outside the code folder, SMTP and `MAIL_FROM`. Add `BACKUP_COPY_TO=/mnt/offsite` (another disk, a mounted network or cloud-synced folder).
+4. Migrate with the full-rights login, seed with `SEED_DEMO=false`, create the first admin with `admin:create`.
+5. Run it (section 4 PM2) behind Nginx (section 5). Open `https://<host>/api/health`.
+6. Email: sign in, Access → Email, send a test; then check forgot-password and an invitation end to end.
+7. Backups: add to cron `0 2 * * * cd /srv/reimsys && node scripts/backup.mjs >> /var/log/reimsys-backup.log 2>&1`, run it once by hand, and rehearse a restore into a spare database (`docs/BACKUP.md`).
+8. Monitoring: add `*/5 * * * * cd /srv/reimsys && node scripts/healthcheck.mjs --webhook <your chat or ntfy.sh URL>`. It checks the API, free disk space, backup age and stuck emails, and posts only when something is wrong.
+9. Gate: `node scripts/preflight.mjs`. Fix every BLOCKER (production mode, https address, SMTP, real From address, no demo accounts, a real Super Admin, a recent backup). Read the advice lines.
+10. Phone check: open the https address on a phone, sign in, and use "Scan receipt" (the live camera only works on https).
+11. Fill in the retention period and data protection contact in `apps/web/src/pages/Privacy.tsx`, raise `PRIVACY_VERSION`, rebuild, and have the client's lawyer or data protection officer approve the wording.
+12. Before the first real receipt: if any test receipts exist, back up, then `data:clear`.
+
+Fonts are bundled with the app, so no visitor's address is sent to Google. Everything the page loads comes from your own server.

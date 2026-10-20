@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, TRANSACTION_LABEL, TRANSACTION_TYPES, type ReceiptStatus } from '@reimsys/shared';
 import { ago, api, errMsg, fmtDate, money } from '../api';
 import { useAuth } from '../auth';
@@ -19,7 +19,7 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
         {pick && <input type="checkbox" checked={pick.on} aria-label={`Select ${r.refNo}`} onClick={(e) => { e.stopPropagation(); }} onChange={pick.toggle} />}
         <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
       </span>
-      <span className="c-cat">{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? '-'}{r.invoiceNo ? ` · ${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
+      <span className="c-cat">{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? (r.invoiceNo ? null : <span className="nodata">—</span>)}{r.invoiceNo ? `${r.transactionType || r.category ? ' · ' : ''}${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
       <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className={`age ${late(r.submittedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.submittedAt) ? 'Waiting ' : ''}{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className={`age ${late(r.checkedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.checkedAt) ? 'Waiting, checked ' : 'checked '}{ago(r.checkedAt)}</span>}</span>
@@ -28,6 +28,7 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
 }
 
 export function ReceiptsPage() {
+  const [fopen, setFopen] = useState(false);
   const { can, me } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
@@ -35,7 +36,8 @@ export function ReceiptsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkNote, setBulkNote] = useState('');
   const [bulkResult, setBulkResult] = useState<{ done: number; results: { id: number; refNo: string | null; ok: boolean; message: string }[] } | null>(null);
-  const [status, setStatus] = useState<ReceiptStatus | ''>('');
+  const [sp] = useSearchParams();
+  const [status, setStatus] = useState<ReceiptStatus | ''>(() => { const s = sp.get('status'); return (RECEIPT_STATUSES as readonly string[]).includes(s ?? '') ? (s as ReceiptStatus) : ''; });
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [from, setFrom] = useState('');
@@ -85,8 +87,12 @@ export function ReceiptsPage() {
         </div>
       </div>
 
+      <section className="card tcard">
+      <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => { setQ(e.target.value); reset(); }} placeholder="Search vendor, invoice no., TIN, reference, name" aria-label="Search receipts" /></div>
+        <button type="button" className="btn only-m" aria-expanded={fopen} onClick={() => setFopen((o) => !o)}><Icon name="list" size={18} />Filters{filtered ? ' •' : ''}</button>
+        <div className={`fgroup ${fopen ? 'open' : ''}`}>
         <select style={{ width: 'auto' }} value={type} aria-label="Product or service" onChange={(e) => { setType(e.target.value); reset(); }}>
           <option value="">Product and service</option>{TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{TRANSACTION_LABEL[t]}</option>)}
         </select>
@@ -97,15 +103,16 @@ export function ReceiptsPage() {
           <option value="amount_high">Amount, high to low</option><option value="amount_low">Amount, low to high</option>
         </select>
         {filtered && <button className="btn sm ghost" onClick={() => { setStatus(''); setQ(''); setType(''); setFrom(''); setTo(''); setPage(1); }}><Icon name="x" size={16} />Clear filters</button>}
+        </div>
       </div>
-      <div className="chips" style={{ marginBottom: 14 }}>
+      <div className="chips" style={{ marginTop: 10 }}>
         <button className={`chip ${status === '' ? 'on' : ''}`} onClick={() => { setStatus(''); reset(); }}>All<span className="n">{all}</span></button>
         {RECEIPT_STATUSES.filter((s) => counts[s]).map((s) => (
           <button key={s} className={`chip ${status === s ? 'on' : ''}`} onClick={() => { setStatus(s); reset(); }}>{STATUS_LABEL[s]}<span className="n">{counts[s]}</span></button>
         ))}
       </div>
-
-      <section className="card">
+      </div>
+      <div className="panel-body">
         <div className="thead"><span>Vendor</span><span>Type · invoice</span><span>Date</span><span className="c-amt">Amount</span><span>Status</span></div>
         {pickable.length > 1 && (
           <label className="selall"><input type="checkbox" checked={pickable.every((r) => picked.includes(r.id))} onChange={(e) => setPicked(e.target.checked ? pickable.slice(0, BULK_MAX).map((r) => r.id) : [])} />Select all {pickable.length} ready to {bulkKind === 'check' ? 'check' : 'decide'}</label>
@@ -113,6 +120,15 @@ export function ReceiptsPage() {
         {data.data?.items.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={!own} pick={canPick(r) ? { on: picked.includes(r.id), toggle: () => toggle(r.id) } : undefined} />)}
         {data.data && !data.data.items.length && <Empty title="No receipts here">{own ? 'Create your first receipt to get started.' : 'Try another filter or search.'}</Empty>}
         {!data.data && <div className="empty">Loading…</div>}
+      </div>
+      <div className="panel-foot"><div className="pager">
+        <span className="muted">{data.data ? `${data.data.total} receipt${data.data.total === 1 ? '' : 's'}` : ''}</span>
+        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+          <span>Page {page} of {pages}</span>
+          <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
+        </span>
+      </div></div>
       </section>
       {picked.length > 0 && (
         <div className="savebar" role="region" aria-label="Selected receipts">
@@ -137,14 +153,6 @@ export function ReceiptsPage() {
           <div className="btns"><button className="btn pri" onClick={() => setBulkResult(null)}>Close</button></div>
         </Modal>
       )}
-      <div className="pager">
-        <span className="muted">{data.data ? `${data.data.total} receipt${data.data.total === 1 ? '' : 's'}` : ''}</span>
-        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <span>Page {page} of {pages}</span>
-          <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-        </span>
-      </div>
     </>
   );
 }

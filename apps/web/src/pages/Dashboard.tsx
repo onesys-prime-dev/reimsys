@@ -77,32 +77,23 @@ export function DashboardPage() {
 
       <div className="grid2">
         <div className="stack">
-        <section className="card">
+        <section className="card dqueue">
           <div className="card-h"><h2>{d.data?.queueTitle ?? 'Your queue'}</h2>{d.data && d.data.queueTotal > d.data.queue.length && <Link className="btn sm ghost" to={kind === 'pay' ? '/pay' : '/receipts'}>View all {d.data.queueTotal}</Link>}</div>
+          {d.data && Object.keys(c).length > 0 && (
+            <div className="dchips" aria-label="Receipts by status">
+              {RECEIPT_STATUSES.filter((st) => c[st]).map((st) => <Link key={st} className="chip" to={`/receipts?status=${st}`}>{STATUS_LABEL[st as ReceiptStatus]}<span className="n">{c[st]}</span></Link>)}
+            </div>
+          )}
+          <div className="dscroll">
           {d.data?.queue.map((r) => <ReceiptRow key={r.id} r={r} showEncoder={kind !== 'receipt'} />)}
           {d.data && !d.data.queue.length && <Empty title="You are all caught up">Nothing needs your attention right now.</Empty>}
           {!d.data && <div className="empty">Loading…</div>}
-        </section>
-        <section className="card">
-          <div className="card-h"><h2>Receipts by status</h2><small>{Object.values(c).reduce((a, b) => a + b, 0)} in total</small></div>
-          <div className="card-b">
-            {RECEIPT_STATUSES.filter((s) => c[s]).map((s) => {
-              const total = Math.max(1, ...Object.values(c));
-              return (
-                <Link key={s} to="/receipts" className="bar-row" style={{ color: 'inherit', textDecoration: 'none' }}>
-                  <span>{STATUS_LABEL[s as ReceiptStatus]}</span>
-                  <span className="track"><span className="fill" style={{ width: `${((c[s] ?? 0) / total) * 100}%` }} /></span>
-                  <b style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{c[s]}</b>
-                </Link>
-              );
-            })}
-            {d.data && !Object.keys(c).length && <span className="muted">No receipts yet.</span>}
           </div>
         </section>
         </div>
-        <section className="card">
+        <section className="card dact">
           <div className="card-h"><h2>Recent activity</h2>{can('audit.view') && <Link className="btn sm ghost" to="/audit">Audit log</Link>}</div>
-          <div className="card-b">
+          <div className="card-b dscroll">
             <ol className="tl">
               {d.data?.activity.slice(0, 6).map((a) => (
                 <li key={a.id}><span className="dot" /><div><b>{a.actor}</b> {a.summary.charAt(0).toLowerCase() + a.summary.slice(1)} {a.receiptId && a.refNo && <Link to={`/receipts/${a.receiptId}`} style={{ color: 'var(--accent)' }}>{a.refNo}</Link>}<small>{ago(a.createdAt)}</small></div></li>

@@ -43,7 +43,7 @@ export function ReportsPage() {
     <>
       <div className="ph"><div><h1>Liquidation reports</h1><p>Approved records only, paid or not yet paid. Pending, returned and disapproved records are never included.</p></div></div>
       <div className="grid2">
-        <section className="card">
+        <section className="card rbuild">
           <div className="card-h"><h2>Build a report</h2></div>
           <div className="card-b">
             <div className="form">
@@ -63,8 +63,9 @@ export function ReportsPage() {
             <div className="formbar"><button className="btn pri" disabled={bad || !preview.data?.count || gen.isPending || !can('report.generate')} onClick={() => gen.mutate()}><Icon name="chart" size={18} />Generate {format.toUpperCase()}</button></div>
           </div>
         </section>
-        <section className="card">
+        <section className="card rpast">
           <div className="card-h"><h2>Past reports</h2></div>
+          <div className="dscroll">
           {shown.map((r) => (
             <div className="rep-row" key={r.id}>
               <div style={{ minWidth: 0 }}>
@@ -84,6 +85,7 @@ export function ReportsPage() {
             </div>
           ))}
           {list.data && !reports.length && <Empty title="No reports yet">Generate one to see it here.</Empty>}
+          </div>
           {reports.length > 6 && <div style={{ padding: 12, textAlign: 'center', borderTop: '1px solid var(--line)' }}><button className="btn sm ghost" onClick={() => setShowAll(!showAll)}>{showAll ? 'Show fewer' : `Show all ${reports.length}`}</button></div>}
         </section>
       </div>
