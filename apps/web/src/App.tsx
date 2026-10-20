@@ -24,6 +24,8 @@ const ReportViewPage = lazy(() => import('./pages/ReportView').then((m) => ({ de
 import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
 
+const isForm = (p: string) => p === '/receipts/new' || /^\/receipts\/\d+\/edit$/.test(p);
+
 function titleFor(path: string) {
   if (path === '/') return 'Dashboard';
   if (path === '/receipts/new') return 'New receipt';
@@ -77,7 +79,7 @@ function Shell() {
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />
-        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''}`}>
+        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${isForm(loc.pathname) ? 'narrow' : ''}`}>
           <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />

@@ -1,10 +1,10 @@
 /* Layout: left sidebar + content on desktop, bottom tab bar on phones. One primary action per screen. */
 :root{
-  --bg:#f9fbfb;--surface:#ffffff;--ink:#12232b;--muted:#5a6d76;--line:#e3eaec;--soft:#f1f6f6;
+  --r:14px;--bg:#f7fafa;--surface:#ffffff;--ink:#12232b;--muted:#5a6d76;--line:#e6edef;--soft:#f3f7f7;
   --accent:#0c7480;--accent-ink:#ffffff;--accent-soft:#dff1f3;
   --info:#2457c5;--info-soft:#e3ecfc;--ok:#1b7b4a;--ok-soft:#dff3e7;--bad:#b5352e;--bad-soft:#fbe6e4;
   --warn:#8a5a00;--warn-soft:#fbf0d3;--hold:#6d45b8;--hold-soft:#ece6f8;
-  --shadow:0 1px 2px rgba(18,35,43,.06),0 4px 14px rgba(18,35,43,.05);
+  --shadow:0 1px 2px rgba(18,35,43,.04),0 8px 24px rgba(18,35,43,.04);
   --sans:'Public Sans Variable','Public Sans',system-ui,sans-serif;--display:'Bricolage Grotesque Variable','Bricolage Grotesque','Public Sans Variable',system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -507,3 +507,71 @@ a.btn.ghost{color:var(--muted)}
 .guide-modal .issues{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}.guide-modal .issue{flex:none;white-space:nowrap}
 .guide-tip{margin-left:auto;font-size:.82rem}
 @media(max-width:520px){.guide-tip{display:none}}
+
+/* ---- Calm polish: roomier, softer, easier to read. Everything here only changes how things look. ---- */
+body{font-size:15px;line-height:1.55}
+h1{font-size:1.75rem}
+.page{max-width:1200px;margin-inline:auto;padding:28px 32px 48px}
+.page.narrow{max-width:900px}
+.ph{margin-bottom:24px}
+.btn{border-radius:10px;min-height:42px;padding:9px 16px;transition:background .15s,border-color .15s,filter .15s}
+.btn.pri{box-shadow:0 1px 2px rgba(12,116,128,.28)}
+.btn.sm{min-height:34px}
+.card-h{padding:16px 20px}
+.card-b{padding:18px 20px}
+.tiles{gap:14px;margin-bottom:24px}
+.tile{padding:18px 20px;transition:border-color .15s,transform .15s}
+.tile:hover{transform:translateY(-1px)}
+.tile small{color:var(--muted);font-size:.84rem}
+.tile.alert{background:var(--accent-soft);border-color:transparent}
+.tile.alert small{color:var(--accent);font-weight:600}
+.thead,.row{padding:14px 20px}
+.row{transition:background .12s}
+.thead{background:var(--soft)}
+.pill{padding:3px 11px 3px 9px}
+.steps{gap:8px;margin-bottom:18px}
+.steps li{padding:11px 14px;border-radius:12px}
+.steps li.on,.steps li[aria-current]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.choice{border-radius:14px;padding:16px 18px;min-height:68px;transition:border-color .15s,background .15s}
+.choice:hover{border-color:var(--accent)}
+.side{padding:20px 14px}
+.side .nav a{border-radius:10px}
+.top{padding:12px 32px}
+.empty{padding:48px 20px}
+input,select,textarea{border-radius:10px}
+::selection{background:var(--accent-soft)}
+
+@media(min-width:821px){
+  /* Dashboard: fits the window; the queue and the recent activity scroll inside their own cards. */
+  .page.dash{height:max(620px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:24px}
+  .page.dash>*{flex:none}
+  .page.dash>.grid2{flex:1 1 auto;min-height:0;align-items:stretch}
+  .page.dash .grid2>.stack{min-height:0;display:flex;flex-direction:column;gap:16px}
+  .page.dash .dqueue{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .page.dash .dstatus{flex:none}
+  .page.dash .dstatus .card-b{display:grid;grid-template-columns:1fr 1fr;gap:2px 32px;padding-block:12px}
+  .page.dash .dact{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .page.dash .dscroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+}
+@media(max-width:820px){
+  .page{padding:20px 16px 110px}
+  .tile{padding:14px 16px}
+  .btn{min-height:46px}
+}
+.row .c-cat .nodata{color:var(--muted);opacity:.5}
+.only-m{display:none}
+.fgroup{display:contents}
+@media(min-width:821px){
+  .page.dash .dstatus .card-b{display:flex;flex-wrap:wrap;gap:8px;padding-block:14px}
+  .page.dash .dstatus .bar-row{display:inline-flex;align-items:center;gap:10px;padding:6px 14px;margin:0;border:1px solid var(--line);border-radius:99px;background:var(--soft)}
+  .page.dash .dstatus .track{display:none}
+}
+@media(max-width:820px){
+  .only-m{display:inline-flex}
+  .fgroup{display:none;width:100%;flex-direction:column;gap:10px}
+  .fgroup.open{display:flex}
+  .panel-bar .search{max-width:none;flex:1 1 100%}
+  .panel-bar .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .panel-bar .chips::-webkit-scrollbar{display:none}
+  .panel-bar .chip{flex:none}
+}

@@ -19,7 +19,7 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
         {pick && <input type="checkbox" checked={pick.on} aria-label={`Select ${r.refNo}`} onClick={(e) => { e.stopPropagation(); }} onChange={pick.toggle} />}
         <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
       </span>
-      <span className="c-cat">{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? '-'}{r.invoiceNo ? ` · ${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
+      <span className="c-cat">{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? (r.invoiceNo ? null : <span className="nodata">—</span>)}{r.invoiceNo ? `${r.transactionType || r.category ? ' · ' : ''}${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
       <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className={`age ${late(r.submittedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.submittedAt) ? 'Waiting ' : ''}{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className={`age ${late(r.checkedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.checkedAt) ? 'Waiting, checked ' : 'checked '}{ago(r.checkedAt)}</span>}</span>
@@ -28,6 +28,7 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
 }
 
 export function ReceiptsPage() {
+  const [fopen, setFopen] = useState(false);
   const { can, me } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
@@ -89,6 +90,8 @@ export function ReceiptsPage() {
       <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => { setQ(e.target.value); reset(); }} placeholder="Search vendor, invoice no., TIN, reference, name" aria-label="Search receipts" /></div>
+        <button type="button" className="btn only-m" aria-expanded={fopen} onClick={() => setFopen((o) => !o)}><Icon name="list" size={18} />Filters{filtered ? ' •' : ''}</button>
+        <div className={`fgroup ${fopen ? 'open' : ''}`}>
         <select style={{ width: 'auto' }} value={type} aria-label="Product or service" onChange={(e) => { setType(e.target.value); reset(); }}>
           <option value="">Product and service</option>{TRANSACTION_TYPES.map((t) => <option key={t} value={t}>{TRANSACTION_LABEL[t]}</option>)}
         </select>
@@ -99,6 +102,7 @@ export function ReceiptsPage() {
           <option value="amount_high">Amount, high to low</option><option value="amount_low">Amount, low to high</option>
         </select>
         {filtered && <button className="btn sm ghost" onClick={() => { setStatus(''); setQ(''); setType(''); setFrom(''); setTo(''); setPage(1); }}><Icon name="x" size={16} />Clear filters</button>}
+        </div>
       </div>
       <div className="chips" style={{ marginTop: 10 }}>
         <button className={`chip ${status === '' ? 'on' : ''}`} onClick={() => { setStatus(''); reset(); }}>All<span className="n">{all}</span></button>
