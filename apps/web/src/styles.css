@@ -598,3 +598,12 @@ input,select,textarea{border-radius:10px}
 a.chip{text-decoration:none}
 a.chip:hover{border-color:var(--accent);color:var(--ink)}
 .dchips{gap:6px;padding:10px 20px}.dchips .chip{padding:4px 10px;font-size:.8rem}
+/* Dashboard greeting: one compact line (greeting and subtitle side by side) so the queue gets the space. */
+@media(min-width:821px){
+  .page.dash{padding-top:16px}
+  .page.dash .ph{margin-bottom:12px;align-items:center}
+  .page.dash .ph>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px}
+  .page.dash .ph h1{font-size:1.3rem}
+  .page.dash .ph p{margin:0;font-size:.9rem}
+  .page.dash .tiles{margin-bottom:14px}
+}
