@@ -62,6 +62,12 @@ small,.muted{color:var(--muted)}
   .page.fit>.scroll{flex:1 1 auto;min-height:420px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
   .page.fit>.stack.scroll{padding-right:2px}
   .page.fit>.card.scroll .thead{position:sticky;top:0;z-index:2;background:var(--surface)}
+  /* Tables: the card itself scrolls both ways, so the column titles, the first column and the total row stay pinned. */
+  .page.fit>.card.scroll>.matrix,.page.fit>.card.scroll .matrix{overflow:visible}
+  .page.fit>.card.scroll .matrix thead th{position:sticky;top:0;z-index:3;background:var(--surface);box-shadow:0 1px 0 var(--line)}
+  .page.fit>.card.scroll .matrix tr:not(.grp) td:first-child,.page.fit>.card.scroll .matrix thead th:first-child{position:sticky;left:0;background:var(--surface);z-index:2}
+  .page.fit>.card.scroll .matrix thead th:first-child{z-index:4}
+  .page.fit>.card.scroll .matrix tfoot td{position:sticky;bottom:0;background:var(--surface);z-index:2;box-shadow:0 -1px 0 var(--line)}
   .page.fit>.pager{margin-top:12px}
 }
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);display:flex;align-items:center;gap:12px;padding:12px 28px;border-bottom:1px solid var(--line)}

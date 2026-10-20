@@ -230,7 +230,7 @@ function PermsTab() {
 
   return (
     <>
-      <section className="card">
+      <section className="card scroll">
         <div className="card-h">
           <h2>Roles and permissions</h2>
           {canEdit && <button className="btn sm" onClick={() => setAdding(true)}><Icon name="plus" size={16} />Add role</button>}
