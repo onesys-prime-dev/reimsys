@@ -60,7 +60,7 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
             <button type="button" className="btn sm" disabled={zi === 0} onClick={() => { setZi(0); view.current?.scrollTo({ top: 0, left: 0 }); }}>Fit</button>
           </div>
           <div className="guide-view" ref={view} data-zoom={zoom}>
-            <img className="guide-img" src={`/guide/${cur.image}.jpg`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%` }}
+            <img className="guide-img" src={`/guide/${cur.image}.png`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%` }}
               onClick={() => setZi((i) => (i >= ZOOMS.length - 1 ? 0 : i + 1))} />
           </div>
           <p className="guide-text"><b>{cur.label}.</b> {cur.text}</p>
