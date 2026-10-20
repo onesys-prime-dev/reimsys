@@ -3,6 +3,7 @@ import { changePasswordSchema, type MeResponse } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { useAuth } from '../auth';
 import { Field, useToast } from '../ui';
+import { PasswordInput } from './PasswordInput';
 
 function strength(p: string) {
   let s = 0;
@@ -48,15 +49,15 @@ export function PasswordForm({ onDone }: { onDone?: () => void }) {
     <form onSubmit={submit}>
       <div className="form">
         <Field label="Current password" className="full">
-          <input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" required />
+          <PasswordInput value={cur} onChange={setCur} autoComplete="current-password" required />
         </Field>
         <Field label="New password">
-          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" required />
+          <PasswordInput value={next} onChange={setNext} autoComplete="new-password" required />
           <span className="meter">{[0, 1, 2, 3].map((i) => <i key={i} className={i < s ? (s <= 1 ? 'b' : s === 2 ? 'w' : 'on') : ''} />)}</span>
           <span className="hint">{LABELS[next ? s : 0]}</span>
         </Field>
         <Field label="Confirm new password">
-          <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
+          <PasswordInput value={again} onChange={setAgain} autoComplete="new-password" required />
         </Field>
       </div>
       {error && <div className="callout bad" role="alert" style={{ margin: '16px 0 0' }}><div><span>{error}</span></div></div>}

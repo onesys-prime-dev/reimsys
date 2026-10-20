@@ -5,6 +5,7 @@ import { passwordSchema } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { Logo } from '../components/Logo';
 import { Field } from '../ui';
+import { PasswordInput } from '../components/PasswordInput';
 
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="login">
@@ -96,8 +97,8 @@ export function ResetPasswordPage() {
       <h1>{check.data.invite ? `Welcome, ${check.data.name?.split(' ')[0]}` : 'Choose a new password'}</h1>
       <p className="muted" style={{ margin: '6px 0 0' }}>{check.data.invite ? 'Choose a password to finish setting up your account.' : `For ${check.data.name}.`} Use at least 10 characters with a letter and a number.</p>
       <form onSubmit={submit}>
-        <Field label="New password"><input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" autoFocus required /></Field>
-        <Field label="Type it again" error={error}><input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" required /></Field>
+        <Field label="New password"><PasswordInput value={pw} onChange={setPw} autoComplete="new-password" autoFocus required /></Field>
+        <Field label="Type it again" error={error}><PasswordInput value={pw2} onChange={setPw2} autoComplete="new-password" required /></Field>
         <button className="btn pri" type="submit" disabled={save.isPending || !pw}>{save.isPending ? 'Saving…' : 'Save password'}</button>
       </form>
     </Shell>
