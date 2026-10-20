@@ -11,6 +11,9 @@ import { ScanDialog } from '../components/ScanDialog';
 import { pageToFile } from '../scanPage';
 import { Field, Icon, useToast } from '../ui';
 
+/** Back to the top of the screen. On a computer the area beside the menu scrolls, not the browser window. */
+const toTop = () => { document.querySelector('.main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); };
+
 const kb = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
 
@@ -179,9 +182,9 @@ export function ReceiptFormPage() {
     setErrors((e) => ({ ...e, ...mine }));
     if (Object.keys(mine).length) { window.setTimeout(() => document.querySelector('.err')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     setStepIx((i) => Math.min(i + 1, steps.length - 1));
-    window.scrollTo({ top: 0 });
+    toTop();
   }
-  const back = () => { setStepIx((i) => Math.max(0, i - 1)); window.scrollTo({ top: 0 }); };
+  const back = () => { setStepIx((i) => Math.max(0, i - 1)); toTop(); };
 
   function addFiles(list: FileList | File[]) {
     const incoming = Array.from(list);

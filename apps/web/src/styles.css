@@ -56,8 +56,12 @@ small,.muted{color:var(--muted)}
 .main{min-width:0;grid-column:2}
 /* Long lists on a computer: the page stays still and only the rows scroll, with the column titles pinned. Needs a window at least 780px tall, so the scrolling part is never cramped; smaller windows scroll the whole page as before. */
 :root{--topH:63px}
-@media(min-width:821px) and (min-height:780px){
-  .page.fit:has(>.scroll,>.tcard){height:calc(100dvh - var(--topH));display:flex;flex-direction:column;padding-bottom:20px}
+/* On a computer the browser window itself never scrolls: the top bar and side menu stay, and the area beside the menu scrolls only when a screen is taller than the window. */
+@media(min-width:821px){
+  html,body{height:100%;overflow:hidden}
+  .shell{height:100dvh;min-height:0}
+  .main{height:100dvh;overflow:auto;overscroll-behavior:contain}
+  .page.fit:has(>.scroll,>.tcard){height:max(580px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:20px}
   .page.fit:has(>.scroll,>.tcard)>*{flex:none}
   /* One card holds the search and filters, the column titles, the scrolling rows and a footer with the count and page buttons. */
   .page.fit>.card.tcard{flex:1 1 auto;min-height:420px;display:flex;flex-direction:column;overflow:hidden}
@@ -79,6 +83,9 @@ small,.muted{color:var(--muted)}
 .panel-bar .chips{margin-bottom:0}
 .panel-foot{padding:10px 16px;border-top:1px solid var(--line);background:var(--soft);border-radius:0 0 var(--r) var(--r);flex:none}
 .panel-foot .pager{margin:0}
+.paygrp+.paygrp{border-top:1px solid var(--line)}
+.paygrp .card-h{position:sticky;top:0;z-index:2;background:var(--soft)}
+.paygrp .row:last-child{border-bottom:0}
 .top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);display:flex;align-items:center;gap:12px;padding:12px 28px;border-bottom:1px solid var(--line)}
 .top .t{font:600 1.05rem var(--display);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;flex:none}
