@@ -342,3 +342,69 @@ REIMSYS — October 20, 2026
 13. Ask the client for: document and report layouts, final categories and branding, retention period, data protection contact.
 
 Not for today: retention clean-up, monitoring and alerts, user guide.
+
+## Implementation plan (full review, 2026-10-20)
+This replaces "Go-live plan" and "Plan for today" above where they differ. Nothing in it has been built or run yet.
+
+### What the review found
+1. **Forgot-password and invitation emails are already built** (`routes/auth.ts`, `lib/passwordLinks.ts`). Only the button link is left out of emails until `WEB_ORIGIN` is a public address (`isPublicLink` in `lib/email.ts`). So this is a test after `WEB_ORIGIN` and SMTP are set, not a build. The "Not built yet" line in "Still missing" is wrong.
+2. **Switching to the limited database login will break the maintenance tools.** `scripts/backup.mjs`, `scripts/restore.mjs` and `prisma/clear-test-data.ts` all read `DATABASE_URL`, which becomes `reimsys_app` (no DROP, CREATE, or UPDATE/DELETE on the audit log and payments). Nothing in the code reads `MIGRATE_DATABASE_URL`, which the setup script adds. `pnpm db:migrate` and `db:seed` have the same problem. `mysqldump --routines` may also be refused. Fix before switching: those tools use `MIGRATE_DATABASE_URL` when it is set.
+3. **Order matters for the new privacy columns.** A migration needs the full-rights login. Run it while `.env` still uses root, then switch users. `docs/db-grants.sql` needs no change, because the columns go on the existing `user` table.
+4. **The first-sign-in gate already has a pattern to copy.** `middleware/auth.ts` blocks everything except `/api/me`, `/api/me/password` and `/api/auth/logout` while `mustChangePassword` is set, and `App.tsx` shows `ForcePasswordPage`. The privacy step follows the same shape, after the password step.
+5. **Every e2e script that signs in will be blocked by the new gate** until the user has accepted. A shared helper must accept the notice after login, or the tests fail for the wrong reason. Also stop the live-update connection (`useLive`) from starting before acceptance.
+6. **`demo:off` refuses to run without another active Super Admin**, so create the real admin first.
+7. **No analytics or outside scripts and one cookie (`reimsys_sid`)** were found, so no cookie banner. The privacy page must say this and only this.
+8. **Nothing in the app mentions privacy yet** (`/privacy` does not exist). It must be reachable before sign-in (`App.tsx` signed-out routes).
+9. `docs/PLAN.md` has overlapping sections; this one is the source of truth.
+
+### Phase A: build and fix locally (no approval needed, nothing live changes)
+Each step ends with `pnpm typecheck` and `pnpm test`.
+1. **Repo:** `git checkout scripts/setup-db-users.mjs`; add the root screenshots to `.gitignore`.
+2. **Maintenance tools use the migrate login.** In `scripts/backup-lib.mjs` (`dbConfig`) and `prisma/clear-test-data.ts`, prefer `MIGRATE_DATABASE_URL`, else `DATABASE_URL`. Add `--no-tablespaces` if mysqldump asks for it. Document the PowerShell line for `db:migrate` and `db:seed`. Test by running a backup and a restore into `reimsys_restore_test` with only the migrate login.
+3. **Privacy columns.** `User.privacyAcceptedVersion Int?` and `privacyAcceptedAt DateTime?`; migration `20261020010000_privacy_notice`; `docs/rollback-privacy-notice.sql`.
+4. **Shared:** `PRIVACY_VERSION = 1` and `needsPrivacy(user)` in `packages/shared`, with a unit test (null, old version, current). `me` returns `privacyRequired`.
+5. **API:** `POST /api/me/privacy` records version and time and writes an audit entry (`privacy.accepted`). Extend `requireAuth` so a user who must accept can only call `/api/me`, `/api/me/privacy`, `/api/auth/logout` (code `PRIVACY_REQUIRED`), after the password rule. Add `/api/privacy` as a public read of the version if the page needs it.
+6. **Web:** `pages/Privacy.tsx` (the notice text, one place); public route `/privacy` in the signed-out routes and a signed-in route; links on `Login.tsx` and the sidebar footer; `PrivacyAcceptPage` shown after `ForcePasswordPage` in `App.tsx`; `useLive` waits for acceptance.
+7. **Notice text:** what is collected, why, who sees it by role, retention (placeholder "to be confirmed by the client"), the one sign-in cookie and no analytics, how to ask for a correction, the data protection contact (placeholder), and the three acceptable-use lines.
+8. **Tests:** update the shared e2e login helper to accept the notice; add `e2e/privacy-flow.mjs` (blocked until accepted, then allowed, audit entry written, new version asks again); add a browser check on computer and phone. Run `pnpm test:api`, `pnpm test:ui`, and `node e2e/security.mjs` on the dev copy.
+9. **Docs:** `DEPLOY.md` (setup script, the migrate-login commands, privacy rollout and rollback), `SECURITY.md` (database login, privacy gate), `BACKUP.md` (which login backups use), fix the "Not built yet" line above.
+
+### Phase B: database login (needs your go-ahead, changes the live setup)
+1. `node scripts/backup.mjs`; confirm the newest folder in `backups/` has `database.sql` and `files.tar.gz`.
+2. `node scripts/setup-db-users.mjs` (dry run), then `--yes`; restart the API.
+3. Check: sign in, submit a receipt, open the audit log. As `reimsys_app` an UPDATE or DELETE on `auditlog` and `payment` must be refused.
+4. Re-run a backup and the restore rehearsal with the new login.
+To go back: copy `apps/api/.env.before-app-user` over `.env`.
+
+### Phase C: production settings and email (needs real values from you)
+Needed: the https address, certificate or Nginx, SMTP host/user/password, the From address.
+1. `NODE_ENV=production`, `WEB_ORIGIN`, `TLS_CERT`/`TLS_KEY` (or Nginx), `MAIL_FROM`. Check `/api/health` over https.
+2. SMTP in Settings; send a test; check the email log.
+3. Test forgot-password and an invitation end to end (the button must now appear). Publish SPF/DKIM/DMARC for the sending domain.
+4. On a phone over https, test the live scanner.
+
+### Phase D: data and accounts (needs your approval for each step)
+1. Back up the live database. **Wait for approval before clearing.**
+2. `data:clear` with the migrate login.
+3. Create the first real Super Admin, sign in as them, then create the other real users.
+4. `pnpm --filter @reimsys/api demo:off`.
+5. Each real user accepts the notice on first sign-in; confirm in the audit log.
+
+### Phase E: safety nets
+1. Nightly backup in Windows Task Scheduler (`docs/BACKUP.md`), a copy off the machine, one restore rehearsal.
+2. Run `pnpm typecheck`, `pnpm test`, `test:api`, `test:ui` and `e2e/security.mjs` against a staging copy.
+
+### Waiting on the client (blocks the privacy wording, not the build)
+Retention period, data protection contact, lawyer sign-off on the notice, document and report layouts, final categories and branding.
+
+### Later
+Retention clean-up (needs the period), monitoring and alerts, user guide.
+
+### Risks and how each is handled
+| Risk | Handling |
+|---|---|
+| Backup or restore fails after the user switch | Phase A step 2, rehearsed in Phase B step 4 |
+| Everyone is locked out by the privacy gate | Gate allows `/api/me`, accept and logout only; tested; rollback SQL; the version constant is the single switch |
+| Tests fail because of the gate | Shared login helper accepts the notice |
+| Real data cleared by mistake | Backup first, approval first, `data:clear` needs the database name typed |
+| Locked out of admin when turning off demo accounts | `demo:off` already refuses without another active Super Admin |
