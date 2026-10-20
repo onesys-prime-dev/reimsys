@@ -60,6 +60,8 @@ function UsersTab() {
   const shown = showOff ? all : all.filter((u) => u.isActive);
   return (
     <>
+      <section className="card tcard">
+      <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" aria-label="Search users" /></div>
         {off > 0 && (
@@ -67,7 +69,8 @@ function UsersTab() {
         )}
         <button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}><Icon name="plus" size={18} />Add user</button>
       </div>
-      <section className="card scroll">
+      </div>
+      <div className="panel-body">
         {shown.map((u) => {
           const self = u.id === me!.id;
           const above = u.role.rank > myRank;
@@ -93,6 +96,8 @@ function UsersTab() {
         })}
         {users.data && !shown.length && <Empty title="No users found">{off > 0 && !showOff ? `Only deactivated users match. Turn on "Show deactivated" to see them.` : 'Try a different search.'}</Empty>}
         {!users.data && <div className="empty">Loading…</div>}
+      </div>
+      <div className="panel-foot"><span className="muted">{shown.length} user{shown.length === 1 ? '' : 's'}</span></div>
       </section>
       {adding && roles.data && <AddUser roles={roles.data.roles.filter((r) => r.rank <= myRank)} onClose={() => setAdding(false)} onDone={refresh} />}
       {managing && <ManageUser user={managing} onClose={() => setManaging(null)} onDone={refresh} />}

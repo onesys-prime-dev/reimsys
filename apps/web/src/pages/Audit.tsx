@@ -45,6 +45,8 @@ function Activity() {
 
   return (
     <>
+      <section className="card tcard">
+      <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} placeholder="Search person, action, record" aria-label="Search audit log" onChange={(e) => { setQ(e.target.value); reset(); }} /></div>
         <select style={{ width: 'auto' }} value={action} aria-label="Activity type" onChange={(e) => { setAction(e.target.value); reset(); }}>{GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -52,7 +54,8 @@ function Activity() {
         <input type="date" style={{ width: 'auto' }} value={to} aria-label="To date" onChange={(e) => { setTo(e.target.value); reset(); }} />
         <a className="btn" style={{ marginLeft: 'auto' }} href={`/api/audit/export?${ex}`}><Icon name="download" size={18} />Export CSV</a>
       </div>
-      <section className="card scroll">
+      </div>
+      <div className="panel-body">
         {data.data?.items.map((a) => (
           <div key={a.id} className="aud">
             <button className="aud-h" onClick={() => setOpen(open === a.id ? null : a.id)} aria-expanded={open === a.id}>
@@ -72,15 +75,16 @@ function Activity() {
         ))}
         {data.data && !data.data.items.length && <Empty title="No matching entries">Try clearing a filter.</Empty>}
         {!data.data && <div className="empty">Loading…</div>}
-      </section>
-      <div className="pager">
+      </div>
+      <div className="panel-foot"><div className="pager">
         <span className="muted">{data.data ? `${data.data.total} entr${data.data.total === 1 ? 'y' : 'ies'}` : ''}</span>
         <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
           <span>Page {page} of {pages}</span>
           <button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
         </span>
-      </div>
+      </div></div>
+      </section>
     </>
   );
 }
@@ -116,8 +120,9 @@ function Emails() {
         <div style={{ flex: '1 1 260px', maxWidth: 380 }}><input type="email" value={testTo} onChange={(e) => setTestTo(e.target.value)} placeholder="Send a test email to…" aria-label="Test email address" /></div>
         <button className="btn pri" type="submit" disabled={!testTo || sendTest.isPending}>Send test email</button>
       </form>
-      <div className="tools"><select style={{ width: 'auto' }} value={status} aria-label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="sent">Sent</option><option value="logged">Logged only</option><option value="failed">Failed</option><option value="queued">Queued</option></select></div>
-      <section className="card scroll">
+      <section className="card tcard">
+      <div className="panel-bar"><div className="tools"><select style={{ width: 'auto' }} value={status} aria-label="Status" onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All statuses</option><option value="sent">Sent</option><option value="logged">Logged only</option><option value="failed">Failed</option><option value="queued">Queued</option></select></div></div>
+      <div className="panel-body">
         {data.data?.items.map((e) => (
           <div className="pref" style={{ padding: '12px 18px' }} key={e.id}>
             <div style={{ minWidth: 0 }}><b>{e.subject}</b><br /><small className="muted">To {e.to} · {e.template} · {fmtDateTime(e.createdAt)}{e.error ? ` · ${e.error}` : ''}</small>{e.response && <small className="muted" style={{ display: 'block' }}>{e.response}</small>}</div>
@@ -125,8 +130,9 @@ function Emails() {
           </div>
         ))}
         {data.data && !data.data.items.length && <Empty title="No emails yet" />}
+      </div>
+      <div className="panel-foot"><div className="pager"><span className="muted">{data.data?.total ?? 0} total</span><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page} of {pages}</span><button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></span></div></div>
       </section>
-      <div className="pager"><span className="muted">{data.data?.total ?? 0} total</span><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><span>Page {page} of {pages}</span><button className="btn sm" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></span></div>
     </>
   );
 }
