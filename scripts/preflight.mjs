@@ -20,7 +20,7 @@ try { host = new URL(origin).hostname; } catch { /* checked below */ }
 blocker(origin.startsWith('https://') && !/^(localhost|127\.|.*\.local$)/.test(host), 'WEB_ORIGIN is a real https address', `It is "${origin || 'empty'}". Use the public https address; emails and password links use it.`);
 // The mail account can be in .env or saved in the app (Access → Email); the saved one is checked below once the database is open.
 const smtpInEnv = !!env.SMTP_HOST;
-blocker(!/@example\.com/.test(env.MAIL_FROM ?? 'x@example.com'), 'MAIL_FROM is a real address', `It is ${env.MAIL_FROM ?? 'the example default'}.`);
+const mailFromExample = /@example\.com/.test(env.MAIL_FROM ?? 'x@example.com');
 const tls = !!(env.TLS_CERT && env.TLS_KEY);
 advice(tls || origin.startsWith('https://'), 'https is served by the app or by Nginx', 'Set TLS_CERT and TLS_KEY, or put Nginx with a certificate in front.');
 
@@ -36,6 +36,7 @@ const rootOpen = spawnSync(tool('mysql', env), ['-uroot', '-N', '-e', 'select 1'
 advice(rootOpen.status !== 0, 'Database "root" cannot be used without a password', 'Give MySQL root a password (or remove remote/passwordless root).');
 const savedMail = q("select count(*) from setting where `key`='mail'");
 if (savedMail !== null) blocker(smtpInEnv || Number(savedMail) > 0, 'A mail account is set up (in .env or saved in Access → Email)', 'No mail account: emails are only recorded, never sent. Enter it in Access → Email.');
+if (savedMail !== null) blocker(Number(savedMail) > 0 || !mailFromExample, 'Emails go out from a real address', `No mail account is saved in the app and MAIL_FROM in .env is ${env.MAIL_FROM ?? 'the example default'}.`);
 advice(!!env.SETTINGS_KEY || !(Number(savedMail) > 0), 'SETTINGS_KEY is set (it locks the mail password saved in the app)', 'Without SETTINGS_KEY the key is the file storage/.settings-key. If the database moves to a new server without that file, saved mail passwords cannot be read and no email goes out. Set SETTINGS_KEY, or copy the storage folder.');
 const demo = q("select count(*) from user where isActive=1 and email like '%@example.com'");
 if (demo === null) add('BLOCKER', 'Database is reachable', 'Could not read the database with the app login.');
