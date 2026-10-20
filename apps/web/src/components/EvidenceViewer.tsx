@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Icon } from '../ui';
@@ -22,6 +22,11 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
   if (!files.length) {
     return <div className="locked"><Icon name="upload" /><b>No evidence yet</b><span className="muted">Add a photo or PDF before submitting.</span></div>;
   }
+  // When the photo is zoomed in, dragging it moves it around (it also scrolls with the wheel and the scroll bars).
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const dragStart = (e: React.PointerEvent<HTMLDivElement>) => { if (zoom <= 1 || e.button !== 0) return; const el = e.currentTarget; drag.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop }; el.setPointerCapture(e.pointerId); };
+  const dragMove = (e: React.PointerEvent<HTMLDivElement>) => { const d = drag.current; if (!d) return; e.currentTarget.scrollLeft = d.left - (e.clientX - d.x); e.currentTarget.scrollTop = d.top - (e.clientY - d.y); };
+  const dragEnd = () => { drag.current = null; };
   const open = () => { setOpened(true); setNonce((n) => n + 1); onOpened?.(); };
   const tabs = (
     <div className="evtabs">
@@ -53,10 +58,10 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
   return (
     <>
       {tabs}
-      <div className="stage" style={isPdf ? { padding: 0, display: 'block', height: 440 } : undefined}>
+      <div className={`stage ${zoom > 1 ? 'grab' : ''}`} style={isPdf ? { padding: 0, display: 'block', height: 440 } : undefined} onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragEnd}>
         {isPdf ? <iframe className="evframe" style={{ height: 440, borderRadius: 10 }} src={url} title={file!.fileName} />
           : isHeic ? <div className="muted" style={{ textAlign: 'center' }}>This photo format cannot be shown in the browser.<br />Download it to view.</div>
-          : <img className="evimg" style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: zoom > 1 ? 'none' : '100%', maxHeight: zoom > 1 ? 'none' : undefined }} src={url} alt={`Evidence: ${file!.fileName}`} />}
+          : <img className="evimg" style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: zoom > 1 ? 'none' : '100%', maxHeight: zoom > 1 ? 'none' : undefined }} src={url} alt={`Evidence: ${file!.fileName}`} draggable={false} />}
       </div>
       <div className="evtool">
         {!isPdf && !isHeic && (
