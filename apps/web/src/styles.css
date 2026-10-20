@@ -607,3 +607,11 @@ a.chip:hover{border-color:var(--accent);color:var(--ink)}
   .page.dash .ph p{margin:0;font-size:.9rem}
   .page.dash .tiles{margin-bottom:14px}
 }
+/* Same compact heading on every list page: title and subtitle on one line. */
+@media(min-width:821px){
+  .page .ph{margin-bottom:14px;align-items:center}
+  .page .ph>div:first-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px}
+  .page .ph h1{font-size:1.3rem}
+  .page .ph p{margin:0;font-size:.9rem}
+  .page:not(.narrow){padding-top:16px}
+}
