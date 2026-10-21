@@ -345,7 +345,12 @@ console.log('\nPrivacy notice settings');
   check('raising the version makes people accept again', (await ana.get('/me')).data.user.privacyRequired === true);
   check('they are blocked until they accept', (await ana.get('/receipts')).status === 403);
   check('accepting clears it', (await ana.post('/me/privacy')).data.user.privacyRequired === false);
-  await admin.req('PUT', '/app-settings', { ...cur, privacyRetention: '', privacyContact: '', privacyVersion: cur.privacyVersion });
+  // raising the version made the administrator's own account accept again too, so accept first or the restore below is refused and leaves the test text behind
+  await admin.post('/me/privacy');
+  const back = await admin.req('PUT', '/app-settings', { ...cur, privacyRetention: '', privacyContact: '', privacyVersion: cur.privacyVersion });
+  check('the notice settings are put back after the test', back.status === 200);
+  // Ana accepted the raised version above; put her back so the next run starts from the same place
+  try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `UPDATE user SET privacyAcceptedVersion=${Number(cur.privacyVersion)} WHERE email='ana.reyes@example.com'`]); } catch { /* best effort */ }
 }
 
 // remove the receipts this run made, so repeated runs do not pile up in everyone's queues
