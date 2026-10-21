@@ -32,6 +32,10 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
   const [zi, setZi] = useState(0);
   const view = useRef<HTMLDivElement>(null);
   const zoom = ZOOMS[zi]!;
+  // The pictures are large. Say so while a picture is on its way, never leave the previous one up under the new text, and say if it does not arrive.
+  const [shown, setShown] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const img = useRef<HTMLImageElement>(null);
   /** Zoomed out, the whole invoice is in view. Zoomed in, scrolls so the marked place is in the middle of the view. */
   const showMark = (t: Tab = tab) => {
@@ -60,9 +64,16 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
   }, [open]);
 
   const cur = TABS[tab];
+  const src = `/guide/${cur.image}.png`;
+  const loading = shown !== src && failed !== src;
+  // once the picture for this tab is in, quietly fetch the other pictures of this page of the form, so the next tab is already there
+  useEffect(() => {
+    if (!open || shown !== src) return;
+    for (const t of RELEVANT[step]) if (t !== tab) { const i = new Image(); i.src = `/guide/${TABS[t].image}.png`; }
+  }, [open, shown, src]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
-      <button type="button" className="btn sm" onClick={() => { setTab(order[0]!); setZi(0); setOpen(true); }}><Icon name="info" size={16} />How to read the invoice</button>
+      <button type="button" className="btn sm" onClick={() => { setTab(order[0]!); setZi(0); setShown(null); setFailed(null); setOpen(true); }}><Icon name="info" size={16} />How to read the invoice</button>
       {open && (
         <Modal title="How to read the invoice" onClose={() => setOpen(false)} className="guide-modal">
           <div className="issues" role="tablist" aria-label="Part of the invoice">
@@ -78,9 +89,17 @@ export function InvoiceGuide({ step }: { step: GuideStep }) {
             <button type="button" className="btn sm" disabled={zi === 0} onClick={() => setZi(0)}>Fit</button>
             <span className="muted guide-tip">Tap the picture to read the small print</span>
           </div>
-          <div className="guide-view" ref={view} data-zoom={zoom}>
-            <img ref={img} className="guide-img" src={`/guide/${cur.image}.png`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%` }} onLoad={() => showMark()}
-              onClick={readable} />
+          <div className="guide-wrap">
+            <div className="guide-view" ref={view} data-zoom={zoom} aria-busy={loading}>
+              {failed !== src && (
+                <img key={`${src}#${retry}`} ref={img} className="guide-img" src={`${src}${retry ? `?try=${retry}` : ''}`} alt={`Sample invoice: ${cur.label}`} style={{ height: `${zoom * 100}%`, visibility: loading ? 'hidden' : 'visible' }}
+                  onLoad={() => { setShown(src); showMark(); }} onError={() => setFailed(src)} onClick={readable} />
+              )}
+            </div>
+            {loading && <div className="guide-loading" role="status"><span className="spin" aria-hidden="true" /><span>Loading the picture…</span></div>}
+            {failed === src && (
+              <div className="guide-loading" role="alert"><span>The picture could not be loaded. Check your connection.</span><button type="button" className="btn sm" onClick={() => { setFailed(null); setShown(null); setRetry((n) => n + 1); }}>Try again</button></div>
+            )}
           </div>
           <p className="guide-text"><b>{cur.label}.</b> {cur.text}</p>
           <div className="btns"><button className="btn pri" type="button" onClick={() => setOpen(false)}>Close</button></div>
