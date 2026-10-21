@@ -12,7 +12,7 @@ const STEPS = [
   // API
   ...['api-flow', 'privacy-flow', 'profile-flow', 'payment-flow', 'return-issues-flow', 'client-form', 'password-links', 'realtime-api', 'session', 'security', 'reminders', 'list-total', 'retention', 'mail-check'].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
   // browser
-  ...['ui-flow', 'guide-loading', 'privacy-ui', 'privacy-settings-ui', 'profile-ui', 'password-eye', 'access-tabs', 'help-ui', 'payment-ui', 'return-ui', 'scan-ui', 'scan-live', 'zoom-ui', 'phone-fixes', 'settings-input', 'profile-photo', 'role-sweep', ...(quick ? [] : ['dark-sweep', 'client-form-ui', 'more-proof-ui', 'guide-ui'])].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
+  ...['ui-flow', 'guide-loading', 'privacy-ui', 'privacy-settings-ui', 'profile-ui', 'password-eye', 'access-tabs', 'help-ui', 'payment-ui', 'return-ui', 'scan-ui', 'scan-live', 'zoom-ui', 'scan-scroll', 'phone-fixes', 'settings-input', 'profile-photo', 'role-sweep', ...(quick ? [] : ['dark-sweep', 'client-form-ui', 'more-proof-ui', 'guide-ui'])].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
 ];
 const results = [];
 for (const [name, cmd, args] of STEPS) {
