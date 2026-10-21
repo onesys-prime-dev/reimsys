@@ -7,6 +7,7 @@ import { Suspense, lazy } from 'react';
 import { DashboardPage } from './pages/Dashboard';
 import { ForcePasswordPage } from './pages/ForcePassword';
 import { LoginPage } from './pages/Login';
+import { HelpPage } from './pages/Help';
 import { PrivacyAcceptPage, PrivacyInAppPage, PrivacyPublicPage } from './pages/Privacy';
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordLink';
 import { ReceiptDetailPage } from './pages/ReceiptDetail';
@@ -32,7 +33,7 @@ function titleFor(path: string) {
   if (path === '/receipts/import') return 'Import receipts';
   if (path.startsWith('/reports/')) return 'Report';
   if (path.startsWith('/receipts/')) return path.endsWith('/edit') ? 'Edit receipt' : 'Receipt';
-  return ({ '/receipts': 'Receipts', '/pay': 'Ready to pay', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile' } as Record<string, string>)[path] ?? 'REIMSYS';
+  return ({ '/receipts': 'Receipts', '/pay': 'Ready to pay', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile', '/help': 'Help' } as Record<string, string>)[path] ?? 'REIMSYS';
 }
 
 function Shell() {
@@ -68,12 +69,13 @@ function Shell() {
           <Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} />
           <span><b>{me.name}</b><small>{me.role.name}</small></span>
         </button>
-        <NavLink to="/privacy" className="privacy-link">Privacy notice</NavLink>
+        <div className="side-links"><NavLink to="/help" className="privacy-link">Help</NavLink><NavLink to="/privacy" className="privacy-link">Privacy notice</NavLink></div>
       </aside>
       <div className="main">
         <header className="top">
           <div className="t">{titleFor(loc.pathname)}</div>
           <LiveLight state={live} />
+          <button className="iconbtn" onClick={() => nav('/help')} aria-label="Help" title="Help"><Icon name="info" /></button>
           <NotificationBell />
           <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} size={30} /></button>
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
@@ -93,6 +95,7 @@ function Shell() {
             <Route path="/reports" element={can('report.generate') ? <ReportsPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/privacy" element={<PrivacyInAppPage />} />
+            <Route path="/help" element={<HelpPage />} />
             <Route path="/access" element={can('user.manage') || can('role.manage') ? <AccessPage /> : <Navigate to="/" replace />} />
             <Route path="/audit" element={can('audit.view') ? <AuditPage /> : <Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />

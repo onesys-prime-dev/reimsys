@@ -13,11 +13,11 @@ const OUT = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? path.join(
 fs.mkdirSync(OUT, { recursive: true });
 
 const ROLES = [
-  ['admin', 'admin@example.com', ['/', '/receipts', '/reports', '/access|Users', '/access|Roles and permissions', '/access|Settings', '/access|Company', '/access|Email', '/access|Email templates', '/audit', '/audit|Emails', '/profile', '/profile|Security', '/profile|Notifications', '/profile|My access', '/profile|Appearance', '/profile|Activity', '/privacy']],
-  ['checker', 'liza.santos@example.com', ['/', '/receipts', '/receipt', '/reports', '/report']],
-  ['approver', 'paolo.v@example.com', ['/', '/receipts', '/receipt']],
-  ['accounting', 'accounting@example.com', ['/', '/pay', '/receipts', '/receipt', '/reports']],
-  ['medref', 'ana.reyes@example.com', ['/', '/receipts', '/receipt', '/receipts/new', '/receipts/import', '/reports']],
+  ['admin', 'admin@example.com', ['/help', '/', '/receipts', '/reports', '/access|Users', '/access|Roles and permissions', '/access|Settings', '/access|Company', '/access|Email', '/access|Email templates', '/audit', '/audit|Emails', '/profile', '/profile|Security', '/profile|Notifications', '/profile|My access', '/profile|Appearance', '/profile|Activity', '/privacy']],
+  ['checker', 'liza.santos@example.com', ['/help', '/', '/receipts', '/receipt', '/reports', '/report']],
+  ['approver', 'paolo.v@example.com', ['/help', '/', '/receipts', '/receipt']],
+  ['accounting', 'accounting@example.com', ['/help', '/', '/pay', '/receipts', '/receipt', '/reports']],
+  ['medref', 'ana.reyes@example.com', ['/help', '/', '/receipts', '/receipt', '/receipts/new', '/receipts/import', '/reports']],
 ];
 
 const call = async (cookie, m, p, b) => {
