@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { classificationText, fixStepFor, issueLabel, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
+import { classificationText, cleanText, fixStepFor, issueLabel, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -293,7 +293,7 @@ function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose
   const [issues, setIssues] = useState<ReturnIssueCode[]>([]);
   const real = issues.some((c) => c !== 'other');
   const needsWords = picking ? issues.length === 0 || issues.includes('other') : required;
-  const ok = answered && (picking ? (real || text.trim().length >= 4) && (!needsWords || text.trim().length >= 4) : !required || text.trim().length >= 4);
+  const ok = answered && (picking ? (real || cleanText(text).length >= 4) && (!needsWords || cleanText(text).length >= 4) : !required || cleanText(text).length >= 4);
   return (
     <Modal title={cfg.title} onClose={onClose} className={picking ? 'issues-modal' : ''}>
       <div className="callout" style={{ margin: '0 0 14px', display: 'block' }}>
@@ -338,7 +338,7 @@ function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose
       </label>
       <div className="btns">
         <button className="btn" onClick={onClose}>Cancel</button>
-        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(text.trim(), askSeen ? (seen as Seen) : undefined, picking ? issues : undefined)}>{action === 'return' ? 'Return record' : cfg.label}</button>
+        <button className={`btn ${cfg.cls || 'pri'}`} disabled={!ok || busy} onClick={() => onSubmit(cleanText(text), askSeen ? (seen as Seen) : undefined, picking ? issues : undefined)}>{action === 'return' ? 'Return record' : cfg.label}</button>
       </div>
     </Modal>
   );

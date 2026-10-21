@@ -16,6 +16,7 @@ import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
 import { meRouter } from './routes/me.js';
 import { rolesRouter } from './routes/roles.js';
+import { cleanBodyText } from './middleware/cleanText.js';
 import { retentionRouter } from './routes/retention.js';
 import { settingsRouter } from './routes/settings.js';
 import { companyRouter } from './routes/company.js';
@@ -58,6 +59,7 @@ app.use(
 app.use(compression({ filter: (req, res) => !req.path.startsWith('/api/events') && compression.filter(req, res) }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+app.use(cleanBodyText);
 
 app.get('/api/health', async (_req, res) => {
   await prisma.$queryRaw`SELECT 1`;
