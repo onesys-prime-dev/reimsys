@@ -41,6 +41,7 @@ pnpm --filter @reimsys/api mail:check -- --to you@company.com    # why email wou
 node scripts/healthcheck.mjs                     # prints nothing when all is well
 ```
 - `https://<host>/api/health` returns `{"ok":true}`.
+- **The API must be rebuilt AND restarted, not only the web app.** Check: `curl https://<host>/api/auth/privacy-info` must return JSON with `retention`, `contact` and `version`. If it returns a 404 or lacks `version`, the web page is newer than the API (seen on staging: the Settings page then showed "Required" boxes and could not save). Run `pnpm build` and `pm2 restart reimsys`, and make sure the process restarted is the one serving the port.
 - Sign in, open **Audit log → Emails**: a test from **Access → Email → Send a test email** must show status `sent`, not `logged`.
 - On a phone over https: sign in, New receipt, Scan receipt.
 - Do **not** run `e2e/*.mjs` against production (they create records). They are for a development or staging copy only.

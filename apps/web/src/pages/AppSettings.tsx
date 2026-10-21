@@ -37,6 +37,9 @@ export function AppSettingsTab() {
 
   if (!q.data || !draft) return <div className="empty">Loading…</div>;
   const { settings, defaults } = q.data;
+  // This page may be newer than the server it talks to (the web page was updated but the API was not restarted). Then the server does not know some of
+  // the settings, would drop them without saying so, and the page would look as if it had saved. Say so, and do not save.
+  const unknown = q.data ? SETTINGS_SECTIONS.flatMap((s) => s.items).filter((i) => !(i.key in q.data!.settings)) : [];
   const parsed = appSettingsSchema.safeParse(draft);
   const errs: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) errs[String(i.path[0])] ||= i.message;
@@ -46,6 +49,12 @@ export function AppSettingsTab() {
 
   return (
     <>
+      {unknown.length > 0 && (
+        <div className="callout bad" role="alert" style={{ marginTop: 0, marginBottom: 12 }}>
+          <Icon name="info" />
+          <div><b>This page is newer than the server it is talking to, so settings cannot be saved</b><span>The server does not know these settings: {unknown.map((i) => i.label).join(', ')}. If you saved now they would be dropped without any message. Ask the person who looks after the server to finish updating it (build and restart the API), then reload this page.</span></div>
+        </div>
+      )}
       <div className="callout"><Icon name="info" /><div><b>Changes apply straight away</b><span>Everyone gets the new rules on their next action, and each change is recorded in the audit log with the old and new value.</span></div></div>
       {SETTINGS_SECTIONS.map((sec) => (
         <section className="card" key={sec.title} style={{ marginBottom: 16 }}>
@@ -82,7 +91,7 @@ export function AppSettingsTab() {
         <button className="btn" type="button" disabled={isDefault || reset.isPending} onClick={() => setConfirmReset(true)}>Reset everything to default</button>
         <span style={{ display: 'flex', gap: 10 }}>
           <button className="btn" type="button" disabled={!dirty} onClick={() => setDraft({ ...settings })}>Undo my edits</button>
-          <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
+          <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending || unknown.length > 0} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
         </span>
       </div>
       <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />

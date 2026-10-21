@@ -7,7 +7,10 @@ import { AuthProvider } from './auth';
 import '@fontsource-variable/bricolage-grotesque/index.css';
 import '@fontsource-variable/public-sans/index.css';
 import './styles.css';
+import { installNumberGuard } from './numberGuard';
 import { ToastProvider } from './ui';
+
+installNumberGuard();
 
 const client = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: false } } });
 
