@@ -187,6 +187,8 @@ export type MailSettingsInput = z.infer<typeof mailSettingsSchema>;
 export interface MailSettingsView {
   source: 'database' | 'environment' | 'none';
   host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string; testRedirect: string;
+  /** A password is saved but this server cannot unlock it (the key it was locked with is missing). */
+  passwordUnreadable?: boolean;
 }
 export * from './emailTemplates';
 export * from './brand';

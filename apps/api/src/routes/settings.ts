@@ -10,6 +10,7 @@ import { explainMailError, isPublicLink, queueEmail } from '../lib/email.js';
 import { EMAIL_LOGO_PNG_BASE64 } from '../lib/emailLogo.js';
 import { LOGO_CID, getBranding, getTemplate, renderEmail, resetTemplate, saveBranding, saveTemplate, templateViews } from '../lib/emailTemplates.js';
 import { badRequest, notFound } from '../lib/errors.js';
+import { diagnoseMail } from '../lib/mailDiagnose.js';
 import { clearMail, mailView, resolveMail, saveMail, savedPassword } from '../lib/mailSettings.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
 
@@ -49,6 +50,13 @@ settingsRouter.post('/mail/verify', async (req, res) => {
   } finally {
     transport.close();
   }
+});
+
+/** Looks at every step of sending (account, key, name, ports, login) and says which one fails. Sends nothing. */
+settingsRouter.post('/mail/diagnose', async (req, res) => {
+  const result = await diagnoseMail();
+  await audit(req, { action: 'settings.mail_checked', entityType: 'settings', entityId: 'mail', summary: result.ok ? 'ran the mail check: all steps passed' : `ran the mail check: ${result.steps.filter((s) => s.state === 'fail').map((s) => s.id).join(', ')} failed` });
+  res.json(result);
 });
 
 settingsRouter.delete('/mail', async (req, res) => {

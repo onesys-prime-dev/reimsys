@@ -6,7 +6,9 @@ import { Field, Icon, Switch, useToast } from '../ui';
 interface MailView {
   source: 'database' | 'environment' | 'none';
   host: string; port: number; secure: boolean; user: string; hasPassword: boolean; fromName: string; fromAddress: string; testRedirect: string;
+  passwordUnreadable?: boolean;
 }
+interface Step { id: string; label: string; state: 'ok' | 'fail' | 'skipped'; detail: string; fix?: string }
 
 const PRESETS: Record<string, { label: string; host: string; port: number; secure: boolean; hint: string }> = {
   gmail: { label: 'Gmail', host: 'smtp.gmail.com', port: 587, secure: false, hint: 'Use an App password, not your normal Gmail password. Turn on 2-step verification, then create one at myaccount.google.com/apppasswords.' },
@@ -62,6 +64,12 @@ export function EmailSettingsTab() {
     onSuccess: (d) => { toast('Saved account removed.'); qc.setQueryData(['mail-settings'], d); fill(d.mail); setResult(null); refresh(); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
+  const [steps, setSteps] = useState<Step[] | null>(null);
+  const diagnose = useMutation({
+    mutationFn: () => api<{ ok: boolean; steps: Step[] }>('/settings/mail/diagnose', { method: 'POST' }),
+    onSuccess: (d) => setSteps(d.steps),
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
   const sendTest = useMutation({
     mutationFn: () => api('/email-log/test', { method: 'POST', body: { to: testTo } }),
     onSuccess: () => { toast('Test email queued. Check Audit log, Emails to see whether it was sent.'); qc.invalidateQueries({ queryKey: ['email-log'] }); },
@@ -82,6 +90,12 @@ export function EmailSettingsTab() {
   if (!m) return <div className="empty">Loading…</div>;
   return (
     <>
+      {m.passwordUnreadable && (
+        <div className="callout bad" role="alert" style={{ marginTop: 0, marginBottom: 12 }}>
+          <Icon name="info" />
+          <div><b>Emails cannot be sent: the saved mail password cannot be unlocked</b><span>This server does not have the key the password was saved with (for example after moving the database to a new server). Type the mail password again in the form below and press Save.</span></div>
+        </div>
+      )}
       <div className={`callout ${m.source === 'none' || m.testRedirect ? 'warn' : 'ok'}`} style={{ marginTop: 0 }}>
         <Icon name={m.source === 'none' ? 'info' : 'check'} />
         <div>
@@ -150,6 +164,23 @@ export function EmailSettingsTab() {
           </div>
           <p className="muted" style={{ fontSize: '.84rem', margin: '4px 0 0' }}>The password is stored encrypted and is never shown again, not even to administrators. Every change is recorded in the audit log without it.</p>
         </form>
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <div className="card-h"><h2>Check why email might not be sending</h2><button className="btn sm" type="button" disabled={diagnose.isPending} onClick={() => diagnose.mutate()}>{diagnose.isPending ? 'Checking…' : 'Run full check'}</button></div>
+        <div className="card-b">
+          {!steps && <p className="muted" style={{ margin: 0 }}>Looks at the saved account, whether its password can be unlocked here, whether the server is found, whether this server can reach the mail ports (hosting providers often block them) and whether the login is accepted. Nothing is sent.</p>}
+          {steps && (
+            <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 10 }} aria-label="Mail check results">
+              {steps.map((st) => (
+                <li key={st.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 10, alignItems: 'start' }}>
+                  <span style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: '50%', fontSize: '.8rem', fontWeight: 700, background: st.state === 'ok' ? 'var(--ok-soft)' : st.state === 'fail' ? 'var(--bad-soft)' : 'var(--soft)', color: st.state === 'ok' ? 'var(--ok)' : st.state === 'fail' ? 'var(--bad)' : 'var(--muted)' }} aria-label={st.state === 'ok' ? 'Passed' : st.state === 'fail' ? 'Failed' : 'Skipped'}>{st.state === 'ok' ? '✓' : st.state === 'fail' ? '✕' : '–'}</span>
+                  <div><b>{st.label}</b><br /><small className="muted">{st.detail}</small>{st.fix && <div className="callout warn" style={{ margin: '6px 0 0' }}><div><span>{st.fix}</span></div></div>}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
       </section>
 
       <section className="card" style={{ marginTop: 16 }}>
