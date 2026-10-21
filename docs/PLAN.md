@@ -473,3 +473,15 @@ Only the software itself. Items follow the list agreed on 2026-10-21. Another wo
 
 ### Done means
 All items ticked, every browser test green on a clean run, `docs/PLAN.md` and the docs updated, and one commit per item on `myBranch`.
+
+### Progress on the system plan (2026-10-21)
+- A done: Remove photo, privacy fields in Settings and the rate-limit switch verified; the privacy settings test now puts everything back (it used to leave the raised version and test text behind).
+- B done: Audit activity filters and Export behind a Filters button on phones (the email log and Access users have a single control, so no button was needed).
+- C done: the form heading was already one line; the receipt detail title brought in line.
+- D done: Access → Email "Run full check" (account, key, name, ports, login), red warning for an unreadable password, `mail:check` shares the same checks (`e2e/mail-check.mjs`).
+- E done: the Receipts footer shows the total of every matching receipt (`e2e/list-total.mjs` compares it to the sum by hand).
+- F done: `e2e/dark-sweep.mjs` (dark, or `--light`) measures text contrast on every screen for every role; 0 low-contrast texts in both modes on 82 screens.
+- G done: Help page (`/help`), guides shown by what a person may do (`e2e/help-ui.mjs`).
+- H phase 1 done: Access → Settings → "Keeping records": a keeping period in months (0 = off) and a preview of finished receipts (paid or disapproved) older than it, with a CSV list; it changes nothing and is audited (`e2e/retention.mjs`). **Phase 2 (archive) is not built**: it waits for the rule (which statuses, which period, archive or delete).
+- I waiting for the original photo of the Metro Parking ticket.
+- J left as it is (already pinned per-person headers with totals).

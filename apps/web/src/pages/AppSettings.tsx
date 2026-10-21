@@ -85,6 +85,7 @@ export function AppSettingsTab() {
           <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
         </span>
       </div>
+      <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />
       <section className="card" style={{ marginTop: 16 }}>
         <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves at about 9am</small></div>
         <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -99,5 +100,45 @@ export function AppSettingsTab() {
         </Modal>
       )}
     </>
+  );
+}
+
+interface Preview { enabled: boolean; months: number; cutoff?: string; total?: number; totalAmount?: number; byStatus?: Record<string, { count: number; amount: number }>; byMonth?: { month: string; count: number; amount: number }[]; oldest?: string | null; files?: { count: number; bytes: number }; note?: string }
+
+/** Phase 1 of keeping records: shows what the keeping period would point out. It changes nothing. */
+function RetentionPreview({ months }: { months: number }) {
+  const toast = useToast();
+  const run = useMutation({
+    mutationFn: () => api<Preview>('/retention/preview'),
+    onError: (e) => toast(errMsg(e), 'bad'),
+  });
+  const p = run.data;
+  const mb = (b: number) => (b > 1_048_576 ? `${(b / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  return (
+    <section className="card" style={{ marginTop: 16 }}>
+      <div className="card-h"><h2>Keeping records: what would be pointed out</h2><small>Preview only, nothing is deleted</small></div>
+      <div className="card-b">
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <span className="muted">{months ? `Finished receipts (paid or disapproved) older than ${months} month${months === 1 ? '' : 's'}. Save the setting above first if you changed it.` : 'The keeping period is 0 (off). Set a number of months above and save to see what it would point out.'}</span>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" type="button" disabled={!months || run.isPending} onClick={() => run.mutate()}>{run.isPending ? 'Looking…' : 'Preview now'}</button>
+            <a className={`btn ${months ? '' : 'disabled'}`} href="/api/retention/preview.csv" aria-disabled={!months}>Download list (CSV)</a>
+          </span>
+        </div>
+        {p && !p.enabled && <p className="muted" style={{ marginBottom: 0 }}>The keeping period is off, so nothing is listed.</p>}
+        {p?.enabled && (
+          <div style={{ marginTop: 14 }}>
+            <p style={{ margin: '0 0 8px' }}><b>{p.total}</b> finished receipt{p.total === 1 ? '' : 's'} older than {p.cutoff} ({new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(p.totalAmount ?? 0)} in total{p.oldest ? `, the oldest from ${p.oldest}` : ''}), with {p.files?.count ?? 0} file{p.files?.count === 1 ? '' : 's'} ({mb(p.files?.bytes ?? 0)}).</p>
+            {!!p.total && (
+              <div className="matrix"><table style={{ minWidth: 360 }}>
+                <thead><tr><th style={{ textAlign: 'left' }}>Month</th><th style={{ textAlign: 'right' }}>Receipts</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
+                <tbody>{p.byMonth?.map((m) => <tr key={m.month}><td>{m.month}</td><td style={{ textAlign: 'right' }}>{m.count}</td><td style={{ textAlign: 'right' }}>{new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(m.amount)}</td></tr>)}</tbody>
+              </table></div>
+            )}
+            <p className="muted" style={{ margin: '10px 0 0', fontSize: '.86rem' }}>{p.note}</p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
