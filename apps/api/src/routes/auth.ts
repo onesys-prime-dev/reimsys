@@ -4,6 +4,7 @@ import { forgotSchema, loginSchema, resetSchema } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
+import { getSettings } from '../lib/appSettings.js';
 import { HttpError, unauthorized } from '../lib/errors.js';
 import { hashPassword, newToken, sha256, verifyPassword } from '../lib/password.js';
 import { checkToken, sendPasswordLink } from '../lib/passwordLinks.js';
@@ -45,6 +46,12 @@ const linkLimiter = rateLimit({
   legacyHeaders: false,
   skip: () => config.rateLimitOff,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please wait a few minutes and try again.' } },
+});
+
+/** What the privacy notice needs, readable before signing in: the two blanks the administrator fills in, and the current version. */
+authRouter.get('/privacy-info', (_req, res) => {
+  const s = getSettings();
+  res.json({ retention: s.privacyRetention, contact: s.privacyContact, version: s.privacyVersion });
 });
 
 /** Always answers the same way, so nobody can use this page to find out who has an account. */

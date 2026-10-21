@@ -2,10 +2,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
-import { PRIVACY_VERSION, changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsys/shared';
+import { changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
+import { getSettings } from '../lib/appSettings.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { meResponse } from '../lib/serialize.js';
@@ -55,8 +56,8 @@ meRouter.post('/password', async (req, res) => {
 meRouter.post('/privacy', async (req, res) => {
   const u = req.auth!.user;
   if (u.mustChangePassword) throw forbidden('Change your password first.', 'PASSWORD_CHANGE_REQUIRED');
-  await prisma.user.update({ where: { id: u.id }, data: { privacyAcceptedVersion: PRIVACY_VERSION, privacyAcceptedAt: new Date() } });
-  await audit(req, { action: 'privacy.accepted', entityType: 'user', entityId: u.id, summary: `accepted the privacy notice (version ${PRIVACY_VERSION})`, before: { version: u.privacyAcceptedVersion ?? null }, after: { version: PRIVACY_VERSION } });
+  await prisma.user.update({ where: { id: u.id }, data: { privacyAcceptedVersion: getSettings().privacyVersion, privacyAcceptedAt: new Date() } });
+  await audit(req, { action: 'privacy.accepted', entityType: 'user', entityId: u.id, summary: `accepted the privacy notice (version ${getSettings().privacyVersion})`, before: { version: u.privacyAcceptedVersion ?? null }, after: { version: getSettings().privacyVersion } });
   res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 

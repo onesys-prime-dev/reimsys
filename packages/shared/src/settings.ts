@@ -31,6 +31,10 @@ export const appSettingsSchema = z.object({
   /* sessions (people already signed in keep the limits they signed in with, except the idle limit, which applies at once) */
   sessionIdleMinutes: num(5, 1440, 'The idle limit').transform(Math.round),
   sessionMaxHours: num(1, 168, 'The maximum session').transform(Math.round),
+  /* privacy notice: the two blanks in the wording, and the version (raising it makes everyone accept again) */
+  privacyRetention: z.string().trim().max(200, 'The retention period is too long (200 characters at most).'),
+  privacyContact: z.string().trim().max(300, 'The contact is too long (300 characters at most).'),
+  privacyVersion: num(1, 999, 'The notice version').transform(Math.round),
   /* keeping records: how old finished receipts must be before the system points them out (0 = off; nothing is ever deleted by this) */
   retentionMonths: num(0, 600, 'The keeping period').transform(Math.round),
 });
@@ -40,11 +44,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vatRate: 12, tolerance: 0.02, warningsBlock: false, allowNoBir: true,
   requireInvoiceNo: true, requireVendorAddress: true, requireVendorTin: true, askWithholding: true, showDescription: true,
   evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, reminderCheckDays: 2, reminderDecideDays: 2, reminderPayDays: 3, reminderFixDays: 5, sessionIdleMinutes: 60, sessionMaxHours: 12,
-  retentionMonths: 0,
+  retentionMonths: 0, privacyRetention: '', privacyContact: '', privacyVersion: 1,
 };
 
 /** Plain-words description of each setting, in the order they are shown. Used by the Settings screen and the audit log. */
-export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: keyof AppSettings; label: string; help: string; kind: 'bool' | 'number'; unit?: string; step?: number }[] }[] = [
+export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: keyof AppSettings; label: string; help: string; kind: 'bool' | 'number' | 'text'; unit?: string; step?: number }[] }[] = [
   {
     title: 'Reimbursement form: checks',
     help: 'How strict the form is about the numbers.',
@@ -91,6 +95,15 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
     items: [
       { key: 'sessionIdleMinutes', label: 'Sign out after no activity for', help: 'Applies to everyone straight away.', kind: 'number', unit: 'minutes', step: 5 },
       { key: 'sessionMaxHours', label: 'Longest a sign-in may last', help: 'Applies to new sign-ins.', kind: 'number', unit: 'hours', step: 1 },
+    ],
+  },
+  {
+    title: 'Privacy notice',
+    help: 'Fills the two blanks in the notice people read when they sign in. Leave a box empty to show "To be confirmed".',
+    items: [
+      { key: 'privacyRetention', label: 'How long records are kept', help: 'For example: Receipts and their files are kept for 10 years.', kind: 'text' },
+      { key: 'privacyContact', label: 'Data protection contact', help: 'Name, email and phone of the person people can ask.', kind: 'text' },
+      { key: 'privacyVersion', label: 'Notice version', help: 'Raise this after changing the notice or these two boxes: everyone must then accept it again at their next action.', kind: 'number', unit: 'version', step: 1 },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import { EmailSettingsTab } from './EmailSettings';
 import { EmailTemplatesTab } from './EmailTemplates';
 import { AppSettingsTab } from './AppSettings';
+import { usePrivacyInfo } from './Privacy';
 import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '../ui';
 
 interface UserRow {
@@ -53,6 +54,7 @@ function UsersTab() {
     onError: (e) => { toast(errMsg(e), 'bad'); refresh(); },
   });
 
+  const privacyNow = usePrivacyInfo().data?.version ?? 1;
   const myRank = me!.role.rank;
   const all = users.data?.users ?? [];
   const off = all.filter((u) => !u.isActive).length;
@@ -83,7 +85,7 @@ function UsersTab() {
               </div>
               <span className="em muted stt2">
                 {!u.isActive ? 'Deactivated' : locked ? 'Locked' : u.mustChangePassword ? 'Invited' : (u.lastLoginAt ? `Last sign in ${fmtDateTime(u.lastLoginAt)}` : "Never signed in")}
-                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
+                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion, privacyNow) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
               </span>
               <select className="rl" value={u.role.id} disabled={self || above} aria-label={`Role for ${u.name}`}
                 onChange={(e) => patch.mutate({ id: u.id, body: { roleId: Number(e.target.value) } })}>

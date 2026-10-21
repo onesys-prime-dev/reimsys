@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { needsPrivacy } from '@reimsys/shared';
+import { getSettings } from '../lib/appSettings.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
@@ -50,7 +51,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   if (req.auth.user.mustChangePassword && !ALLOWED_WHILE_LOCKED.includes(path)) {
     return next(forbidden('Change your password to continue.', 'PASSWORD_CHANGE_REQUIRED'));
   }
-  if (needsPrivacy(req.auth.user.privacyAcceptedVersion) && !ALLOWED_BEFORE_PRIVACY.includes(path)) {
+  if (needsPrivacy(req.auth.user.privacyAcceptedVersion, getSettings().privacyVersion) && !ALLOWED_BEFORE_PRIVACY.includes(path)) {
     return next(forbidden('Read and accept the privacy notice to continue.', 'PRIVACY_REQUIRED'));
   }
   next();
