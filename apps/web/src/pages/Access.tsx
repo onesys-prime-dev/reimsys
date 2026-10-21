@@ -45,6 +45,7 @@ function UsersTab() {
   const [managing, setManaging] = useState<UserRow | null>(null);
   const users = useQuery({ queryKey: ['users', q], queryFn: () => api<{ users: UserRow[] }>(`/users?q=${encodeURIComponent(q)}`), placeholderData: (p) => p });
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api<{ roles: RoleSummary[] }>('/roles') });
+  const privacy = useQuery({ queryKey: ['privacy-info'], queryFn: () => api<{ version: number }>('/auth/privacy-info') });
   const refresh = () => { qc.invalidateQueries({ queryKey: ['users'] }); qc.invalidateQueries({ queryKey: ['roles'] }); };
 
   const patch = useMutation({
@@ -83,7 +84,7 @@ function UsersTab() {
               </div>
               <span className="em muted stt2">
                 {!u.isActive ? 'Deactivated' : locked ? 'Locked' : u.mustChangePassword ? 'Invited' : (u.lastLoginAt ? `Last sign in ${fmtDateTime(u.lastLoginAt)}` : "Never signed in")}
-                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
+                {u.isActive && !u.mustChangePassword && <small style={{ display: 'block', color: needsPrivacy(u.privacyAcceptedVersion, privacy.data?.version) ? 'var(--warn, #b45309)' : undefined }}>{needsPrivacy(u.privacyAcceptedVersion, privacy.data?.version) ? 'Privacy notice: not accepted yet' : `Privacy notice accepted ${fmtDateTime(u.privacyAcceptedAt)}`}</small>}
               </span>
               <select className="rl" value={u.role.id} disabled={self || above} aria-label={`Role for ${u.name}`}
                 onChange={(e) => patch.mutate({ id: u.id, body: { roleId: Number(e.target.value) } })}>
@@ -194,6 +195,7 @@ function PermsTab() {
   const toast = useToast();
   const qc = useQueryClient();
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api<{ roles: RoleSummary[] }>('/roles') });
+  const privacy = useQuery({ queryKey: ['privacy-info'], queryFn: () => api<{ version: number }>('/auth/privacy-info') });
   const perms = useQuery({ queryKey: ['permissions'], queryFn: () => api<PermData>('/permissions') });
   const [draft, setDraft] = useState<Record<string, Set<string>> | null>(null);
   const [adding, setAdding] = useState(false);

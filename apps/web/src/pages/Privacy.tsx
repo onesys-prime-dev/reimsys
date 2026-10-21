@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PRIVACY_VERSION, type MeResponse } from '@reimsys/shared';
@@ -10,6 +11,8 @@ import { Logo } from '../components/Logo';
  * when people should read it again. The two "To be confirmed" lines are filled in once the client decides.
  */
 export function PrivacyNotice() {
+  const info = useQuery({ queryKey: ['privacy-info'], queryFn: () => api<{ retention: string; contact: string; version: number }>('/auth/privacy-info') });
+  const tbc = <b>To be confirmed by your administrator.</b>;
   return (
     <div className="notice">
       <h2>What we collect</h2>
@@ -36,13 +39,13 @@ export function PrivacyNotice() {
       <p>REIMSYS uses one cookie, only to keep you signed in. It is removed when you sign out. There is no tracking or analytics, and no scripts from other companies.</p>
 
       <h2>How long we keep it</h2>
-      <p><b>To be confirmed by your administrator.</b> The retention period is set by the company.</p>
+      <p>{info.data?.retention ? info.data.retention : <>{tbc} The retention period is set by the company.</>}</p>
 
       <h2>Your rights</h2>
       <p>You can ask to see the data held about you and to have mistakes corrected. Contact the person below. Records that the company must keep for audit or tax cannot be erased on request.</p>
 
       <h2>Who to contact</h2>
-      <p><b>To be confirmed by your administrator.</b> This will be the company's data protection contact.</p>
+      <p>{info.data?.contact ? info.data.contact : <>{tbc} This will be the company's data protection contact.</>}</p>
 
       <h2>Using REIMSYS</h2>
       <ul>
@@ -50,7 +53,7 @@ export function PrivacyNotice() {
         <li>Do not share your sign-in. Everything done under it is recorded as you.</li>
         <li>Every action in the system is recorded and can be reviewed.</li>
       </ul>
-      <p className="muted" style={{ fontSize: '.82rem' }}>Version {PRIVACY_VERSION}</p>
+      <p className="muted" style={{ fontSize: '.82rem' }}>Version {info.data?.version ?? PRIVACY_VERSION}</p>
     </div>
   );
 }

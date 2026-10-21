@@ -321,6 +321,38 @@ const aud = (await admin.get(`/audit?q=${r.id}&pageSize=100`)).data;
 check('audit browser finds receipt activity', aud.total > 5);
 check('non-admin cannot read audit', (await ana.get('/audit')).status === 403);
 
+console.log('\nProfile photo');
+{
+  await ana.req('DELETE', '/me/photo'); // start from no photo, whatever an earlier run left
+  const none = await ana.req('DELETE', '/me/photo');
+  check('removing a photo when there is none is a clear error', none.status === 400 && none.data?.error?.code === 'NO_PHOTO');
+  const pf = new FormData(); pf.append('photo', png('avatar'), 'a.png');
+  check('a photo can be uploaded', (await ana.req('POST', '/me/photo', pf)).data?.user?.hasPhoto === true);
+  const gone = await ana.req('DELETE', '/me/photo');
+  check('the photo can be removed', gone.status === 200 && gone.data?.user?.hasPhoto === false);
+  check('removing the photo is audited', (await admin.get('/audit?q=profile.photo_removed&pageSize=5')).data.items.length > 0);
+}
+
+console.log('\nPrivacy notice settings');
+{
+  const cur = (await admin.get('/app-settings')).data.settings;
+  const info0 = await fetch(BASE + '/auth/privacy-info', { headers: { 'x-requested-with': 'reimsys' } }).then((x) => x.json());
+  check('the notice fields are public and start empty', info0.retention === '' && info0.contact === '');
+  const put = await admin.req('PUT', '/app-settings', { ...cur, privacyRetention: 'Kept for 10 years', privacyContact: 'Dana Cruz, dpo@example.com', privacyVersion: cur.privacyVersion + 1 });
+  check('an administrator can fill the notice and raise its version', put.status === 200);
+  const info1 = await fetch(BASE + '/auth/privacy-info', { headers: { 'x-requested-with': 'reimsys' } }).then((x) => x.json());
+  check('the notice shows the saved retention and contact', info1.retention === 'Kept for 10 years' && info1.contact.startsWith('Dana Cruz'));
+  check('raising the version makes people accept again', (await ana.get('/me')).data.user.privacyRequired === true);
+  check('they are blocked until they accept', (await ana.get('/receipts')).status === 403);
+  check('accepting clears it', (await ana.post('/me/privacy')).data.user.privacyRequired === false);
+  // raising the version made the administrator's own account accept again too, so accept first or the restore below is refused and leaves the test text behind
+  await admin.post('/me/privacy');
+  const back = await admin.req('PUT', '/app-settings', { ...cur, privacyRetention: '', privacyContact: '', privacyVersion: cur.privacyVersion });
+  check('the notice settings are put back after the test', back.status === 200);
+  // Ana accepted the raised version above; put her back so the next run starts from the same place
+  try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `UPDATE user SET privacyAcceptedVersion=${Number(cur.privacyVersion)} WHERE email='ana.reyes@example.com'`]); } catch { /* best effort */ }
+}
+
 // remove the receipts this run made, so repeated runs do not pile up in everyone's queues
 try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee LIKE '% ${stamp}%'`]); } catch { /* cleanup is best effort */ }
 console.log(`
