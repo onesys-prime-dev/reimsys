@@ -47,21 +47,29 @@ console.log('Number boxes take digits only');
 console.log('\nA page newer than its server');
 {
   const p = await login('admin@example.com');
-  let puts = 0;
+  const sent = [];
+  const strip = (j) => { for (const k of NEW_KEYS) { delete j.settings[k]; delete j.defaults[k]; } return j; };
   await p.route('**/api/app-settings', async (route) => {
     const req = route.request();
-    if (req.method() === 'PUT') { puts++; return route.continue(); }
-    const r = await route.fetch(); const j = await r.json();
-    for (const k of NEW_KEYS) { delete j.settings[k]; delete j.defaults[k]; }
-    await route.fulfill({ response: r, json: j });
+    if (req.method() === 'PUT') {
+      sent.push(JSON.parse(req.postData() ?? '{}'));
+      // answer like an older server would, without touching the real settings
+      const get = await (await p.request.get('http://localhost:4000/api/app-settings')).json();
+      return route.fulfill({ json: strip(get) });
+    }
+    const r = await route.fetch(); await route.fulfill({ response: r, json: strip(await r.json()) });
   });
   await p.goto('/access'); await p.click('.tabs button:has-text("Settings")'); await p.waitForSelector('text=This page is newer than the server');
   const t = await p.locator('.callout.bad').first().innerText();
-  ok('it says the page is newer than the server and which settings the server does not know', /newer than the server/.test(t) && /How long records are kept/.test(t) && /Notice version/.test(t), t.slice(0, 300));
+  ok('it says the page is newer than the server and lists the settings the server does not know', /newer than the server/.test(t) && /How long records are kept/.test(t) && /Notice version/.test(t) && /Point out finished records/.test(t), t.slice(0, 300));
   ok('it tells people what to do (update and restart the API)', /restart/i.test(t));
+  ok('the settings the server does not know are hidden, not shown as empty "Required" boxes', (await p.locator('h3:has-text("Privacy notice")').count()) === 0 && (await p.locator('h3:has-text("Keeping records")').count()) === 0 && (await p.locator('text=Preview now').count()) === 0 && (await p.locator('.err').count()) === 0);
+  ok('the other settings are still there', (await p.locator('input[aria-label="VAT rate"]').count()) === 1 && (await p.locator('input[aria-label="Sign out after no activity for"]').count()) === 1);
   await p.fill('input[aria-label="VAT rate"]', '13');
-  ok('Save settings stays off even after a change', await p.locator('button:has-text("Save settings")').isDisabled());
-  ok('nothing was sent to the server', puts === 0, String(puts));
+  ok('and they can still be saved', await p.locator('button:has-text("Save settings")').isEnabled());
+  await p.click('button:has-text("Save settings")');
+  await p.waitForTimeout(800);
+  ok('saving sends the change the person made', sent.length === 1 && Number(sent[0].vatRate) === 13, JSON.stringify(sent[0] ?? null).slice(0, 120));
   await p.context().close();
 }
 {

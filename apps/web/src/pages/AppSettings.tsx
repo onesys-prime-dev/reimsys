@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { SETTINGS_SECTIONS, appSettingsSchema, type AppSettings } from '@reimsys/shared';
+import { DEFAULT_SETTINGS, SETTINGS_SECTIONS, appSettingsSchema, type AppSettings } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { PaymentMethodsCard } from '../components/PaymentMethods';
 import { Icon, Modal, Switch, useToast } from '../ui';
@@ -37,10 +37,12 @@ export function AppSettingsTab() {
 
   if (!q.data || !draft) return <div className="empty">Loading…</div>;
   const { settings, defaults } = q.data;
-  // This page may be newer than the server it talks to (the web page was updated but the API was not restarted). Then the server does not know some of
-  // the settings, would drop them without saying so, and the page would look as if it had saved. Say so, and do not save.
+  // This page may be newer than the server it talks to (the web page was updated but the API was not restarted). The server then does not know some of
+  // the settings and would drop them without saying so, so the page would look as if it had saved. Those settings are hidden and left alone (and the page says
+  // so); everything the server does know can still be changed and saved.
   const unknown = q.data ? SETTINGS_SECTIONS.flatMap((s) => s.items).filter((i) => !(i.key in q.data!.settings)) : [];
-  const parsed = appSettingsSchema.safeParse(draft);
+  const unknownKeys = new Set<string>(unknown.map((i) => i.key));
+  const parsed = appSettingsSchema.safeParse({ ...Object.fromEntries(unknown.map((i) => [i.key, DEFAULT_SETTINGS[i.key]])), ...(draft ?? {}) });
   const errs: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) errs[String(i.path[0])] ||= i.message;
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
@@ -52,15 +54,15 @@ export function AppSettingsTab() {
       {unknown.length > 0 && (
         <div className="callout bad" role="alert" style={{ marginTop: 0, marginBottom: 12 }}>
           <Icon name="info" />
-          <div><b>This page is newer than the server it is talking to, so settings cannot be saved</b><span>The server does not know these settings: {unknown.map((i) => i.label).join(', ')}. If you saved now they would be dropped without any message. Ask the person who looks after the server to finish updating it (build and restart the API), then reload this page.</span></div>
+          <div><b>This page is newer than the server it is talking to</b><span>The server does not know these settings, so they are hidden and cannot be changed yet: {unknown.map((i) => i.label).join(', ')}. The other settings work as usual. Ask the person who looks after the server to finish updating it (build and restart the API), then reload this page.</span></div>
         </div>
       )}
       <div className="callout"><Icon name="info" /><div><b>Changes apply straight away</b><span>Everyone gets the new rules on their next action, and each change is recorded in the audit log with the old and new value.</span></div></div>
-      {SETTINGS_SECTIONS.map((sec) => (
+      {SETTINGS_SECTIONS.filter((sec) => sec.items.some((i) => !unknownKeys.has(i.key))).map((sec) => (
         <section className="card" key={sec.title} style={{ marginBottom: 16 }}>
           <div className="card-h"><h3>{sec.title}</h3><small>{sec.help}</small></div>
           <div className="card-b" style={{ display: 'grid', gap: 14 }}>
-            {sec.items.map((it) => {
+            {sec.items.filter((it) => !unknownKeys.has(it.key)).map((it) => {
               const same = draft[it.key] === defaults[it.key];
               return (
                 <div key={it.key} style={{ display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -91,10 +93,10 @@ export function AppSettingsTab() {
         <button className="btn" type="button" disabled={isDefault || reset.isPending} onClick={() => setConfirmReset(true)}>Reset everything to default</button>
         <span style={{ display: 'flex', gap: 10 }}>
           <button className="btn" type="button" disabled={!dirty} onClick={() => setDraft({ ...settings })}>Undo my edits</button>
-          <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending || unknown.length > 0} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
+          <button className="btn pri" type="button" disabled={!dirty || !parsed.success || save.isPending} onClick={() => parsed.success && save.mutate(parsed.data)}>Save settings</button>
         </span>
       </div>
-      <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />
+      {!unknownKeys.has('retentionMonths') && <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />}
       <section className="card" style={{ marginTop: 16 }}>
         <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves at about 9am</small></div>
         <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
