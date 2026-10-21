@@ -659,3 +659,6 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
 .zp-bar .btn{background:var(--surface);backdrop-filter:none;min-width:38px}
 .zp-bar .btn:disabled{opacity:.35}
 @media(min-width:821px){.dh h1{font-size:1.45rem}.dh{margin-bottom:14px}}
+/* the number inside a status chip was 70% see-through: too faint on dark */
+.chip .n{opacity:1;font-weight:600}
+.chip:not(.on) .n{color:var(--ink)}
