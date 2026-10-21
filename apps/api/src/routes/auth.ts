@@ -15,7 +15,6 @@ export const authRouter = Router();
 const loginLimiter = rateLimit({
   windowMs: 60_000,
   limit: 20,
-  skip: () => config.rateLimitOff,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Wait a minute and try again.' } },
@@ -31,7 +30,6 @@ const cookieOptions = () => ({
 const forgotLimiter = rateLimit({
   windowMs: 15 * 60_000,
   limit: 6,
-  skip: () => config.rateLimitOff,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many requests. Please wait a few minutes and try again.' } },
@@ -41,7 +39,6 @@ const forgotLimiter = rateLimit({
 const linkLimiter = rateLimit({
   windowMs: 15 * 60_000,
   limit: 40,
-  skip: () => config.rateLimitOff,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please wait a few minutes and try again.' } },

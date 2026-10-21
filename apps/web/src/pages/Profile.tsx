@@ -67,11 +67,6 @@ function Details() {
     onSuccess: (d) => { setMe(d); setVer((v) => v + 1); toast('Photo updated.'); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
-  const removePhoto = useMutation({
-    mutationFn: () => api<MeResponse>('/me/photo', { method: 'DELETE' }),
-    onSuccess: (d) => { setMe(d); setVer((v) => v + 1); toast('Photo removed.'); },
-    onError: (e) => toast(errMsg(e), 'bad'),
-  });
   const submit = (e: FormEvent) => { e.preventDefault(); save.mutate(); };
 
   return (
@@ -83,7 +78,6 @@ function Details() {
             <b style={{ fontSize: '1.1rem' }}>{me!.name}</b><br />
             <span className="muted">{me!.role.name}</span><br />
             <button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => file.current?.click()}><Icon name="upload" size={16} />Change photo</button>
-            {me!.hasPhoto && <button type="button" className="btn sm" style={{ marginTop: 8, marginLeft: 8 }} disabled={removePhoto.isPending} onClick={() => removePhoto.mutate()}>Remove photo</button>}
             <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" className="sr" onChange={(e) => { const f = e.target.files?.[0]; if (f) photo.mutate(f); e.target.value = ''; }} />
           </div>
         </div>
