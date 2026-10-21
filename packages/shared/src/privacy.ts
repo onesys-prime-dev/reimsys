@@ -5,7 +5,4 @@
 export const PRIVACY_VERSION = 1;
 
 /** True when this person has not accepted the current version of the notice. */
-export const needsPrivacy = (acceptedVersion: number | null | undefined, currentVersion: number = PRIVACY_VERSION): boolean => (acceptedVersion ?? 0) < Math.max(currentVersion, PRIVACY_VERSION);
-
-/** The version in force: the one in the code, or the one an administrator raised it to in Settings, whichever is higher. */
-export const privacyVersionIn = (settingsVersion: number | null | undefined): number => Math.max(PRIVACY_VERSION, settingsVersion ?? 0);
+export const needsPrivacy = (acceptedVersion: number | null | undefined): boolean => (acceptedVersion ?? 0) < PRIVACY_VERSION;

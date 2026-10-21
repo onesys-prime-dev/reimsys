@@ -1,5 +1,4 @@
 import type { Role, Session, User } from '@prisma/client';
-import { getSettings } from './appSettings.js';
 import { needsPrivacy, type MeResponse, type RoleSummary } from '@reimsys/shared';
 import { config } from '../config.js';
 
@@ -36,7 +35,7 @@ export function meResponse(user: User & { role: Role }, permissions: Iterable<st
       photoV: photoVersion(user.photoFile),
       theme: (user.theme as 'light' | 'dark' | 'system') ?? 'light',
       mustChangePassword: user.mustChangePassword,
-      privacyRequired: needsPrivacy(user.privacyAcceptedVersion, getSettings().privacyVersion),
+      privacyRequired: needsPrivacy(user.privacyAcceptedVersion),
       prefs: { dailyDigest: user.dailyDigest, reservationReleased: user.reservationReleased },
       role: roleSummary(user.role),
     },
