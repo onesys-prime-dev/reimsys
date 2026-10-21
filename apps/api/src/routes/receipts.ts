@@ -56,14 +56,16 @@ receiptsRouter.get('/', async (req, res) => {
   const scope = visibleWhere(req.auth!);
   const base = filterWhere({ ...q, status: undefined });
   const where: Prisma.ReceiptWhereInput = { AND: [scope, base, q.status ? { status: q.status } : {}] };
-  const [total, rows, grouped] = await Promise.all([
+  const [total, sum, rows, grouped] = await Promise.all([
     prisma.receipt.count({ where }),
+    // the amount of ALL receipts matching the filters (every page), for the total at the foot of the list
+    prisma.receipt.aggregate({ where, _sum: { amount: true } }),
     prisma.receipt.findMany({ where, include: receiptInclude, orderBy: SORTS[q.sort], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
     prisma.receipt.groupBy({ by: ['status'], where: { AND: [scope, base] }, _count: { _all: true } }),
   ]);
   const counts: Record<string, number> = {};
   for (const g of grouped) counts[g.status] = g._count._all;
-  res.json({ total, page: q.page, pageSize: q.pageSize, counts, items: rows.map(receiptBrief) });
+  res.json({ total, totalAmount: Number(sum._sum.amount ?? 0), page: q.page, pageSize: q.pageSize, counts, items: rows.map(receiptBrief) });
 });
 
 /** People who have receipts this user can see. Used for the "person" filter on reports and lists. */

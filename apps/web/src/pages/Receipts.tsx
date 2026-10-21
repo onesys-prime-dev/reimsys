@@ -7,7 +7,7 @@ import { useAuth } from '../auth';
 import type { ReceiptBrief } from '../types';
 import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
 
-interface ListData { total: number; page: number; pageSize: number; counts: Record<string, number>; items: ReceiptBrief[] }
+interface ListData { total: number; totalAmount?: number; page: number; pageSize: number; counts: Record<string, number>; items: ReceiptBrief[] }
 
 /** More than two days waiting for the next person. */
 const late = (iso: string) => Date.now() - new Date(iso).getTime() > 2 * 86_400_000;
@@ -122,7 +122,7 @@ export function ReceiptsPage() {
         {!data.data && <div className="empty">Loading…</div>}
       </div>
       <div className="panel-foot"><div className="pager">
-        <span className="muted">{data.data ? `${data.data.total} receipt${data.data.total === 1 ? '' : 's'}` : ''}</span>
+        <span className="muted">{data.data ? `${data.data.total} receipt${data.data.total === 1 ? '' : 's'}${data.data.totalAmount !== undefined && data.data.total > 0 ? ` · ${money(data.data.totalAmount)} in total` : ''}` : ''}</span>
         <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button className="btn sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
           <span>Page {page} of {pages}</span>
