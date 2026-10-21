@@ -51,6 +51,11 @@ r = await photo('image/png', png, 'p2.png');
 check('a second photo gets a new version number', r.s === 200 && r.d.user.photoV > v1);
 const img = await u.req('GET', `/users/${r.d.user.id}/photo`, undefined, true);
 check('the photo can be fetched', img.status === 200 && (img.headers.get('content-type') ?? '').startsWith('image/'));
+check('the photo can be removed', await (async () => { const rm = await u.req('DELETE', '/me/photo'); return rm.s === 200 && rm.d.user.hasPhoto === false && rm.d.user.photoV === null; })());
+check('after removing it there is no photo to fetch', (await u.req('GET', `/users/${r.d.user.id}/photo`, undefined, true)).status === 404);
+check('removing a photo that is not there is refused politely', (await u.req('DELETE', '/me/photo')).s === 404);
+r = await photo('image/png', png, 'p3.png');
+check('a new photo can be added again after removing', r.s === 200 && r.d.user.hasPhoto === true);
 check('a text file is refused as a photo', (await photo('text/plain', Buffer.from('hello'), 'x.txt')).s === 400);
 const big = await photo('image/png', Buffer.alloc(Math.round(2.5 * 1024 * 1024), 1), 'big.png');
 check(`a photo over 2 MB is refused with a clear message (status ${big.s}: ${(big.d?.error?.message ?? '').slice(0, 70)})`, big.s >= 400 && big.s < 500 && !!big.d?.error?.message, JSON.stringify(big.d));
@@ -98,7 +103,7 @@ check('My access lists the Med Ref rights and not the admin ones', me.permission
 
 /* activity */
 const act = (await u.get('/me/activity')).d.items;
-check('Activity shows my own recent actions', act.length > 0 && act.some((a) => a.action === 'profile.updated') && act.some((a) => a.action === 'profile.photo_changed') && act.some((a) => a.action === 'auth.password_changed'));
+check('Activity shows my own recent actions', act.length > 0 && act.some((a) => a.action === 'profile.updated') && act.some((a) => a.action === 'profile.photo_changed') && act.some((a) => a.action === 'profile.photo_removed') && act.some((a) => a.action === 'auth.password_changed'));
 
 // tidy up: switch the test user off
 const id = (await admin.get('/users?active=true')).d.users.find((x) => x.email === email)?.id;

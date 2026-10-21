@@ -103,6 +103,16 @@ meRouter.post('/photo', upload.single('photo'), async (req, res) => {
   res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
+/** Takes the photo away: the initials show again. The picture file is deleted, and the change is recorded. */
+meRouter.delete('/photo', async (req, res) => {
+  const u = req.auth!.user;
+  if (!u.photoFile) throw notFound('There is no photo to remove.');
+  await prisma.user.update({ where: { id: u.id }, data: { photoFile: null } });
+  await fs.rm(path.join(avatarDir(), u.photoFile), { force: true });
+  await audit(req, { action: 'profile.photo_removed', entityType: 'user', entityId: u.id, summary: 'removed profile photo' });
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
+});
+
 export async function sendAvatar(userId: number, res: import('express').Response) {
   const u = await prisma.user.findUnique({ where: { id: userId }, select: { photoFile: true } });
   if (!u?.photoFile) throw notFound('No photo.');
