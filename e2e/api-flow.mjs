@@ -353,6 +353,14 @@ console.log('\nPrivacy notice settings');
   try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `UPDATE user SET privacyAcceptedVersion=${Number(cur.privacyVersion)} WHERE email='ana.reyes@example.com'`]); } catch { /* best effort */ }
 }
 
+console.log('\nEmail test result');
+{
+  const t = await admin.post('/email-log/test', { to: 'nobody@example.com' });
+  check('the test email answers with ok, a message and the steps checked', t.status === 200 && typeof t.data.ok === 'boolean' && typeof t.data.message === 'string' && Array.isArray(t.data.steps));
+  check('a failure names the step that failed', t.data.ok || !!t.data.step);
+  check('a bad address is refused', (await admin.post('/email-log/test', { to: 'nope' })).status === 400);
+}
+
 // remove the receipts this run made, so repeated runs do not pile up in everyone's queues
 try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee LIKE '% ${stamp}%'`]); } catch { /* cleanup is best effort */ }
 console.log(`

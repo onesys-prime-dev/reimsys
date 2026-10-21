@@ -96,6 +96,7 @@ export async function queueEmail(input: { userId?: number; to: string; template:
     data: { userId: input.userId ?? null, toEmail: input.to, template: input.template, subject: input.subject.slice(0, 200), body: input.html },
   });
   await enqueue('email', { emailLogId: row.id });
+  return row.id;
 }
 
 registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
