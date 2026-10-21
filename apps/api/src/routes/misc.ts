@@ -6,7 +6,6 @@ import { audit } from '../lib/audit.js';
 import { badRequest, conflict, notFound } from '../lib/errors.js';
 import { config } from '../config.js';
 import { queueEmail } from '../lib/email.js';
-import { diagnoseMail } from '../lib/mailDiagnose.js';
 import { renderEmail } from '../lib/emailTemplates.js';
 import { resolveMail } from '../lib/mailSettings.js';
 import { sendDigestNow } from '../lib/digest.js';
@@ -156,25 +155,10 @@ emailLogRouter.get('/status', async (_req, res) => {
 emailLogRouter.post('/test', async (req, res) => {
   const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw badRequest('Enter a valid email address.');
-  // Check every step first, so a failure can say which one it was instead of just "queued".
-  const check = await diagnoseMail();
-  if (!check.ok) {
-    const failed = check.steps.find((s) => s.state === 'fail');
-    await audit(req, { action: 'email.test', entityType: 'email', summary: `test email to ${to} stopped: ${failed?.label ?? 'a check failed'}` });
-    res.json({ ok: false, step: failed?.id ?? null, message: `${failed?.label ?? 'A check'} failed. ${failed?.detail ?? ''}`.trim(), steps: check.steps });
-    return;
-  }
   const mail = await renderEmail({ key: 'test', data: { actorName: req.auth!.user.name }, link: config.webOrigin });
-  const id = await queueEmail({ to, template: 'test', subject: mail.subject, html: mail.html });
-  // The sending itself happens in the background worker; wait a few seconds for its answer.
-  let row = await prisma.emailLog.findUnique({ where: { id }, select: { status: true, error: true } });
-  for (let i = 0; i < 16 && row && row.status === 'queued'; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-    row = await prisma.emailLog.findUnique({ where: { id }, select: { status: true, error: true } });
-  }
-  const sent = row?.status === 'sent';
-  await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}: ${sent ? 'delivered to the mail server' : (row?.error ?? row?.status ?? 'unknown')}` });
-  res.json({ ok: sent, step: sent ? null : 'send', message: sent ? `Sent to ${to}.` : row?.status === 'queued' ? 'The email is still waiting to be sent. Check the Email log in a moment.' : `Sending failed. ${row?.error ?? ''}`.trim(), steps: check.steps });
+  await queueEmail({ to, template: 'test', subject: mail.subject, html: mail.html });
+  await audit(req, { action: 'email.test', entityType: 'email', summary: `sent a test email to ${to}` });
+  res.status(202).json({ ok: true });
 });
 
 /** Sends the reminders for receipts that have waited too long right now (they also go out by themselves at 9am), so an administrator can try the settings. */

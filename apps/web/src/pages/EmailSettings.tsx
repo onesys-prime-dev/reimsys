@@ -71,8 +71,8 @@ export function EmailSettingsTab() {
     onError: (e) => toast(errMsg(e), 'bad'),
   });
   const sendTest = useMutation({
-    mutationFn: () => api<{ ok: boolean; step: string | null; message: string; steps: Step[] }>('/email-log/test', { method: 'POST', body: { to: testTo } }),
-    onSuccess: (d) => { setSteps(d.steps); toast(d.message, d.ok ? undefined : 'bad'); qc.invalidateQueries({ queryKey: ['email-log'] }); },
+    mutationFn: () => api('/email-log/test', { method: 'POST', body: { to: testTo } }),
+    onSuccess: () => { toast('Test email queued. Check Audit log, Emails to see whether it was sent.'); qc.invalidateQueries({ queryKey: ['email-log'] }); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
 
