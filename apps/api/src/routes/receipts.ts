@@ -6,7 +6,7 @@ import type { Prisma } from '@prisma/client';
 import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
-  cleanFormData, VAT_LABEL, classificationText, issuesText, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
+  cleanFormData, VAT_LABEL, classificationText, issuesText, issuesFor, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
 } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -284,6 +284,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   // Sending a receipt back: the problems ticked from the short list, with or without a typed note.
   const issues: ReturnIssueCode[] = action === 'return' || action === 'request' ? RETURN_ISSUE_CODES.filter((c) => body.issues?.includes(c)) : [];
   if (body.issues?.length && !issues.length) throw badRequest('Problems can only be listed when sending a receipt back.', 'ISSUES_NOT_ALLOWED');
+  const allowed = issuesFor(r.birInvoice).map((i) => i.code) as string[];
+  if (issues.some((c) => !allowed.includes(c))) throw badRequest('That problem does not apply to a receipt without a BIR invoice.', 'ISSUE_NOT_APPLICABLE');
   // What people read in notices, emails and the history: the ticked problems, then the note.
   const reason = issues.length ? issuesText(issues, note) : note;
   const hasReason = !!note || issues.some((c) => c !== 'other');

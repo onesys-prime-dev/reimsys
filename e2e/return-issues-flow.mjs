@@ -84,5 +84,14 @@ ok('another Med Ref cannot see the receipt at all', (await view(U.mark, b)).s ==
 const asChecker = (await view(U.liza, b)).d.receipt;
 ok('the Checker sees the problems (as text, no edit rights)', asChecker.returnIssues.includes('vendor_wrong') && asChecker.canEdit === false);
 
+// BL-06: a receipt without a BIR invoice has no invoice number, VAT or withholding, so those problems cannot be picked for it
+const n = await ready('Return no BIR');
+for (const bad of ['invoice_no_wrong', 'vat_wrong']) {
+  const x = await call(U.liza, 'POST', `/receipts/${n.id}/return`, { version: n.version, issues: [bad] });
+  ok(`"${bad}" is refused on a receipt without a BIR invoice`, x.s === 400 && code(x) === 'ISSUE_NOT_APPLICABLE', `${x.s} ${code(x)}`);
+}
+const fine = await call(U.liza, 'POST', `/receipts/${n.id}/return`, { version: n.version, issues: ['vendor_wrong'] });
+ok('a problem that does apply is still accepted', fine.s === 200, String(fine.s));
+
 // END OF CHECKS
 done();

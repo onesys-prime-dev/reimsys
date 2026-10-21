@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { classificationText, cleanText, fixStepFor, issueLabel, RETURN_ISSUES, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
+import { classificationText, cleanText, fixStepFor, issueLabel, issuesFor, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -325,7 +325,7 @@ function NoteModal({ receipt, action, cfg, required: baseRequired, busy, onClose
         <div style={{ margin: '0 0 14px' }}>
           <b style={{ fontSize: '.9rem', display: 'block', marginBottom: 8 }}>What is the problem? <span className="hint muted">Pick all that apply</span></b>
           <div className="issues" role="group" aria-label="Problems">
-            {RETURN_ISSUES.map((i) => {
+            {issuesFor(receipt.form.birInvoice).map((i) => {
               const on = issues.includes(i.code);
               return <button key={i.code} type="button" className={`issue ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setIssues((s) => (on ? s.filter((x) => x !== i.code) : [...s, i.code]))}>{i.label}</button>;
             })}
