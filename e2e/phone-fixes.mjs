@@ -76,6 +76,23 @@ const view = await p.evaluate(() => {
 ok('all four corner dots are on the screen', view.pts.length === 4 && view.pts.every((q) => q.y > 0 && q.y < view.vh && q.x > 0 && q.x < 390), JSON.stringify(view));
 ok('they are inside the editor area, not hidden behind its edge', view.pts.every((q) => q.y >= view.bodyTop && q.y <= view.bodyBottom), JSON.stringify(view));
 await p.screenshot({ path: path.join(OUT, '2-tall-photo.png') });
+
+console.log('A tall picture in the preview windows');
+// 1. the scan editor's "page as it will be saved" preview of the tall photo above
+const prev = await p.evaluate(() => { const z = document.querySelector('.modal.scan .scanzp'); const c = z && z.querySelector('canvas'); if (!z || !c) return null; const zr = z.getBoundingClientRect(), cr = c.getBoundingClientRect(); return { fits: cr.height <= zr.height + 1 && cr.width <= zr.width + 1, box: [Math.round(zr.width), Math.round(zr.height)], canvas: [Math.round(cr.width), Math.round(cr.height)] }; });
+ok('the scan editor shows the whole saved page of a tall photo, not just its top', !!prev && prev.fits, JSON.stringify(prev));
+await dlg.locator('button:has-text("Use scan")').click();
+await dlg.waitFor({ state: 'detached' });
+// 2. the file preview (eye button) of a very tall picture
+const tall = Buffer.from((await p.evaluate(() => { const c = document.createElement('canvas'); c.width = 800; c.height = 2400; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 800, 2400); g.fillStyle = '#c00'; g.fillRect(0, 0, 800, 120); g.fillStyle = '#00c'; g.fillRect(0, 2280, 800, 120); return c.toDataURL('image/png'); })).split(',')[1], 'base64');
+await p.setInputFiles('input[type=file][multiple]', { name: 'tall.png', mimeType: 'image/png', buffer: tall });
+await p.waitForSelector('button[aria-label="Preview tall.png"]');
+await p.click('button[aria-label="Preview tall.png"]');
+await p.waitForSelector('.zp.pvz img');
+await p.waitForFunction(() => { const i = document.querySelector('.zp.pvz img'); return i && i.complete && i.naturalWidth > 0; });
+await p.waitForTimeout(300);
+const pv = await p.evaluate(() => { const z = document.querySelector('.zp.pvz').getBoundingClientRect(), i = document.querySelector('.zp.pvz img').getBoundingClientRect(); return { fits: i.height <= z.height + 1 && i.width <= z.width + 1, box: [Math.round(z.width), Math.round(z.height)], img: [Math.round(i.width), Math.round(i.height)] }; });
+ok('the file preview shows a very tall picture whole (top and bottom both in view)', pv.fits, JSON.stringify(pv));
 ok('no errors in the browser', p.errors.length === 0, p.errors.join(' | '));
 await b.close();
 console.log(failed ? `\n${failed} FAILED` : `\nAll checks passed. Screenshots in ${OUT}`);
