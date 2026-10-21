@@ -126,7 +126,9 @@ try {
   /* ---- rate limit on asking for links ---- */
   let limited = false;
   for (let i = 0; i < 8 && !limited; i++) limited = (await api('', 'POST', '/auth/forgot', { email })).status === 429;
-  ok('asking for links over and over is slowed down', limited);
+  // When the API was started with RATE_LIMIT_OFF=1 for a test run, there is no slowing down to see.
+  if (process.env.RATE_LIMIT_OFF === '1') console.log('  skip asking for links over and over is slowed down (the limits are off for this run)');
+  else ok('asking for links over and over is slowed down', limited);
 
   /* ---- phone ---- */
   const ph = await page({ width: 390, height: 800 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PRIVACY_VERSION, type MeResponse } from '@reimsys/shared';
+import { useQuery } from '@tanstack/react-query';
+import type { MeResponse } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { useAuth } from '../auth';
 import { Logo } from '../components/Logo';
@@ -9,7 +10,13 @@ import { Logo } from '../components/Logo';
  * The privacy notice and acceptable-use lines. Change the wording here; raise PRIVACY_VERSION (packages/shared/src/privacy.ts)
  * when people should read it again. The two "To be confirmed" lines are filled in once the client decides.
  */
+/** The two blanks and the version, set by an administrator in Access → Settings. Readable before signing in. */
+export interface PrivacyInfo { retention: string; contact: string; version: number }
+export const usePrivacyInfo = () => useQuery({ queryKey: ['privacy-info'], queryFn: () => api<PrivacyInfo>('/auth/privacy-info'), staleTime: 60_000 });
+const TBC = <b>To be confirmed by your administrator.</b>;
+
 export function PrivacyNotice() {
+  const info = usePrivacyInfo().data;
   return (
     <div className="notice">
       <h2>What we collect</h2>
@@ -36,13 +43,13 @@ export function PrivacyNotice() {
       <p>REIMSYS uses one cookie, only to keep you signed in. It is removed when you sign out. There is no tracking or analytics, and no scripts from other companies.</p>
 
       <h2>How long we keep it</h2>
-      <p><b>To be confirmed by your administrator.</b> The retention period is set by the company.</p>
+      <p>{info?.retention ? info.retention : <>{TBC} The retention period is set by the company.</>}</p>
 
       <h2>Your rights</h2>
       <p>You can ask to see the data held about you and to have mistakes corrected. Contact the person below. Records that the company must keep for audit or tax cannot be erased on request.</p>
 
       <h2>Who to contact</h2>
-      <p><b>To be confirmed by your administrator.</b> This will be the company's data protection contact.</p>
+      <p>{info?.contact ? info.contact : <>{TBC} This will be the company&apos;s data protection contact.</>}</p>
 
       <h2>Using REIMSYS</h2>
       <ul>
@@ -50,7 +57,7 @@ export function PrivacyNotice() {
         <li>Do not share your sign-in. Everything done under it is recorded as you.</li>
         <li>Every action in the system is recorded and can be reviewed.</li>
       </ul>
-      <p className="muted" style={{ fontSize: '.82rem' }}>Version {PRIVACY_VERSION}</p>
+      <p className="muted" style={{ fontSize: '.82rem' }}>Version {info?.version ?? ''}</p>
     </div>
   );
 }

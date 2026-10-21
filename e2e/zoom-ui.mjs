@@ -62,7 +62,9 @@ for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone
   await dlg.waitFor({ state: 'detached' });
 
   /* the preview opened from the file list */
+  await p.waitForTimeout(500);
   const eye = p.locator('button[aria-label^="Preview scan-"]').first();
+  console.log('  labels:', JSON.stringify(await p.locator('button[aria-label^="Preview"]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))), 'dialog open:', await p.locator('.modal.scan').count());
   ok('the scanned file has a preview button', (await eye.count()) === 1);
   await eye.click();
   await p.waitForSelector('.zp.pvz img');

@@ -21,6 +21,7 @@ blocker(origin.startsWith('https://') && !/^(localhost|127\.|.*\.local$)/.test(h
 // The mail account can be in .env or saved in the app (Access → Email); the saved one is checked below once the database is open.
 const smtpInEnv = !!env.SMTP_HOST;
 const mailFromExample = /@example\.com/.test(env.MAIL_FROM ?? 'x@example.com');
+advice(env.RATE_LIMIT_OFF !== '1', 'The sign-in rate limits are on (RATE_LIMIT_OFF is not 1)', 'RATE_LIMIT_OFF=1 is a test setting. The app ignores it in production mode, but remove it from .env.');
 const tls = !!(env.TLS_CERT && env.TLS_KEY);
 advice(tls || origin.startsWith('https://'), 'https is served by the app or by Nginx', 'Set TLS_CERT and TLS_KEY, or put Nginx with a certificate in front.');
 

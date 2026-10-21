@@ -21,6 +21,8 @@ const env = z
     MAIL_FROM: z.string().default('REIMSYS <no-reply@example.com>'),
     ORG_NAME: z.string().default('REIMSYS'),
     WEB_DIST: z.string().default('../web/dist'),
+    // Test runs only: switches the sign-in and password-link rate limits off so automatic checks can sign in many times. Ignored in production.
+    RATE_LIMIT_OFF: z.enum(['0', '1']).default('0'),
   })
   .parse(process.env);
 
@@ -43,6 +45,7 @@ export const config = {
   webDist: path.resolve(env.WEB_DIST),
   mailFrom: env.MAIL_FROM,
   smtp: env.SMTP_HOST ? { host: env.SMTP_HOST, port: env.SMTP_PORT, secure: env.SMTP_SECURE === 'true', user: env.SMTP_USER, pass: env.SMTP_PASS } : null,
+  rateLimitOff: env.NODE_ENV !== 'production' && env.RATE_LIMIT_OFF === '1',
   maxFailedAttempts: 5,
   lockMinutes: 15,
 };

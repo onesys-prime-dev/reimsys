@@ -2,10 +2,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
-import { PRIVACY_VERSION, changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsys/shared';
+import { changePasswordSchema, preferencesSchema, updateProfileSchema } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
+import { getSettings } from '../lib/appSettings.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { meResponse } from '../lib/serialize.js';
@@ -55,8 +56,8 @@ meRouter.post('/password', async (req, res) => {
 meRouter.post('/privacy', async (req, res) => {
   const u = req.auth!.user;
   if (u.mustChangePassword) throw forbidden('Change your password first.', 'PASSWORD_CHANGE_REQUIRED');
-  await prisma.user.update({ where: { id: u.id }, data: { privacyAcceptedVersion: PRIVACY_VERSION, privacyAcceptedAt: new Date() } });
-  await audit(req, { action: 'privacy.accepted', entityType: 'user', entityId: u.id, summary: `accepted the privacy notice (version ${PRIVACY_VERSION})`, before: { version: u.privacyAcceptedVersion ?? null }, after: { version: PRIVACY_VERSION } });
+  await prisma.user.update({ where: { id: u.id }, data: { privacyAcceptedVersion: getSettings().privacyVersion, privacyAcceptedAt: new Date() } });
+  await audit(req, { action: 'privacy.accepted', entityType: 'user', entityId: u.id, summary: `accepted the privacy notice (version ${getSettings().privacyVersion})`, before: { version: u.privacyAcceptedVersion ?? null }, after: { version: getSettings().privacyVersion } });
   res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 
@@ -100,6 +101,16 @@ meRouter.post('/photo', upload.single('photo'), async (req, res) => {
   if (u.photoFile) await fs.rm(path.join(avatarDir(), u.photoFile), { force: true });
   await prisma.user.update({ where: { id: u.id }, data: { photoFile: name } });
   await audit(req, { action: 'profile.photo_changed', entityType: 'user', entityId: u.id, summary: 'changed profile photo' });
+  res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
+});
+
+/** Takes the photo away: the initials show again. The picture file is deleted, and the change is recorded. */
+meRouter.delete('/photo', async (req, res) => {
+  const u = req.auth!.user;
+  if (!u.photoFile) throw notFound('There is no photo to remove.');
+  await prisma.user.update({ where: { id: u.id }, data: { photoFile: null } });
+  await fs.rm(path.join(avatarDir(), u.photoFile), { force: true });
+  await audit(req, { action: 'profile.photo_removed', entityType: 'user', entityId: u.id, summary: 'removed profile photo' });
   res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });
 

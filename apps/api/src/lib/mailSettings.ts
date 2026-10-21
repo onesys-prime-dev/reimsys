@@ -49,7 +49,7 @@ export async function resolveMail(): Promise<ResolvedMail> {
 /** What the settings page may see. The password is never included. */
 export async function mailView(): Promise<MailSettingsView> {
   const s = await readStored();
-  if (s) return { source: 'database', host: s.host, port: s.port, secure: s.secure, user: s.user, hasPassword: !!s.passEnc, fromName: s.fromName, fromAddress: s.fromAddress, testRedirect: s.testRedirect ?? '' };
+  if (s) return { source: 'database', host: s.host, port: s.port, secure: s.secure, user: s.user, hasPassword: !!s.passEnc, fromName: s.fromName, fromAddress: s.fromAddress, testRedirect: s.testRedirect ?? '', passwordUnreadable: !!(await resolveMail()).passwordUnreadable };
   if (config.smtp) {
     const m = /^"?([^"<]*?)"?\s*<([^>]+)>$/.exec(config.mailFrom);
     return { source: 'environment', host: config.smtp.host, port: config.smtp.port, secure: config.smtp.secure, user: config.smtp.user ?? '', hasPassword: !!config.smtp.pass, fromName: m?.[1]?.trim() ?? '', fromAddress: m?.[2] ?? config.mailFrom, testRedirect: '' };

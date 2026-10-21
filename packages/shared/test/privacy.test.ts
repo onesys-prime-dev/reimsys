@@ -13,4 +13,10 @@ describe('privacy notice acceptance', () => {
     expect(needsPrivacy(PRIVACY_VERSION)).toBe(false);
     expect(needsPrivacy(PRIVACY_VERSION + 1)).toBe(false);
   });
+  it('compares against the version given when the notice version is a setting', () => {
+    expect(needsPrivacy(1, 2)).toBe(true);
+    expect(needsPrivacy(2, 2)).toBe(false);
+    expect(needsPrivacy(null, 1)).toBe(true);
+    expect(needsPrivacy(5, 3)).toBe(false);
+  });
 });

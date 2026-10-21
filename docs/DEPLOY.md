@@ -223,3 +223,8 @@ Do these in order. Step 9 is the gate: it must report no blockers.
 12. Before the first real receipt: if any test receipts exist, back up, then `data:clear`.
 
 Fonts are bundled with the app, so no visitor's address is sent to Google. Everything the page loads comes from your own server.
+
+## Settings that live in the app (Access → Settings)
+- **Privacy notice:** how long records are kept, the data protection contact, and the notice version. Fill in the first two before launch. Raise the version after changing them and everyone accepts the notice again at their next action.
+- **Keeping records:** a period in months (0 = off). It only powers a preview of finished receipts (paid or disapproved) older than that, with a CSV list. Nothing is deleted or hidden by it.
+- **Email:** the mail account and **Run full check**, which tests each step of sending and says what to fix.

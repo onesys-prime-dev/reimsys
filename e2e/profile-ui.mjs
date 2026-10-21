@@ -63,8 +63,19 @@ for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone
 
   // Photo button opens a file chooser
   const chooser = p.waitForEvent('filechooser', { timeout: 5000 }).then(() => true).catch(() => false);
-  await p.click('button:has-text("Change photo")');
+  await p.click('button:has-text("Add photo")');
   ok('Change photo opens the file chooser', await chooser);
+  // add a photo, then remove it
+  ok('with no photo the button says Add photo and there is no Remove button', (await p.locator('button:has-text("Add photo")').count()) === 1 && (await p.locator('button:has-text("Remove photo")').count()) === 0);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await p.setInputFiles('input[type=file]', { name: 'me.png', mimeType: 'image/png', buffer: png });
+  ok('the photo is added', await p.locator('#toast :text("Photo updated")').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false));
+  await p.waitForSelector('button:has-text("Remove photo")');
+  ok('now the button says Change photo and Remove photo is offered', (await p.locator('button:has-text("Change photo")').count()) === 1);
+  await p.click('button:has-text("Remove photo")');
+  ok('removing it shows a message', await p.locator('#toast :text("Photo removed")').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false));
+  await p.waitForSelector('button:has-text("Add photo")');
+  ok('the initials are back in the menu and the Remove button is gone', (await p.locator('.who img.av').count()) === 0 && (await p.locator('button:has-text("Remove photo")').count()) === 0);
 
   // Security
   await p.click('.tabs button:has-text("Security")');

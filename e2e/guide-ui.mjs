@@ -15,7 +15,7 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
     await p.click('button:has-text("How to read the invoice")');
     await p.waitForSelector('.guide-img');
     ok(`${label}: the ${step} step opens the guide on "${tab}"`, (await p.locator('.issue.on').innerText()) === tab);
-    ok(`${label}: the picture loads`, await p.locator('.guide-img').evaluate((i) => i.complete && i.naturalWidth > 0));
+    ok(`${label}: the picture loads`, await p.waitForFunction(() => { const i = document.querySelector('.guide-img'); return !!i && i.complete && i.naturalWidth > 0; }, null, { timeout: 8000 }).then(() => true).catch(() => false));
     ok(`${label}: the part for this page is the first tab`, (await p.locator('.issue').first().innerText()) === tab);
     const h0 = (await p.locator('.guide-img').boundingBox()).height;
     ok(`${label}: it opens with the whole invoice in view`, await p.locator('.guide-img').evaluate((i) => { const v = i.parentElement.getBoundingClientRect(), r = i.getBoundingClientRect(); return r.height <= v.height + 1 && r.top >= v.top - 1; }));

@@ -431,3 +431,62 @@ Target: a Linux server / VPS (`docs/DEPLOY.md`, new "Go-live runbook").
 - Done: fonts bundled with the app (no Google requests; CSP tightened to the app's own address; checked in Chrome through the API port with no CSP errors); `scripts/preflight.mjs` (go-live gate, lists blockers and advice); `scripts/healthcheck.mjs` (API, disk, backup age, stuck emails, optional webhook); `BACKUP_COPY_TO` / `--copy-to` off-disk backup copy (tested); `SEED_DEMO=false` seed and `pnpm --filter @reimsys/api admin:create` so a real server never has demo accounts (tested on a spare database); runbook, BACKUP and SECURITY docs updated.
 - On this dev PC `node scripts/preflight.mjs` reports 6 blockers: production mode, https address, SMTP, real From address, demo accounts active, no real Super Admin. These only clear on the real server.
 - Still needs from you: the server and domain, SMTP details and From address, the first real admin's name (email given: onesysprimedev@gmail.com), the retention period and data protection contact, lawyer sign-off on the notice, document/report layouts, categories and branding.
+
+## System plan for 2026-10-21
+Only the software itself. Items follow the list agreed on 2026-10-21. Another working session is committing to the same branch, so: **fetch and merge before every commit, one item per commit, and note a claimed item in this list before starting it.**
+
+### Already landed today (verify, do not rebuild)
+- **2. Remove photo** (`949c5ab`): button on Profile, audit entry, API tests.
+- **3. Privacy fields in Settings** (`4d47682`): retention period, data protection contact and notice version are Settings fields; the notice reads them.
+- **12. Test reliability** (`949c5ab`): sign-in rate limits can be reset for test runs.
+- Verification to do first: `pnpm typecheck`, `pnpm test`, `api-flow`, `privacy-flow`, `profile-flow`, `profile-ui`, `privacy-ui`; open Access → Settings and the Privacy page; remove a photo in Chrome; raise the version and confirm everyone is asked again.
+
+### Order of work (smallest and safest first; each ends with typecheck, unit tests and the browser tests that touch it)
+| # | Item | What changes | How it is checked |
+|---|---|---|---|
+| A | Verify the three landed items | nothing, unless a test fails | the tests above |
+| B | **7. Phone filters** on Audit log, email log, Access users | reuse the Receipts `Filters` button pattern (`.fgroup`) | `role-sweep`, `access-tabs`, phone screenshots |
+| C | **8. Compact headings** on the new-receipt form and the receipt detail page | CSS and small markup; keep Back link and status/amount block | `privacy-ui`, `return-ui`, `ui-flow`, screenshots |
+| D | **4. Access → Email warning and full check** | move the `mail:check` logic into `lib/mailDiagnose.ts` (used by the command and by `POST /api/settings/mail/diagnose`); add `passwordUnreadable` to the mail settings view; a "Run full check" button lists each step (account, key, name, ports, login) with ok or the fix | unit test with a fake host and a wrong key, `email-settings` test, a new API test |
+| E | **5. Receipts footer total** | the list endpoint also returns the sum of amounts for the current filters (all pages, one `aggregate` query, same permission filters); the footer shows "N receipts · ₱total" | `api-flow`: the sum equals the sum of all pages for several filters and for a Med Ref (own receipts only) |
+| F | **9. Dark mode sweep** | a script takes dark screenshots of every screen for every role on computer and phone; fix low contrast (variables first, then individual rules) | screenshots reviewed one by one; an automated contrast check on text and pill colours |
+| G | **11. Help page** | `/help` with one short guide per role (what you do, step by step, what the statuses mean, who to ask), linked from the sidebar footer and the phone menu; text first, existing screenshots where they help | each role sees only its own guide plus the shared basics; `role-sweep` |
+| H | **10. Retention clean-up** | see below | see below |
+| I | **1. Live scanner outline** | see below | see below |
+| J | **6. Ready to pay** | see "Decisions" | |
+
+### 10. Retention clean-up (largest, destructive, so built in two safe phases)
+- The app's database login cannot delete payments or history rows (`docs/db-grants.sql`), so "delete old receipts" is not possible for the app as it is, and the history log must stay anyway.
+- **Phase 1 (build now, deletes nothing):** a setting "keep records for N months" (empty = off, the default); a **preview** that lists, by status and month, which receipts would be affected (only finished ones: paid, disapproved, and approved-and-paid, older than N months by their last decision date); an admin-only page with an export of that list (CSV) and an audit entry each time it is run. Check: the counts match a direct database query.
+- **Phase 2 (only after the rule is decided):** archive, not delete: a migration adds `archivedAt` to `receipt`; archived receipts are hidden from lists and reports but still open by direct link for audit; their evidence files are moved into a dated archive folder that the backup also copies. Fully reversible with an "unarchive". Rollback SQL in `docs/`.
+
+### 1. Live scanner outline (needs the real photo)
+- Send the original photo of the Metro Parking ticket. It is turned into a small fixture next to `light-desk-frame.json`.
+- The detector is tuned against that fixture plus the 202 existing tests, which must all keep passing. A first attempt without the photo was tried and removed because it broke an existing scene.
+- If the outline still cannot be made right, the fallback is a visible "Outline looks wrong? Drag the corners" hint in the camera screen and starting the editor on the whole frame.
+
+### Decisions needed
+1. **Ready to pay (J):** each person's group already has a pinned header with their receipt count and total, inside one scrolling list. Making every group scroll separately would give a scroll box inside a scroll box. Recommendation: leave as it is.
+2. **Footer total (E):** a total across all pages needs the new server number. Recommendation: add it.
+3. **Retention (H):** archive (reversible) or delete? Recommendation: archive. Which statuses count as finished, and what is the starting period? Phase 1 can be built without these.
+4. **Photo (I):** please send the original ticket photo.
+
+### Done means
+All items ticked, every browser test green on a clean run, `docs/PLAN.md` and the docs updated, and one commit per item on `myBranch`.
+
+### Progress on the system plan (2026-10-21)
+- A done: Remove photo, privacy fields in Settings and the rate-limit switch verified; the privacy settings test now puts everything back (it used to leave the raised version and test text behind).
+- B done: Audit activity filters and Export behind a Filters button on phones (the email log and Access users have a single control, so no button was needed).
+- C done: the form heading was already one line; the receipt detail title brought in line.
+- D done: Access → Email "Run full check" (account, key, name, ports, login), red warning for an unreadable password, `mail:check` shares the same checks (`e2e/mail-check.mjs`).
+- E done: the Receipts footer shows the total of every matching receipt (`e2e/list-total.mjs` compares it to the sum by hand).
+- F done: `e2e/dark-sweep.mjs` (dark, or `--light`) measures text contrast on every screen for every role; 0 low-contrast texts in both modes on 82 screens.
+- G done: Help page (`/help`), guides shown by what a person may do (`e2e/help-ui.mjs`).
+- H phase 1 done: Access → Settings → "Keeping records": a keeping period in months (0 = off) and a preview of finished receipts (paid or disapproved) older than it, with a CSV list; it changes nothing and is audited (`e2e/retention.mjs`). **Phase 2 (archive) is not built**: it waits for the rule (which statuses, which period, archive or delete).
+- I waiting for the original photo of the Metro Parking ticket.
+- J left as it is (already pinned per-person headers with totals).
+
+### System plan: final state (2026-10-21)
+- Rebuilt after the other session's versions were reverted (by choice): **12** `RATE_LIMIT_OFF=1` (development only, ignored in production); **2** Remove photo (file deleted, audit entry, Add/Change/Remove buttons); **3** the retention period, contact and version of the privacy notice are Settings fields (`/api/auth/privacy-info` is public; raising the version makes everyone accept again). Each has API and browser tests, and every test puts back what it changes (the privacy tests restore the settings and the accepting accounts, so they pass when run again and again).
+- `pnpm test:all` (`e2e/run-all.mjs`) runs typecheck, unit tests and every API and browser check in turn. Start the API with `RATE_LIMIT_OFF=1` first.
+- Still open: **I** the live scanner outline (needs the original ticket photo); **H phase 2** archiving old records (needs the rule); **J** Ready to pay was left as it is.

@@ -638,3 +638,46 @@ a.chip:hover{border-color:var(--accent);color:var(--ink)}
 @media(max-width:820px){.zp.scanzp{height:min(44vh,420px)}.zp.pvz{height:60vh}}
 .scan-out{padding:0;background:none}
 .scan-out .zp-in canvas{max-width:100%;max-height:100%}
+
+/* ---- Fixes from the phone (staging) ---- */
+/* The scan windows open on top of the black live-camera screen, whose text colour is white: windows and buttons must set their own. */
+.modal{color:var(--ink)}
+.btn{color:var(--ink)}
+.btn.pri,.btn.ok{color:var(--accent-ink)}
+.btn.bad{color:var(--bad)}.btn.hold{color:var(--hold)}.btn.ghost{color:var(--muted)}
+/* iPhone date boxes have a built-in width and stuck out of the card. */
+input[type=date],input[type=time]{display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
+.form>*,.f,.field{min-width:0}
+/* The scan editor: the whole photo stays on the screen, so all four corner dots can be reached (a tall photo used to push the bottom ones off-screen). */
+.scan-photo{width:fit-content;max-width:100%;margin-inline:auto}
+.scan-photo canvas{width:auto;height:auto;max-width:100%;max-height:min(54vh,560px)}
+.scan-grid>.scan-photo{justify-self:center}
+@media(min-width:821px){.scan-photo canvas{max-height:min(62vh,620px)}}
+/* Zoom buttons: a solid bar so they can be read over any picture. */
+.zp-bar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.zp-bar .btn{background:var(--surface);backdrop-filter:none;min-width:38px}
+.zp-bar .btn:disabled{opacity:.35}
+@media(min-width:821px){.dh h1{font-size:1.45rem}.dh{margin-bottom:14px}}
+/* the number inside a status chip was 70% see-through: too faint on dark */
+.chip .n{opacity:1;font-weight:600}
+.chip:not(.on) .n{color:var(--ink)}
+
+/* Help page */
+.side-links{display:flex;justify-content:center;gap:14px}
+.side-links .privacy-link{margin-top:8px}
+.help h3{font-size:1rem;margin:18px 0 6px}.help h3:first-child{margin-top:0}
+.help p,.help li{line-height:1.55}
+.help ul,.helpsteps{margin:6px 0 10px;padding-left:20px}
+.helpsteps{counter-reset:s;list-style:none;padding-left:0}
+.helpsteps li{counter-increment:s;position:relative;padding:6px 0 6px 34px}
+.helpsteps li::before{content:counter(s);position:absolute;left:0;top:6px;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.8rem;display:grid;place-items:center}
+.helpdl{margin:6px 0 10px;display:grid;gap:8px}
+.helpdl>div{display:grid;grid-template-columns:120px 1fr;gap:4px 14px;align-items:baseline}
+.helpdl dt{font-weight:600}.helpdl dd{margin:0;color:var(--muted)}
+.helpnav{display:flex;flex-wrap:wrap;gap:8px}
+.helpnav a{padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--surface);font-size:.86rem;font-weight:600;color:var(--muted);text-decoration:none}
+.helpnav a:hover{border-color:var(--accent);color:var(--ink)}
+@media(max-width:820px){.helpdl>div{grid-template-columns:1fr}}
+section.card[id]{scroll-margin-top:84px}
+.help a{color:var(--accent);font-weight:600}

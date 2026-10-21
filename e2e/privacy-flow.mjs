@@ -58,6 +58,31 @@ check('signing in again does not ask again', relogin.status === 200 && relogin.d
 
 check('the sign-in page never needs the notice (not signed in = 401, not 403)', (await new Client().get('/receipts')).status === 401);
 
+console.log('\nThe notice settings (Access → Settings → Privacy notice)');
+{
+  const info = () => fetch(BASE + '/auth/privacy-info', { headers: { 'x-requested-with': 'reimsys' } }).then((x) => x.json());
+  const cur = (await admin.get('/app-settings')).data.settings;
+  const info0 = await info();
+  check('the notice details are public, readable before signing in', typeof info0.retention === 'string' && typeof info0.contact === 'string' && Number.isInteger(info0.version));
+  check('the public version is the saved version', info0.version === cur.privacyVersion);
+  const accepted = new Client(); await accepted.post('/auth/login', { email, password: NEW_PW });
+  const put = await admin.req('PUT', '/app-settings', { ...cur, privacyRetention: 'Kept for 10 years', privacyContact: 'Dana Cruz, dpo@example.com', privacyVersion: cur.privacyVersion + 1 });
+  check('an administrator can fill in the notice and raise its version', put.status === 200);
+  const info1 = await info();
+  check('the notice now shows the retention period and the contact', info1.retention === 'Kept for 10 years' && info1.contact.startsWith('Dana Cruz') && info1.version === cur.privacyVersion + 1, JSON.stringify(info1));
+  check('raising the version makes people accept again', (await accepted.get('/me')).data.user.privacyRequired === true);
+  check('they are blocked until they do', (await accepted.get('/receipts')).status === 403);
+  const acc = await accepted.post('/me/privacy');
+  check('accepting clears it', acc.status === 200 && acc.data.user.privacyRequired === false);
+  const audit2 = (await admin.get('/audit?action=privacy.&pageSize=5')).data?.items ?? [];
+  check('the new version is written in the history log', audit2.some((r) => r.action === 'privacy.accepted' && (r.summary ?? '').includes('version ' + (cur.privacyVersion + 1))), JSON.stringify(audit2.map((r) => r.summary)));
+  check('too-long text is refused', (await admin.req('PUT', '/app-settings', { ...cur, privacyContact: 'x'.repeat(400) })).status === 400);
+  // put everything back: the administrator must accept too (raising the version includes them), or the restore is refused
+  await admin.post('/me/privacy');
+  const back = await admin.req('PUT', '/app-settings', { ...cur });
+  check('the settings are put back after the test', back.status === 200 && (await info()).version === cur.privacyVersion && (await info()).retention === cur.privacyRetention);
+}
+
 await admin.post('/auth/logout');
 console.log(failed ? `\n${failed} FAILED` : '\nAll privacy checks passed.');
 process.exit(failed ? 1 : 0);

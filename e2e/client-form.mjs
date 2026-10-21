@@ -153,6 +153,8 @@ const exp = await ana.req('GET', '/receipts/export?format=csv', undefined, { raw
 const text = await exp.text();
 check('the receipt export has the invoice, VAT and withholding columns', ['Invoice no.', 'Vendor TIN', 'VAT amount', 'Withholding amount', 'BIR invoice'].every((c) => text.includes(c)));
 check('the export holds no category column', !/Category/.test(text.split('\n')[0]));
+const svc = await ana.post('/receipts', full({ transactionType: 'service', invoiceNo: 'SVC-' + Date.now() })); // make our own, so the check does not depend on what earlier runs left behind
+check('a Service receipt can be created for the filter check', svc.status === 201, JSON.stringify(svc.data).slice(0, 160));
 const t = (await ana.get('/receipts?transactionType=service')).data;
 check('the list can be filtered by Product or Service', t.items.length > 0 && t.items.every((x) => x.transactionType === 'service'));
 const rep = await ana.post('/reports', { from: '2026-10-01', to: '2026-10-31', format: 'csv', transactionType: 'product' });
