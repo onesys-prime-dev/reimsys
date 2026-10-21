@@ -58,11 +58,13 @@ export function AppSettingsTab() {
                   <div style={{ flex: '1 1 280px', minWidth: 0 }}>
                     <b>{it.label}</b>
                     {it.help && <div className="muted" style={{ fontSize: '.86rem' }}>{it.help}</div>}
-                    {!same && <small className="muted">Default: {it.kind === 'bool' ? (defaults[it.key] ? 'On' : 'Off') : `${defaults[it.key]} ${it.unit ?? ''}`}</small>}
+                    {!same && <small className="muted">Default: {it.kind === 'bool' ? (defaults[it.key] ? 'On' : 'Off') : it.kind === 'text' ? (defaults[it.key] ? String(defaults[it.key]) : 'empty') : `${defaults[it.key]} ${it.unit ?? ''}`}</small>}
                     {errs[it.key] && <span className="err" style={{ display: 'block' }}>{errs[it.key]}</span>}
                   </div>
                   {it.kind === 'bool' ? (
                     <Switch checked={!!draft[it.key]} label={it.label} onChange={(v) => set(it.key, v)} />
+                  ) : it.kind === 'text' ? (
+                    <input type="text" style={{ flex: '1 1 320px', maxWidth: 520 }} value={String(draft[it.key] ?? '')} aria-label={it.label} onChange={(e) => set(it.key, e.target.value)} />
                   ) : (
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input type="number" style={{ width: 110 }} step={it.step} value={String(draft[it.key] ?? '')} aria-label={it.label} onChange={(e) => set(it.key, e.target.value)} />

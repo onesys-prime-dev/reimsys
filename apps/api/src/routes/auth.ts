@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { forgotSchema, loginSchema, resetSchema } from '@reimsys/shared';
+import { forgotSchema, loginSchema, privacyVersionIn, resetSchema } from '@reimsys/shared';
+import { getSettings } from '../lib/appSettings.js';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
@@ -45,6 +46,12 @@ const linkLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please wait a few minutes and try again.' } },
+});
+
+/** The two blanks of the privacy notice. Public: the notice can be read before signing in, and it holds nothing secret. */
+authRouter.get('/privacy-info', (_req, res) => {
+  const s = getSettings();
+  res.json({ retention: s.privacyRetention, contact: s.privacyContact, version: privacyVersionIn(s.privacyVersion) });
 });
 
 /** Always answers the same way, so nobody can use this page to find out who has an account. */
