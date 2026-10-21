@@ -17,6 +17,7 @@ const loginLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => config.rateLimitOff,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Wait a minute and try again.' } },
 });
 
@@ -32,6 +33,7 @@ const forgotLimiter = rateLimit({
   limit: 6,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => config.rateLimitOff,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many requests. Please wait a few minutes and try again.' } },
 });
 
@@ -41,6 +43,7 @@ const linkLimiter = rateLimit({
   limit: 40,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => config.rateLimitOff,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many attempts. Please wait a few minutes and try again.' } },
 });
 
