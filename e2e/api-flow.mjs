@@ -321,6 +321,18 @@ const aud = (await admin.get(`/audit?q=${r.id}&pageSize=100`)).data;
 check('audit browser finds receipt activity', aud.total > 5);
 check('non-admin cannot read audit', (await ana.get('/audit')).status === 403);
 
+console.log('\nProfile photo');
+{
+  await ana.req('DELETE', '/me/photo'); // start from no photo, whatever an earlier run left
+  const none = await ana.req('DELETE', '/me/photo');
+  check('removing a photo when there is none is a clear error', none.status === 400 && none.data?.error?.code === 'NO_PHOTO');
+  const pf = new FormData(); pf.append('photo', png('avatar'), 'a.png');
+  check('a photo can be uploaded', (await ana.req('POST', '/me/photo', pf)).data?.user?.hasPhoto === true);
+  const gone = await ana.req('DELETE', '/me/photo');
+  check('the photo can be removed', gone.status === 200 && gone.data?.user?.hasPhoto === false);
+  check('removing the photo is audited', (await admin.get('/audit?q=profile.photo_removed&pageSize=5')).data.items.length > 0);
+}
+
 // remove the receipts this run made, so repeated runs do not pile up in everyone's queues
 try { execFileSync('C:/xampp/mysql/bin/mysql.exe', ['-u', 'root', 'reimsys', '-e', `DELETE FROM receipt WHERE payee LIKE '% ${stamp}%'`]); } catch { /* cleanup is best effort */ }
 console.log(`
