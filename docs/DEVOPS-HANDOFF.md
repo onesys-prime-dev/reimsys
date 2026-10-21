@@ -55,6 +55,15 @@ node scripts/healthcheck.mjs                     # prints nothing when all is we
 6. **Nginx.** Use the block in `docs/DEPLOY.md` section 5. Two points matter: `client_max_body_size 12m` (evidence files are up to 10 MB) and the `/api/events` block with `proxy_buffering off` (live updates).
 7. **Never expose the storage folder** through Nginx. Files are served only by the API, which records every view.
 
+## 4a. The live database is new and empty: first start, in this order
+1. Create the database and the two logins (`docs/DEPLOY.md` section 2), and apply `docs/db-grants.sql` **after** the migrations.
+2. `pnpm --filter @reimsys/api exec prisma migrate deploy` (runs every migration from the start, with the full-rights login).
+3. `SEED_DEMO=false pnpm --filter @reimsys/api db:seed` (roles, rights, categories; **no demo accounts**).
+4. `pnpm --filter @reimsys/api admin:create -- --email <address> --name "<name>"`. Hand the printed temporary password to that person; they choose their own at first sign-in and read the privacy notice.
+5. Start the API (`pm2`), set `SETTINGS_KEY` **before** step 6, then that admin signs in and sets up **Access → Email** (the mail account is stored in the database, so a new database starts without one), the company details, the categories, and Access → Settings → Privacy notice (retention period and contact).
+6. Create the real users from Access → Users. Run `node scripts/preflight.mjs` and clear every BLOCKER.
+Because the database is new, there is nothing to clear and no demo accounts to switch off. Do not copy staging data into it.
+
 ## 5. Rollback
 Restore the backup taken in step 1 (`node scripts/restore.mjs backups/<folder> --yes`, stop the API first), then `git checkout <previous tag>`, `pnpm install --frozen-lockfile`, `pnpm build`, `pm2 restart reimsys`.
 
