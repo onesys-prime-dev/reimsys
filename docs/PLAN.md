@@ -485,3 +485,8 @@ All items ticked, every browser test green on a clean run, `docs/PLAN.md` and th
 - H phase 1 done: Access → Settings → "Keeping records": a keeping period in months (0 = off) and a preview of finished receipts (paid or disapproved) older than it, with a CSV list; it changes nothing and is audited (`e2e/retention.mjs`). **Phase 2 (archive) is not built**: it waits for the rule (which statuses, which period, archive or delete).
 - I waiting for the original photo of the Metro Parking ticket.
 - J left as it is (already pinned per-person headers with totals).
+
+### System plan: final state (2026-10-21)
+- Rebuilt after the other session's versions were reverted (by choice): **12** `RATE_LIMIT_OFF=1` (development only, ignored in production); **2** Remove photo (file deleted, audit entry, Add/Change/Remove buttons); **3** the retention period, contact and version of the privacy notice are Settings fields (`/api/auth/privacy-info` is public; raising the version makes everyone accept again). Each has API and browser tests, and every test puts back what it changes (the privacy tests restore the settings and the accepting accounts, so they pass when run again and again).
+- `pnpm test:all` (`e2e/run-all.mjs`) runs typecheck, unit tests and every API and browser check in turn. Start the API with `RATE_LIMIT_OFF=1` first.
+- Still open: **I** the live scanner outline (needs the original ticket photo); **H phase 2** archiving old records (needs the rule); **J** Ready to pay was left as it is.

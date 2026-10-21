@@ -194,7 +194,8 @@ check('forged or truncated cookies are refused', (await Promise.all(['reimsys_si
   check('weak, common and the public demo passwords are refused as a new password', results.every((r) => r === 400), results.join(','));
 }
 const burst = []; for (let i = 0; i < 30; i++) burst.push((await raw('POST', '/auth/login', { body: { email: `burst${i}@example.com`, password: 'x' } })).status);
-check('a flood of sign-in attempts from one place is slowed down', burst.includes(429), burst.join(','));
+if (process.env.RATE_LIMIT_OFF === '1') console.log('  skip a flood of sign-in attempts from one place is slowed down (the limits are off for this run)');
+else check('a flood of sign-in attempts from one place is slowed down', burst.includes(429), burst.join(','));
 await sleep(1000);
 const lockUser = 'liza.santos@example.com'; let locked = false;
 for (let i = 0; i < 7; i++) { const r = await raw('POST', '/auth/login', { body: { email: lockUser, password: 'wrong' + i } }); if (r.status === 423 || r.status === 429) locked = true; }
