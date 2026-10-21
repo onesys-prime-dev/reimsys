@@ -27,6 +27,7 @@ export function AuditPage() {
 }
 
 function Activity() {
+  const [fopen, setFopen] = useState(false);
   const [q, setQ] = useState('');
   const [action, setAction] = useState('');
   const [from, setFrom] = useState('');
@@ -49,10 +50,13 @@ function Activity() {
       <div className="panel-bar">
       <div className="tools">
         <div className="search"><Icon name="search" size={18} /><input type="text" value={q} placeholder="Search person, action, record" aria-label="Search audit log" onChange={(e) => { setQ(e.target.value); reset(); }} /></div>
+        <button type="button" className="btn only-m" aria-expanded={fopen} onClick={() => setFopen((o) => !o)}><Icon name="list" size={18} />Filters{action || from || to ? ' •' : ''}</button>
+        <div className={`fgroup ${fopen ? 'open' : ''}`}>
         <select style={{ width: 'auto' }} value={action} aria-label="Activity type" onChange={(e) => { setAction(e.target.value); reset(); }}>{GROUPS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         <input type="date" style={{ width: 'auto' }} value={from} aria-label="From date" onChange={(e) => { setFrom(e.target.value); reset(); }} />
         <input type="date" style={{ width: 'auto' }} value={to} aria-label="To date" onChange={(e) => { setTo(e.target.value); reset(); }} />
         <a className="btn" style={{ marginLeft: 'auto' }} href={`/api/audit/export?${ex}`}><Icon name="download" size={18} />Export CSV</a>
+        </div>
       </div>
       </div>
       <div className="panel-body">
