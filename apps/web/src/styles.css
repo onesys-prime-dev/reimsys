@@ -158,6 +158,8 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:none;padding:8px 16px;font-weight:600;color:var(--muted);min-height:38px}
 .seg button.on{background:var(--accent-soft);color:var(--accent)}
+.seg{max-width:100%;flex-shrink:0}
+.pref:has(.seg){flex-wrap:wrap}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
 .tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap}
 .tabs button.on{color:var(--accent);border-color:var(--accent)}
