@@ -702,3 +702,7 @@ section.card[id]{scroll-margin-top:84px}
 .zp{touch-action:pan-y}
 .zp.zoomed{touch-action:none}
 .stage.grab{touch-action:auto}
+
+/* Evidence viewer: the loading sign sits over the picture area while a picture comes in */
+.ev-wrap{position:relative}
+.ev-wrap .ev-loading{inset:12px 14px}

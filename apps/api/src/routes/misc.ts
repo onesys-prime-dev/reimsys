@@ -16,7 +16,7 @@ import { requireAuth, requirePerm } from '../middleware/auth.js';
 
 const idParam = (v: unknown) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) throw notFound();
+  if (!Number.isInteger(n) || n <= 0 || n > 2_147_483_647) throw notFound();
   return n;
 };
 
@@ -61,8 +61,10 @@ notificationsRouter.get('/', async (req, res) => {
 });
 
 notificationsRouter.post('/read', async (req, res) => {
-  const ids = Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(Number).filter(Number.isInteger) : null;
-  const receiptId = Number.isInteger(Number(req.body?.receiptId)) && Number(req.body.receiptId) > 0 ? Number(req.body.receiptId) : null;
+  // A huge number is still a whole number but would crash the query (too big for the column), so ids outside the column's range are ignored.
+  const dbId = (n: number) => Number.isInteger(n) && n > 0 && n <= 2_147_483_647;
+  const ids = Array.isArray(req.body?.ids) ? (req.body.ids as unknown[]).map(Number).filter(dbId) : null;
+  const receiptId = dbId(Number(req.body?.receiptId)) ? Number(req.body.receiptId) : null;
   await prisma.notification.updateMany({
     where: { userId: req.auth!.user.id, readAt: null, ...(ids ? { id: { in: ids } } : {}), ...(receiptId ? { receiptId } : {}) },
     data: { readAt: new Date() },
@@ -171,7 +173,7 @@ emailLogRouter.post('/reminders-now', async (req, res) => {
 /** Sends one person their daily summary right now, so an administrator can see what it looks like. */
 emailLogRouter.post('/digest-now', async (req, res) => {
   const userId = Number(req.body?.userId);
-  if (!Number.isInteger(userId) || userId <= 0) throw badRequest('Choose a person.');
+  if (!Number.isInteger(userId) || userId <= 0 || userId > 2_147_483_647) throw badRequest('Choose a person.');
   const sent = await sendDigestNow(userId);
   if (sent) await audit(req, { action: 'email.digest_sent', entityType: 'email', summary: `sent the daily summary to user #${userId} now` });
   res.json({ sent });

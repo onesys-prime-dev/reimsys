@@ -17,6 +17,9 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
   const [opened, setOpened] = useState(!gated);
   const [zoom, setZoom] = useState(1);
   const [nonce, setNonce] = useState(0);
+  // Which picture address has finished loading, or failed: while neither is true for the one on screen, a loading sign shows.
+  const [shown, setShown] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const file = files[idx] ?? files[0];
 
   if (!files.length) {
@@ -55,13 +58,21 @@ export function EvidenceViewer({ receiptId, files, gated, onOpened }: { receiptI
   const url = `${fileUrl(receiptId, file!.id, 'view')}&n=${nonce}`;
   const isPdf = file!.mime === 'application/pdf';
   const isHeic = file!.mime === 'image/heic';
+  const loading = !isHeic && shown !== url && failed !== url;
   return (
     <>
       {tabs}
+      <div className="ev-wrap">
       <div className={`stage ${zoom > 1 ? 'grab' : ''}`} style={isPdf ? { padding: 0, display: 'block', height: 440 } : undefined} onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragEnd}>
-        {isPdf ? <iframe className="evframe" style={{ height: 440, borderRadius: 10 }} src={url} title={file!.fileName} />
+        {isPdf ? <iframe key={url} className="evframe" style={{ height: 440, borderRadius: 10 }} src={url} title={file!.fileName} onLoad={() => setShown(url)} />
           : isHeic ? <div className="muted" style={{ textAlign: 'center' }}>This photo format cannot be shown in the browser.<br />Download it to view.</div>
-          : <img className="evimg" style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: zoom > 1 ? 'none' : '100%', maxHeight: zoom > 1 ? 'none' : undefined }} src={url} alt={`Evidence: ${file!.fileName}`} draggable={false} />}
+          : failed === url ? null
+          : <img key={url} className="evimg" style={{ ...(zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: zoom > 1 ? 'none' : '100%', maxHeight: zoom > 1 ? 'none' : undefined }), ...(shown === url ? undefined : { visibility: 'hidden' }) }} src={url} alt={`Evidence: ${file!.fileName}`} draggable={false} onLoad={() => setShown(url)} onError={() => setFailed(url)} />}
+      </div>
+      {loading && failed !== url && <div className="guide-loading ev-loading" role="status"><span className="spin" aria-hidden="true" /><span>Loading the picture…</span></div>}
+      {failed === url && (
+        <div className="guide-loading ev-loading" role="alert"><span>The picture could not be loaded. Check your connection.</span><button type="button" className="btn sm" onClick={() => { setFailed(null); setNonce((n) => n + 1); }}>Try again</button></div>
+      )}
       </div>
       <div className="evtool">
         {!isPdf && !isHeic && (

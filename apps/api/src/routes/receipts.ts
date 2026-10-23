@@ -26,7 +26,7 @@ receiptsRouter.use(requireAuth);
 
 const idParam = (v: unknown) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) throw notFound('Receipt not found.');
+  if (!Number.isInteger(n) || n <= 0 || n > 2_147_483_647) throw notFound('Receipt not found.');
   return n;
 };
 
