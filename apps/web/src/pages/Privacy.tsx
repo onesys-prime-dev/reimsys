@@ -105,10 +105,10 @@ export function PrivacyAcceptPage() {
         <PrivacyNotice />
         <label className="check" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '16px 0 10px' }}>
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} style={{ marginTop: 3 }} />
-          <span>I have read this notice and I understand how my data is used and how I should use REIMSYS.</span>
+          <span>I have read this privacy notice and I agree to its terms: I understand how my data is used and how I must use REIMSYS.</span>
         </label>
         {error && <div className="callout bad" role="alert"><div><span>{error}</span></div></div>}
-        <button className="btn pri" disabled={!agree || busy} onClick={accept}>{busy ? 'Saving…' : 'I understand, continue'}</button>
+        <button className="btn pri" disabled={!agree || busy} onClick={accept}>{busy ? 'Saving…' : 'I agree, continue'}</button>
         <button className="btn ghost" style={{ marginTop: 8 }} onClick={() => signOut()}>Sign out</button>
       </div>
     </div>

@@ -33,6 +33,7 @@ import './lib/reports.js';
 import { startDigest } from './lib/digest.js';
 import { startReminders } from './lib/reminders.js';
 import { startWorker } from './lib/jobs.js';
+import { buildInfo } from './lib/build.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -73,6 +74,8 @@ app.use('/api', rateLimit({
 app.use('/api', csrfGuard, loadAuth);
 app.use('/api/auth', authRouter);
 /** Live updates for the signed-in browser. See lib/realtime.ts. */
+/** Which code this server runs and when it started. Signed-in people only: the public health check reveals nothing but "ok". */
+app.get('/api/build', requireAuth, (_req, res) => void res.json(buildInfo));
 app.get('/api/events', requireAuth, (req, res) => void hub.connect(req.auth!.user.id, req, res, req.auth!.session.id));
 app.use('/api/me', meRouter);
 app.use('/api/users', usersRouter);

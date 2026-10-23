@@ -1,11 +1,34 @@
+import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { api, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 
 /**
  * The Help page: what each person does in REIMSYS, in plain words. Everyone sees "The basics"; the guides below it are shown by what the person is
  * allowed to do (so a custom role gets the right ones). Change the wording here. Keep it short and about the screens as they are.
  */
+
+/** Which version of the page and of the server is running. A server older than the page (not restarted after an update) is the usual cause of "Not found." on a new button. */
+function VersionInfo() {
+  const q = useQuery({ queryKey: ['build'], queryFn: () => api<{ commit: string; startedAt: string }>('/build'), retry: false });
+  const web = __WEB_BUILD__;
+  const server = q.data;
+  const old = q.isError; // a server that has no /build at all is older than this page
+  const differ = !!server && server.commit !== 'unknown' && web.commit !== 'unknown' && server.commit !== web.commit;
+  return (
+    <div className="card" id="version" style={{ marginTop: 16 }}>
+      <div className="card-h"><h2>About this version</h2></div>
+      <div className="card-b help">
+        <ul style={{ marginTop: 0 }}>
+          <li>Page: <b>{web.commit}</b>, built {fmtDateTime(web.builtAt)}</li>
+          <li>Server: {old ? <b>not reported (older than this page)</b> : server ? <><b>{server.commit}</b>, running since {fmtDateTime(server.startedAt)}</> : 'checking…'}</li>
+        </ul>
+        {(old || differ) && <p className="muted" style={{ marginBottom: 0 }}>The server is not the same version as this page, so some new buttons may say "Not found." Ask your administrator to update and restart the server.</p>}
+      </div>
+    </div>
+  );
+}
 
 const STATUSES: [string, string][] = [
   ['Draft', 'Being written by the Med Ref. Nobody else sees it yet.'],
@@ -160,6 +183,7 @@ export function HelpPage() {
           </ul>
         </div>
       </section>
+      <VersionInfo />
     </>
   );
 }
