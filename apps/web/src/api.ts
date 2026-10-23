@@ -12,19 +12,27 @@ interface Options {
   form?: FormData;
 }
 
+/** What to say when the server's answer has no message of its own (a proxy page, a crash, a timeout). */
+const fallbackMessage = (status: number) => (status >= 502 && status <= 504 ? 'The server is not available right now. Please try again in a moment.' : status >= 500 ? 'The server had a problem. Please try again.' : 'Something went wrong. Please try again.');
+
 export async function api<T>(path: string, opts: Options = {}): Promise<T> {
   const headers: Record<string, string> = { 'x-requested-with': 'reimsys' };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   // Marks the request as coming from a person at the keyboard, not the page refreshing itself.
   if (isActive(45_000)) headers['x-user-activity'] = '1';
-  const res = await fetch('/api' + path, {
-    method: opts.method ?? 'GET',
-    credentials: 'same-origin',
-    headers,
-    body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
-  });
+  let res: Response;
+  try {
+    res = await fetch('/api' + path, {
+      method: opts.method ?? 'GET',
+      credentials: 'same-origin',
+      headers,
+      body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Check your connection and try again.');
+  }
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error?.code ?? 'ERROR', data?.error?.message ?? 'Something went wrong. Please try again.');
+  if (!res.ok) throw new ApiError(res.status, data?.error?.code ?? 'ERROR', data?.error?.message ?? fallbackMessage(res.status));
   return data as T;
 }
 
