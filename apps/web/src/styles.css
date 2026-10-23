@@ -61,6 +61,8 @@ small,.muted{color:var(--muted)}
   html,body{height:100%;overflow:hidden}
   .shell{height:100dvh;min-height:0}
   .main{height:100dvh;overflow:auto;overscroll-behavior:contain}
+  /* Pages outside the menu layout (sign in, the privacy notice, first-time password) scroll inside the window, since the window itself is locked. */
+  .login{height:100dvh;min-height:0;overflow:auto;overscroll-behavior:contain}
   .page.fit:has(>.scroll,>.tcard){height:max(580px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:20px}
   .page.fit:has(>.scroll,>.tcard)>*{flex:none}
   /* One card holds the search and filters, the column titles, the scrolling rows and a footer with the count and page buttons. */

@@ -57,7 +57,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone
   await p.click('button[type=submit]');
   await p.waitForSelector('h1:has-text("Privacy notice")');
   ok('after the password, the notice is shown instead of the app', (await p.locator('.shell').count()) === 0);
-  const go = p.locator('button:has-text("I understand, continue")');
+  const go = p.locator('button:has-text("I agree, continue")');
   ok('the button waits for the tick', await go.isDisabled());
   await p.screenshot({ path: path.join(OUT, `${label}-2-accept.png`), fullPage: true });
   await p.check('input[type=checkbox]');
