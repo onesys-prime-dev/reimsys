@@ -158,6 +158,8 @@ label.f .hint{font-weight:400;color:var(--muted)}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:none;padding:8px 16px;font-weight:600;color:var(--muted);min-height:38px}
 .seg button.on{background:var(--accent-soft);color:var(--accent)}
+.seg{max-width:100%;flex-shrink:0}
+.pref:has(.seg){flex-wrap:wrap}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
 .tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap}
 .tabs button.on{color:var(--accent);border-color:var(--accent)}
@@ -686,3 +688,17 @@ section.card[id]{scroll-margin-top:84px}
 .zp-in{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 .zp-in img,.zp-in canvas{width:100%;height:100%;max-width:none;max-height:none;object-fit:contain;background:transparent;box-shadow:none;border-radius:0}
 .scan-out .zp-in canvas{max-width:none;max-height:none}
+
+/* "How to read the invoice": a loading sign while the (large) picture comes in */
+.guide-wrap{position:relative}
+.guide-loading{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:16px;border-radius:10px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--muted);font-weight:600}
+.guide-loading .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:guidespin .8s linear infinite}
+@keyframes guidespin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.guide-loading .spin{animation-duration:2.4s}}
+
+/* Phones: a swipe must still scroll the window when it starts on a picture. Only the corner dots, and a picture that is zoomed in, keep the touch for themselves. */
+.scan-photo,.scan-photo svg{touch-action:pan-y}
+.scan-dot{touch-action:none}
+.zp{touch-action:pan-y}
+.zp.zoomed{touch-action:none}
+.stage.grab{touch-action:auto}

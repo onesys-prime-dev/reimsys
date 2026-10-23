@@ -19,6 +19,10 @@ export const RETURN_ISSUES = [
 export type ReturnIssueCode = (typeof RETURN_ISSUES)[number]['code'];
 export const RETURN_ISSUE_CODES = RETURN_ISSUES.map((i) => i.code) as [ReturnIssueCode, ...ReturnIssueCode[]];
 
+/** A receipt without a BIR invoice has no invoice number, TIN, VAT or withholding to get wrong, so those problems cannot be picked for it. */
+const BIR_ONLY: readonly string[] = ['invoice_no_wrong', 'vat_wrong'];
+export const issuesFor = (birInvoice: boolean | null | undefined) => RETURN_ISSUES.filter((i) => birInvoice !== false || !BIR_ONLY.includes(i.code));
+
 const byCode = new Map<string, (typeof RETURN_ISSUES)[number]>(RETURN_ISSUES.map((i) => [i.code, i]));
 export const issueLabel = (code: ReturnIssueCode) => byCode.get(code)!.label;
 export const fixStepFor = (code: ReturnIssueCode): FixStep | null => byCode.get(code)!.step;

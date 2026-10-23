@@ -167,6 +167,7 @@ export * from './receipts';
 export * from './payments';
 export * from './returnIssues';
 export * from './privacy';
+export * from './text';
 export * from './reminders';
 export * from './settings';
 

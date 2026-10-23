@@ -84,5 +84,26 @@ ok('another Med Ref cannot see the receipt at all', (await view(U.mark, b)).s ==
 const asChecker = (await view(U.liza, b)).d.receipt;
 ok('the Checker sees the problems (as text, no edit rights)', asChecker.returnIssues.includes('vendor_wrong') && asChecker.canEdit === false);
 
+// BL-06: a receipt without a BIR invoice has no invoice number, VAT or withholding, so those problems cannot be picked for it
+const n = await ready('Return no BIR');
+for (const bad of ['invoice_no_wrong', 'vat_wrong']) {
+  const x = await call(U.liza, 'POST', `/receipts/${n.id}/return`, { version: n.version, issues: [bad] });
+  ok(`"${bad}" is refused on a receipt without a BIR invoice`, x.s === 400 && code(x) === 'ISSUE_NOT_APPLICABLE', `${x.s} ${code(x)}`);
+}
+const fine = await call(U.liza, 'POST', `/receipts/${n.id}/return`, { version: n.version, issues: ['vendor_wrong'] });
+ok('a problem that does apply is still accepted', fine.s === 200, String(fine.s));
+
+// BL-07: the same for the Approver's "Ask for more proof"
+const q = await ready('Request no BIR');
+const qc = (await call(U.liza, 'POST', `/receipts/${q.id}/check`, { version: q.version })).d.receipt;
+await look(U.paolo, qc);
+for (const bad of ['invoice_no_wrong', 'vat_wrong']) {
+  const x = await call(U.paolo, 'POST', `/receipts/${q.id}/request`, { version: qc.version, issues: [bad] });
+  ok(`the Approver cannot ask for more proof about "${bad}" on a receipt without a BIR invoice`, x.s === 400 && code(x) === 'ISSUE_NOT_APPLICABLE', `${x.s} ${code(x)}`);
+}
+// BL-08: the Approver cannot disapprove with a reason that only looks empty
+const blank = await call(U.paolo, 'POST', `/receipts/${q.id}/disapprove`, { version: qc.version, note: 'ㅤ⠀​  ' });
+ok('disapproving with only blank characters is refused', blank.s === 400 && code(blank) === 'NOTE_REQUIRED', `${blank.s} ${code(blank)}`);
+
 // END OF CHECKS
 done();

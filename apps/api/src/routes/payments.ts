@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import ExcelJS from 'exceljs';
-import { EVIDENCE_MAX_BYTES, paymentIssues, paymentMethodsSchema, paymentRequestSchema, totalOf } from '@reimsys/shared';
+import { EVIDENCE_MAX_BYTES, cleanDeep, paymentIssues, paymentMethodsSchema, paymentRequestSchema, totalOf } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { getSettings } from '../lib/appSettings.js';
@@ -61,7 +61,7 @@ paymentsRouter.get('/queue', requirePerm('payment.mark'), async (req, res) => {
 paymentsRouter.post('/', requirePerm('payment.mark'), payLimiter, upload.single('proof'), async (req, res) => {
   const auth = req.auth!;
   let lines: unknown;
-  try { lines = JSON.parse(String(req.body?.lines ?? '')); } catch { throw badRequest('The list of receipts could not be read. Reload and try again.', 'BAD_LINES'); }
+  try { lines = cleanDeep(JSON.parse(String(req.body?.lines ?? ''))); } catch { throw badRequest('The list of receipts could not be read. Reload and try again.', 'BAD_LINES'); }
   const body = paymentRequestSchema.parse({ method: req.body?.method, paidOn: req.body?.paidOn, lines });
 
   const method = (await getPaymentMethods()).find((m) => m.toLowerCase() === body.method.toLowerCase());

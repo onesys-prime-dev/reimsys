@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { paymentIssues, totalOf } from '@reimsys/shared';
+import { cleanText, paymentIssues, totalOf } from '@reimsys/shared';
 import { api, errMsg, localToday, money } from '../api';
 import { Field, Modal, useToast } from '../ui';
 
@@ -18,7 +18,7 @@ export function PayDialog({ payee, lines, onClose, onDone }: { payee: string; li
   const [reasons, setReasons] = useState<Record<number, string>>({});
 
   const chosen = method || methods.data?.methods[0] || '';
-  const parsed = lines.map((l) => ({ receiptId: l.id, version: l.version, amount: Math.round(Number(amounts[l.id]) * 100) / 100, shortReason: (reasons[l.id] ?? '').trim() || null }));
+  const parsed = lines.map((l) => ({ receiptId: l.id, version: l.version, amount: Math.round(Number(amounts[l.id]) * 100) / 100, shortReason: cleanText(reasons[l.id] ?? '') || null }));
   const badAmount = (id: number) => { const n = parsed.find((p) => p.receiptId === id)!.amount; return !Number.isFinite(n) || n <= 0; };
   const issues = paymentIssues({ paidOn, lines: parsed.filter((p) => !badAmount(p.receiptId)) }, new Map(lines.map((l) => [l.id, l.amount])));
   const issueFor = (id: number) => issues.find((i) => i.receiptId === id && i.code !== 'SHORT_REASON');

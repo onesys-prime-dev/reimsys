@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { isBlank } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import type { CommentItem } from '../types';
 import { Avatar, useToast } from '../ui';
@@ -16,7 +17,7 @@ export function Comments({ receiptId }: { receiptId: number }) {
     onSuccess: () => { setText(''); qc.invalidateQueries({ queryKey: key }); qc.invalidateQueries({ queryKey: ['history', receiptId] }); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
-  const submit = (e: FormEvent) => { e.preventDefault(); if (text.trim()) post.mutate(); };
+  const submit = (e: FormEvent) => { e.preventDefault(); if (!isBlank(text)) post.mutate(); };
   const items = q.data?.comments ?? [];
 
   return (
@@ -32,7 +33,7 @@ export function Comments({ receiptId }: { receiptId: number }) {
         {q.isSuccess && !items.length && <p className="muted" style={{ margin: '0 0 12px' }}>No comments yet.</p>}
         <form onSubmit={submit} className="cmt-form">
           <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a comment" maxLength={1000} aria-label="Write a comment" rows={2} />
-          <button className="btn pri" type="submit" disabled={!text.trim() || post.isPending}>Post</button>
+          <button className="btn pri" type="submit" disabled={isBlank(text) || post.isPending}>Post</button>
         </form>
       </div>
     </section>
