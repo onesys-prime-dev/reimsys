@@ -706,3 +706,6 @@ section.card[id]{scroll-margin-top:84px}
 /* Evidence viewer: the loading sign sits over the picture area while a picture comes in */
 .ev-wrap{position:relative}
 .ev-wrap .ev-loading{inset:12px 14px}
+/* Make the evidence loading sign easy to notice: a bigger spinner in the accent colour and text in the normal ink colour */
+.ev-wrap .ev-loading{color:var(--ink);font-size:1rem;gap:14px;background:color-mix(in srgb,var(--surface) 96%,transparent)}
+.ev-wrap .ev-loading .spin{width:44px;height:44px;border-width:5px;border-color:var(--accent-soft);border-top-color:var(--accent)}
