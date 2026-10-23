@@ -36,5 +36,13 @@ ok('a picture that cannot be loaded says so', await p.locator('.ev-loading[role=
 await p.unroute(`**/evidence/${r.evidence[0].id}/file**`);
 await p.getByRole('button', { name: /Try again/ }).click();
 ok('Try again loads it', await p.locator('.stage .evimg').first().waitFor({ timeout: 5000 }).then(() => true, () => false) && (await p.locator('.ev-loading').count()) === 0);
+// the preview window opened from the eye button in the receipt form
+await p.goto(`/receipts/${r.id}/edit?step=evidence`);
+let hold2; const gate2 = new Promise((res) => { hold2 = res; });
+await p.route(`**/evidence/${r.evidence[0].id}/file**`, async (rt) => { await gate2; await rt.continue(); });
+await p.locator('button[title="Preview"]').first().click();
+ok('the preview window shows a loading sign while the picture comes in', await p.locator('.modal .ev-loading').waitFor({ timeout: 4000 }).then(() => true, () => false));
+hold2();
+ok('and it goes away when the picture is in', await p.locator('.modal .ev-loading').waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false));
 await b.close();
 process.exit(failed ? 1 : 0);
