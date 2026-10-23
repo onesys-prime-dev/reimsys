@@ -49,6 +49,9 @@ export function Avatar({ name, userId, hasPhoto, size = 34, version, photoV }: {
 /* ---------- toast ---------- */
 const ToastCtx = createContext<(msg: string, tone?: 'ok' | 'bad') => void>(() => undefined);
 export const useToast = () => useContext(ToastCtx);
+/** Lets code outside React (the query client's safety net) show a toast too. Set by ToastProvider. */
+let pushOutside: ((msg: string, tone?: 'ok' | 'bad') => void) | null = null;
+export const toastOutside = (msg: string) => pushOutside?.(msg, 'bad');
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<{ id: number; msg: string; tone: 'ok' | 'bad' }[]>([]);
@@ -58,6 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setItems((s) => [...s, { id, msg, tone }]);
     setTimeout(() => setItems((s) => s.filter((x) => x.id !== id)), 3600);
   }, []);
+  useEffect(() => { pushOutside = push; return () => { pushOutside = null; }; }, [push]);
   return (
     <ToastCtx.Provider value={push}>
       {children}
