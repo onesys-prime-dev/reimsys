@@ -20,7 +20,7 @@ paymentsRouter.use(requireAuth);
 
 const idParam = (v: unknown) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) throw notFound('Payment not found.');
+  if (!Number.isInteger(n) || n <= 0 || n > 2_147_483_647) throw notFound('Payment not found.');
   return n;
 };
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: EVIDENCE_MAX_BYTES, files: 1 } });

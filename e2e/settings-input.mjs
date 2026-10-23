@@ -27,6 +27,14 @@ console.log('Number boxes take digits only');
   ok('the box that said "must be a number" for the letter e no longer shows it', (await p.locator('text=must be a number').count()) === 0);
   const pasted = (text, sel) => p.locator(sel).first().evaluate((el, t) => { const dt = new DataTransfer(); dt.setData('text', t); const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); el.dispatchEvent(ev); return ev.defaultPrevented; }, text);
   ok('pasting "1e5" into a whole-number box is refused', await pasted('1e5', 'input[aria-label="Point out finished records older than"]') === true);
+  // A phone keyboard sends no key presses, only the text it inserts, one character at a time (BL-02 on a phone).
+  for (const [label, sel, want] of [['a whole-number box', 'input[aria-label="Point out finished records older than"]', '125'], ['a decimal box', 'input[aria-label="VAT rate"]', '12.5']]) {
+    const box = p.locator(sel).first();
+    await box.click(); await p.keyboard.press('Control+A'); await p.keyboard.press('Delete');
+    for (const ch of '1e+-2.5') await p.keyboard.insertText(ch);
+    const got = await box.inputValue();
+    ok(`phone-style typing into ${label} ignores e + - (and . in whole numbers)`, got === want, 'got ' + JSON.stringify(got));
+  }
   ok('pasting "36" into it is allowed', await pasted('36', 'input[aria-label="Point out finished records older than"]') === false);
   ok('pasting "-4" is refused', await pasted('-4', 'input[aria-label="VAT rate"]') === true);
   await p.click('.tabs button:has-text("Email")'); await p.waitForSelector('input[type=number]');

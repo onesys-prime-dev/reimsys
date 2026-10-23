@@ -74,6 +74,7 @@ console.log('\nThe notice settings (Access → Settings → Privacy notice)');
   check('they are blocked until they do', (await accepted.get('/receipts')).status === 403);
   const acc = await accepted.post('/me/privacy');
   check('accepting clears it', acc.status === 200 && acc.data.user.privacyRequired === false);
+  await admin.post('/me/privacy'); // raising the version includes the administrator, who is blocked from everything else until they accept
   const audit2 = (await admin.get('/audit?action=privacy.&pageSize=5')).data?.items ?? [];
   check('the new version is written in the history log', audit2.some((r) => r.action === 'privacy.accepted' && (r.summary ?? '').includes('version ' + (cur.privacyVersion + 1))), JSON.stringify(audit2.map((r) => r.summary)));
   check('too-long text is refused', (await admin.req('PUT', '/app-settings', { ...cur, privacyContact: 'x'.repeat(400) })).status === 400);

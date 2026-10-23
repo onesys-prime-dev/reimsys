@@ -21,7 +21,7 @@ const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 've
 
 const idParam = (v: unknown) => {
   const n = Number(v);
-  if (!Number.isInteger(n) || n <= 0) throw notFound();
+  if (!Number.isInteger(n) || n <= 0 || n > 2_147_483_647) throw notFound();
   return n;
 };
 

@@ -67,7 +67,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api', rateLimit({
-  windowMs: 60_000, limit: 1200, standardHeaders: true, legacyHeaders: false,
+  windowMs: 60_000, limit: 1200, standardHeaders: true, legacyHeaders: false, skip: () => config.rateLimitOff,
   message: { error: { code: 'RATE_LIMIT', message: 'Too many requests. Slow down for a moment.' } },
 }));
 app.use('/api', csrfGuard, loadAuth);
