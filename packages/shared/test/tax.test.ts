@@ -44,7 +44,7 @@ describe('VAT checks', () => {
     expect(lv({ withheld: false })).toEqual([]);
   });
   it('Yes is strict: every mismatch is red and blocks the step', () => {
-    expect(lv({ withheld: true, vatAmount: 100 })).toEqual(['vatAmount:error', 'vatAmount:error']);
+    expect(lv({ withheld: true, vatAmount: 100 })).toEqual(['vatAmount:error']);
     expect(lv({ withheld: true, whtRate: 2, whtAmount: 99 })).toEqual(['whtAmount:error']);
   });
   it('No: an ordinary mismatch is yellow and lets the person carry on', () => {
@@ -53,13 +53,13 @@ describe('VAT checks', () => {
     expect(lv({ withheld: false, vatType: 'non_vatable', vatableAmount: 1000, vatAmount: 120 })).toEqual(['vatAmount:warn']);
   });
   it('a total that does not add up blocks submitting whatever the answer', () => {
-    expect(lv({ withheld: false, vatableAmount: 900, vatAmount: 108 })).toContain('vatAmount:blockSubmit');
-    expect(lv({ withheld: null, vatableAmount: 900, vatAmount: 108 })).toContain('vatAmount:blockSubmit');
-    expect(lv({ withheld: true, vatableAmount: 900, vatAmount: 108 })).toContain('vatAmount:error');
+    expect(lv({ withheld: false, vatableAmount: 900, vatAmount: 108 })).toContain('vatExemptAmount:blockSubmit');
+    expect(lv({ withheld: null, vatableAmount: 900, vatAmount: 108 })).toContain('vatExemptAmount:blockSubmit');
+    expect(lv({ withheld: true, vatableAmount: 900, vatAmount: 108 })).toContain('vatExemptAmount:error');
   });
   it('the total check follows the tolerance and ignores receipts without a BIR invoice', () => {
     expect(lv({ withheld: false, vatAmount: 120.01 })).toEqual([]);
-    expect(lv({ withheld: false, vatAmount: 121 })).toEqual(['vatAmount:blockSubmit', 'vatAmount:warn']);
+    expect(lv({ withheld: false, vatAmount: 121 })).toEqual(['vatAmount:blockSubmit']);
     expect(lv({ withheld: false, vatAmount: 121 }, { ...rules, tolerance: 2 })).toEqual([]);
     expect(vatChecks({ ...base, birInvoice: false, vatAmount: 1 })).toEqual([]);
   });
@@ -112,8 +112,8 @@ describe('VAT-exempt sales and discount', () => {
   it('the total counts the VAT-exempt amount', () => {
     expect(lv({ withheld: false })).toEqual([]);
     expect(lv({ withheld: true, whtRate: 2, whtAmount: 30 })).toEqual([]); // 2% of the net 1,500 (vatable + VAT-exempt)
-    expect(lv({ withheld: false, vatExemptAmount: 0 })).toEqual(['vatAmount:blockSubmit']);
-    expect(lv({ withheld: true, vatExemptAmount: 0 })).toEqual(['vatAmount:error']);
+    expect(lv({ withheld: false, vatExemptAmount: 0 })).toEqual(['vatExemptAmount:blockSubmit']);
+    expect(lv({ withheld: true, vatExemptAmount: 0 })).toEqual(['vatExemptAmount:error']);
   });
   it('withholding is checked on the net: vatable plus VAT-exempt', () => {
     expect(lv({ withheld: true, whtRate: 2, whtAmount: 20 })).toEqual(['whtAmount:error']);
@@ -129,5 +129,30 @@ describe('VAT-exempt sales and discount', () => {
     expect(receiptProblems(f, rules, false)).toEqual({});
     expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no' }).reimbursementCode).toMatch(/reimbursement code/);
     expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no', reimbursementCode: 'RC-1' })).toEqual({});
+  });
+});
+
+describe('the total note goes under the amount that is wrong', () => {
+  const where = (f: object) => vatChecks({ birInvoice: true, vatType: 'vatable', withheld: false, ...f } as never, rules).filter((c) => c.total).map((c) => c.field);
+  const note = (f: object) => vatChecks({ birInvoice: true, vatType: 'vatable', withheld: false, ...f } as never, rules).find((c) => c.total)?.message ?? '';
+  it('a VAT that is far from the right share points at the VAT amount', () => {
+    // the case from the screen: gross 234,324, vatable 213,123, VAT 123,123
+    expect(where({ amount: 234324, vatableAmount: 213123, vatAmount: 123123 })).toEqual(['vatAmount']);
+    expect(note({ amount: 234324, vatableAmount: 213123, vatAmount: 123123 })).toMatch(/VAT amount should be about 25106./);
+  });
+  it('a vatable amount that is far from what the gross implies points at the vatable amount', () => {
+    // gross 1,120 = 1,000 + 120, but the vatable amount was typed as 100 with the right VAT
+    expect(where({ amount: 1120, vatableAmount: 100, vatAmount: 120 })).toEqual(['vatableAmount']);
+  });
+  it('vatable and VAT that agree, but fall short of the gross, point at the VAT-exempt amount', () => {
+    expect(where({ amount: 1620, vatableAmount: 1000, vatAmount: 120, vatExemptAmount: 0 })).toEqual(['vatExemptAmount']);
+    expect(note({ amount: 1620, vatableAmount: 1000, vatAmount: 120 })).toMatch(/500.00 of the gross is not accounted for/);
+  });
+  it('amounts that add up to more than the gross point at the vatable amount', () => {
+    expect(where({ amount: 1000, vatableAmount: 1000, vatAmount: 120 })).toEqual(['vatableAmount']);
+  });
+  it('non-vatable: a VAT amount points at the VAT amount, otherwise the vatable amount', () => {
+    expect(where({ vatType: 'non_vatable', amount: 500, vatableAmount: 500, vatAmount: 60 })).toEqual(['vatAmount']);
+    expect(where({ vatType: 'non_vatable', amount: 500, vatableAmount: 400, vatAmount: 0 })).toEqual(['vatableAmount']);
   });
 });

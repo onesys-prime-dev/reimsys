@@ -141,14 +141,19 @@ export function vatChecks(f: VatCheckInput, rules: AppSettings = DEFAULT_SETTING
   const totalLevel: CheckLevel = strict ? 'error' : 'blockSubmit';
 
   // The invoice gross (Total Sales, VAT inclusive) is the vatable sales, the VAT and the VAT-exempt sales. A discount is a deduction after it, so it is not part of this.
+  // The note goes under the amount most likely to be wrong, so the person sees it where they have to fix it.
+  let totalOn = '';
   if (vatable !== null && vat !== null && !close(vatable + vat + exempt, f.amount)) {
     const parts = exempt ? `vatable amount ${vatable.toFixed(2)} plus VAT ${vat.toFixed(2)} plus VAT-exempt ${exempt.toFixed(2)}` : `vatable amount ${vatable.toFixed(2)} plus VAT ${vat.toFixed(2)}`;
+    const c = totalCulprit(vatable, vat, exempt, f.amount, rules.vatRate / 100, f.vatType === 'non_vatable', close);
+    totalOn = c.field;
     out.push({
-      field: 'vatAmount', level: totalLevel, total: true,
-      message: `The total does not match: ${parts} is ${(vatable + vat + exempt).toFixed(2)}, but the invoice gross amount is ${f.amount.toFixed(2)}.${strict ? '' : ' Correct it before submitting.'}`,
+      field: c.field, level: totalLevel, total: true,
+      message: `The total does not match: ${parts} is ${(vatable + vat + exempt).toFixed(2)}, but the invoice gross amount is ${f.amount.toFixed(2)}. ${c.hint}${strict ? '' : ' Correct it before submitting.'}`,
     });
   }
-  if (f.vatType === 'vatable' && vatable !== null && vat !== null && !close(vatable * (rules.vatRate / 100), vat)) {
+  // When the total note already says what the VAT amount should be, a second note about the same box would only repeat it.
+  if (f.vatType === 'vatable' && vatable !== null && vat !== null && totalOn !== 'vatAmount' && !close(vatable * (rules.vatRate / 100), vat)) {
     out.push({ field: 'vatAmount', level: ordinary, message: `VAT is usually ${rules.vatRate}% of the vatable amount (${(vatable * rules.vatRate / 100).toFixed(2)}), but ${vat.toFixed(2)} was entered.` });
   }
   if (f.vatType === 'non_vatable' && vat !== null && vat !== 0) {
@@ -161,4 +166,30 @@ export function vatChecks(f: VatCheckInput, rules: AppSettings = DEFAULT_SETTING
     }
   }
   return out;
+}
+
+/**
+ * Which amount is the likely mistake when vatable + VAT + VAT-exempt does not add up to the gross. Looks at what each amount should be if the other two are right.
+ * With a VAT rate, the vatable amount should be (gross - exempt) / (1 + rate) and the VAT the rest.
+ */
+function totalCulprit(vatable: number, vat: number, exempt: number, gross: number, rate: number, nonVatable: boolean, close: (a: number, b: number) => boolean): { field: string; hint: string } {
+  const n2 = (n: number) => n.toFixed(2);
+  const rest = round2(gross - exempt);
+  if (nonVatable) {
+    if (vat !== 0) return { field: 'vatAmount', hint: 'The invoice is non-vatable, so the VAT amount should be 0.' };
+    return { field: 'vatableAmount', hint: `With no VAT, the vatable amount should be about ${n2(rest)}.` };
+  }
+  const vNet = rest / (1 + rate);
+  if (!close(vatable * rate, vat)) {
+    // The VAT is not the right share of the vatable amount: one of the two is wrong. The one further from what the gross implies is the mistake.
+    const errV = vNet ? Math.abs(vatable - vNet) / vNet : 1;
+    const expectedVat = rest - vNet;
+    const errT = expectedVat ? Math.abs(vat - expectedVat) / expectedVat : 1;
+    if (errT >= errV) return { field: 'vatAmount', hint: `With a vatable amount of ${n2(vNet)}, the VAT amount should be about ${n2(expectedVat)}.` };
+    return { field: 'vatableAmount', hint: `With a VAT of ${n2(vat)}, the vatable amount should be about ${n2(rate ? vat / rate : 0)}.` };
+  }
+  // The vatable amount and the VAT agree with each other, so what is left over is VAT-exempt sales, or the gross amount is not right.
+  const left = round2(gross - vatable - vat);
+  if (left > 0) return { field: 'vatExemptAmount', hint: `${n2(left)} of the gross is not accounted for. If the invoice has VAT-exempt sales, enter ${n2(left)} here; if not, check the gross amount on the invoice details.` };
+  return { field: 'vatableAmount', hint: 'The amounts add up to more than the gross. Check the vatable amount, or the gross amount on the invoice details.' };
 }
