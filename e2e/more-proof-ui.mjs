@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-const WEB = process.env.WEB ?? 'http://localhost:4000';
+const WEB = process.env.WEB ?? 'http://localhost:5173';
 const out = path.resolve(process.argv[2] ?? 'storage/more-proof');
 fs.mkdirSync(out, { recursive: true });
 let bad = 0;

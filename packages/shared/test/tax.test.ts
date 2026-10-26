@@ -104,3 +104,30 @@ describe('vendor TIN', () => {
     expect(receiptProblems({ ...f, vendorTin: '' }).vendorTin).toMatch(/Enter the vendor TIN/);
   });
 });
+
+describe('VAT-exempt sales and discount', () => {
+  // Total Sales (VAT inclusive) = vatable sales + VAT + VAT-exempt sales. A discount is taken off after it, so it is not part of the gross.
+  const inv = { birInvoice: true, amount: 1620, vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, vatExemptAmount: 500 };
+  const lv = (f: object, r = rules) => vatChecks({ ...inv, ...f } as never, r).map((c) => `${c.field}:${c.level}`);
+  it('the total counts the VAT-exempt amount', () => {
+    expect(lv({ withheld: false })).toEqual([]);
+    expect(lv({ withheld: true, whtRate: 2, whtAmount: 30 })).toEqual([]); // 2% of the net 1,500 (vatable + VAT-exempt)
+    expect(lv({ withheld: false, vatExemptAmount: 0 })).toEqual(['vatAmount:blockSubmit']);
+    expect(lv({ withheld: true, vatExemptAmount: 0 })).toEqual(['vatAmount:error']);
+  });
+  it('withholding is checked on the net: vatable plus VAT-exempt', () => {
+    expect(lv({ withheld: true, whtRate: 2, whtAmount: 20 })).toEqual(['whtAmount:error']);
+  });
+  it('the impact uses the same net, so the difference is still the rate times the VAT', () => {
+    const t = taxImpact({ ...inv, withheld: false }, rules);
+    expect(t).toMatchObject({ net: 1500, ifYes: 30, ifNo: 32.4, difference: 2.4, potentialLoss: 2.4 });
+  });
+  it('a receipt without the new answers is fine for the API but not for the form', () => {
+    const f = { birInvoice: 'yes', invoiceUnderCompany: 'no', transactionType: 'product', invoiceNo: 'A', vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', withheld: 'no', reasonForSpending: 'Water', classification: 'fuel', receiptDate: '2026-10-12', payee: 'Corner', amount: '1120' };
+    const strict = receiptProblems(f);
+    expect(Object.keys(strict).sort()).toEqual(['chargeLocationId', 'discountAmount', 'newReimbursementCode', 'vatExemptAmount']);
+    expect(receiptProblems(f, rules, false)).toEqual({});
+    expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no' }).reimbursementCode).toMatch(/reimbursement code/);
+    expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no', reimbursementCode: 'RC-1' })).toEqual({});
+  });
+});

@@ -2,6 +2,7 @@
 // Usage: node e2e/tax-form-ui.mjs
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { completeLastPage } from './form-helpers.mjs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -33,7 +34,7 @@ async function fillInvoice(p, name, gross) {
   await radio(p, 'Product');
   await next(p);
 }
-const vat = async (p, vatable, vatAmt) => { await radio(p, 'Vatable'); await p.getByLabel(/^Vatable amount/).fill(String(vatable)); await p.getByLabel(/^VAT amount/).fill(String(vatAmt)); };
+const vat = async (p, vatable, vatAmt) => { await radio(p, 'Vatable'); await p.getByLabel(/^Vatable amount/).fill(String(vatable)); await p.getByLabel(/^VAT amount/).fill(String(vatAmt)); await p.getByLabel(/^VAT-exempt amount/).fill('0'); await p.getByLabel(/^Discount/).fill('0'); };
 
 for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone', { width: 390, height: 800 }]]) {
   console.log('\n' + label);
@@ -107,6 +108,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   ok('on the last step Submit is blocked and says why', (await p.locator('button:has-text("Submit for checking")').isDisabled()) && /cannot be submitted yet/.test(await p.locator('.callout.bad').innerText()));
   ok('Save draft is still possible', await p.locator('button:has-text("Save draft")').isEnabled());
   await p.setInputFiles('input[type=file]', png);
+  await completeLastPage(p);
   await p.click('.callout.bad button:has-text("Go to the VAT details")');
   ok('the link goes back to the VAT details', (await title(p)) === 'VAT details');
   await p.getByLabel(/^VAT amount/).fill('100');
@@ -135,7 +137,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await p.getByLabel(/^VAT amount/).fill('120');
   await next(p);
   ok('matching amounts let the person continue', (await title(p)) === 'Tax withheld');
-  await p.getByLabel('Withholding tax rate (%)').fill('2');
+  await p.getByLabel(/^Withholding tax rate/).fill('2');
   await p.getByLabel('Withholding tax amount (PHP)').fill('25');
   ok('the withholding amount that is not rate x net is red, under its field', (await p.locator('.note.bad').count()) === 1);
   await next(p);

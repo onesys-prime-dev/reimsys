@@ -125,6 +125,18 @@ model Category {
   @@map("category")
 }
 
+/// Where a receipt is charged ("Choose where to charge"). An administrator edits the list.
+model ChargeLocation {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique @db.VarChar(120)
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  receipts  Receipt[]
+  createdAt DateTime  @default(now())
+
+  @@map("charge_location")
+}
+
 model Receipt {
   id           Int                      @id @default(autoincrement())
   refNo        String                   @unique @db.VarChar(30)
@@ -153,9 +165,17 @@ model Receipt {
   vatType         String?                  @db.VarChar(12)
   vatableAmount   Decimal?                 @db.Decimal(12, 2)
   vatAmount       Decimal?                 @db.Decimal(12, 2)
+  vatExemptAmount Decimal?                 @db.Decimal(12, 2)
+  discountAmount  Decimal?                 @db.Decimal(12, 2)
   withheld        Boolean?
   whtRate         Decimal?                 @db.Decimal(5, 2)
   whtAmount       Decimal?                 @db.Decimal(12, 2)
+  // Last page of the form: where to charge, whether this is a new reimbursement code (otherwise the old code is written), and the person's own review.
+  chargeLocationId     Int?
+  chargeLocation       ChargeLocation?          @relation(fields: [chargeLocationId], references: [id])
+  newReimbursementCode Boolean?
+  reimbursementCode    String?                  @db.VarChar(40)
+  detailsReviewed      Boolean?
   ckCompany       Boolean?
   ckTin           Boolean?
   ckAddress       Boolean?

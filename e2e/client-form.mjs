@@ -39,7 +39,7 @@ const stamp = Date.now();
 // A complete answer for "BIR invoice: yes", vatable, no withholding.
 const full = (over = {}) => ({
   birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
-  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, ...over,
+  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, newReimbursementCode: true, detailsReviewed: true, ...over,
 });
 const codes = (r) => (r.data?.error?.issues ?? []).map((i) => i.path[0]);
 
@@ -63,14 +63,14 @@ check('withholding saved with rate and amount', w.status === 201 && w.data.recei
 const none = { birInvoice: false, receiptDate: '2026-10-12', payee: 'Form Test Corner ' + stamp, amount: 350 };
 const noneBad = await ana.post('/receipts', none);
 check('no BIR invoice still needs the address and the reason for spending', noneBad.status === 400 && ['vendorAddress', 'reasonForSpending', 'classification'].every((k) => codes(noneBad).includes(k)), JSON.stringify(codes(noneBad)));
-const noneOk = { ...none, vendorAddress: 'Mandaue City, Cebu', reasonForSpending: 'Water refills for the clinic', classification: 'meal' };
+const noneOk = { ...none, vendorAddress: 'Mandaue City, Cebu', reasonForSpending: 'Water refills for the clinic', classification: 'meal_personal' };
 const nb = await ana.post('/receipts', { ...noneOk, vatType: 'vatable', vatAmount: 9, seenCompany: true, transactionType: 'service' });
-check('the short no-BIR path is accepted', nb.status === 201 && nb.data.receipt.form.reasonForSpending === 'Water refills for the clinic' && nb.data.receipt.form.classification === 'meal');
+check('the short no-BIR path is accepted', nb.status === 201 && nb.data.receipt.form.reasonForSpending === 'Water refills for the clinic' && nb.data.receipt.form.classification === 'meal_personal');
 check('a classification outside the list is refused', codes(await ana.post('/receipts', { ...noneOk, classification: 'holiday' })).includes('classification'));
 check('"Other" needs the person to write what it is', codes(await ana.post('/receipts', { ...noneOk, classification: 'other' })).includes('classificationOther'));
 const oth = await ana.post('/receipts', { ...noneOk, classification: 'other', classificationOther: 'Team building' });
 check('"Other" with its words is saved', oth.status === 201 && oth.data.receipt.form.classification === 'other' && oth.data.receipt.form.classificationOther === 'Team building');
-const oth3 = await ana.post('/receipts', { ...noneOk, classification: 'meal', classificationOther: 'left over' });
+const oth3 = await ana.post('/receipts', { ...noneOk, classification: 'meal_personal', classificationOther: 'left over' });
 check('the "Other" words are dropped when another classification is chosen', oth3.status === 201 && oth3.data.receipt.form.classificationOther === null);
 const notCo = await ana.post('/receipts', full({ invoiceNo: 'NC-' + stamp, invoiceUnderCompany: false, seenCompany: false, seenTin: false, seenAddress: false }));
 check('an invoice not under the company skips the three ticks', notCo.status === 201 && notCo.data.receipt.form.invoiceUnderCompany === false && notCo.data.receipt.form.seenCompany === null, JSON.stringify(notCo.data?.error));

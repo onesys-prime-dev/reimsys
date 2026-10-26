@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 // The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
-const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'fuel' };
+const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'fuel', chargeLocationId: 1, newReimbursementCode: true, detailsReviewed: true };
 
 const WEB = process.env.WEB ?? 'http://localhost:4000';
 const out = path.resolve(process.argv[2] ?? 'storage/realtime');

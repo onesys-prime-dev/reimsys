@@ -4,7 +4,7 @@ import { Icon } from '../ui';
 import { ZoomPan } from './ZoomPan';
 
 /** Each question or field that has a sample picture of its own. */
-export type GuideField = 'invoiceDate' | 'invoiceNo' | 'vendorName' | 'vendorAddress' | 'vendorTin' | 'grossAmount' | 'vatableAmount' | 'vatAmount' | 'taxWithheld' | 'whtRate' | 'whtAmount';
+export type GuideField = 'invoiceDate' | 'invoiceNo' | 'vendorName' | 'vendorAddress' | 'vendorTin' | 'grossAmount' | 'vatableAmount' | 'vatAmount' | 'vatExempt' | 'discount' | 'taxWithheld' | 'whtRate' | 'whtAmount';
 
 /** The sample invoice with the place to look marked, and the name of the field for the screen reader. */
 const GUIDES: Record<GuideField, { image: string; label: string }> = {
@@ -16,6 +16,8 @@ const GUIDES: Record<GuideField, { image: string; label: string }> = {
   grossAmount: { image: 'total', label: 'gross amount' },
   vatableAmount: { image: 'vatable', label: 'vatable amount' },
   vatAmount: { image: 'vat', label: 'VAT amount' },
+  vatExempt: { image: 'exempt', label: 'VAT-exempt amount' },
+  discount: { image: 'discount', label: 'discount' },
   taxWithheld: { image: 'withholding', label: 'tax withheld' },
   whtRate: { image: 'withholding', label: 'withholding tax rate' },
   whtAmount: { image: 'withholding', label: 'withholding tax amount' },

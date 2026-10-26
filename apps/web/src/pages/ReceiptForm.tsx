@@ -25,13 +25,15 @@ interface FormState {
   seenCompany: boolean; seenTin: boolean; seenAddress: boolean;
   spendReason: string; classification: '' | (typeof CLASSIFICATIONS)[number]; classificationOther: string;
   date: string; invoiceNo: string; payee: string; vendorAddress: string; vendorTin: string; amount: string; type: '' | 'product' | 'service';
-  vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string;
+  vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string; vatExempt: string; discount: string;
   withheld: '' | 'yes' | 'no'; whtRate: string; whtAmount: string;
   description: string;
+  chargeLocationId: string; newCode: '' | 'yes' | 'no'; reimbursementCode: string; reviewed: '' | 'yes' | 'no';
 }
 const EMPTY: FormState = {
   bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', classificationOther: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
-  type: '', vatType: '', vatable: '', vat: '', withheld: '', whtRate: '', whtAmount: '', description: '',
+  type: '', vatType: '', vatable: '', vat: '', vatExempt: '', discount: '', withheld: '', whtRate: '', whtAmount: '', description: '',
+  chargeLocationId: '', newCode: '', reimbursementCode: '', reviewed: '',
 };
 
 type StepId = 'bir' | 'underco' | 'company' | 'invoice' | 'vat' | 'wht' | 'spend' | 'evidence';
@@ -41,13 +43,13 @@ const STEP_TITLE: Record<StepId, string> = {
 const STEP_FIELDS: Record<StepId, string[]> = {
   bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
-  vat: ['vatType', 'vatableAmount', 'vatAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
+  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description', 'chargeLocationId', 'newReimbursementCode', 'reimbursementCode', 'detailsReviewed'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
   birInvoice: f.bir, invoiceUnderCompany: f.bir === 'yes' ? f.underCo : '', seenCompany: f.underCo === 'yes' ? f.seenCompany : null, seenTin: f.underCo === 'yes' ? f.seenTin : null, seenAddress: f.underCo === 'yes' ? f.seenAddress : null,
   reasonForSpending: f.spendReason, classification: f.classification, classificationOther: f.classificationOther, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
-  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
+  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, vatExemptAmount: f.vatExempt, discountAmount: f.discount, chargeLocationId: f.chargeLocationId, newReimbursementCode: f.newCode, reimbursementCode: f.reimbursementCode, detailsReviewed: f.reviewed, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
 const fromReceipt = (r: ReceiptDetail): FormState => {
@@ -58,7 +60,8 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
     bir: yn(x.birInvoice), underCo: x.birInvoice ? (x.invoiceUnderCompany === null ? 'yes' : yn(x.invoiceUnderCompany)) : '', seenCompany: !!x.seenCompany, seenTin: !!x.seenTin, seenAddress: !!x.seenAddress,
     spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '', classificationOther: x.classificationOther ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
-    type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount),
+    type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount), vatExempt: n(x.vatExemptAmount), discount: n(x.discountAmount),
+    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '', newCode: yn(x.newReimbursementCode) as FormState['newCode'], reimbursementCode: x.reimbursementCode ?? '', reviewed: yn(x.detailsReviewed) as FormState['reviewed'],
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
   };
 };
@@ -123,6 +126,7 @@ export function ReceiptFormPage() {
   const rules = appSet.data?.settings ?? DEFAULT_SETTINGS;
   const MAX_FILES = rules.evidenceMaxFiles;
   const MAX_BYTES = rules.evidenceMaxMb * 1_048_576;
+  const charges = useQuery({ queryKey: ['charge-locations'], queryFn: () => api<{ locations: { id: number; name: string }[] }>('/charge-locations') });
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
   const rec = existing.data?.receipt;
 
@@ -165,7 +169,7 @@ export function ReceiptFormPage() {
     const amount = n(f.amount);
     if (amount === null) return null;
     return {
-      birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat),
+      birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat), vatExemptAmount: n(f.vatExempt) ?? 0,
       withheld: f.withheld === '' ? null : f.withheld === 'yes', whtRate: n(f.whtRate), whtAmount: n(f.whtAmount),
     };
   }, [f]);
@@ -228,6 +232,7 @@ export function ReceiptFormPage() {
       window.setTimeout(() => document.querySelector('.note.bad')?.scrollIntoView({ block: 'center' }), 50);
       return;
     }
+    if (andSubmit && f.reviewed !== 'yes') errs.detailsReviewed = 'Review the details, then choose Yes.';
     if (andSubmit && !total) errs.evidence = 'Add at least one photo or PDF of the receipt.';
     setErrors(errs);
     if (Object.keys(errs).length || !parsed.success) {
@@ -295,7 +300,7 @@ export function ReceiptFormPage() {
             <div className="form">
               <div className="full">
                 <div className="q">With BIR-registered invoice? <i>*</i></div>
-                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
+                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'Either of the sample invoices, as allowed' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
                 {e.birInvoice && <span className="err">{e.birInvoice}</span>}
               </div>
             </div>
@@ -305,7 +310,7 @@ export function ReceiptFormPage() {
             <div className="form">
               <div className="full">
                 <div className="q">Invoice under <b>{co.name}</b>? <i>*</i></div>
-                <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
+                <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'Allowed by BIR only. You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
                 {e.invoiceUnderCompany && <span className="err">{e.invoiceUnderCompany}</span>}
               </div>
             </div>
@@ -343,8 +348,10 @@ export function ReceiptFormPage() {
                 <Choice name="VAT type" value={f.vatType} onChange={(v) => set('vatType', v, 'vatType')} options={[{ value: 'vatable', label: 'Vatable', sub: '"VAT" can be seen in the letterhead of the invoice' }, { value: 'non_vatable', label: 'Non-vatable', sub: '"NON-VAT" appeared in the letterhead of the invoice' }]} />
                 {e.vatType && <span className="err">{e.vatType}</span>}
               </div>
-              <Field label="Vatable amount, without VAT and any deduction (PHP)" hint="VATable Sales only, not VAT-Exempt" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
+              <Field label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
               <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
+              <Field label='VAT-exempt amount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" /></Field>
+              <Field label='Discount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
               {rules.askWithholding && <div className="full">
                 <div className="q">Tax withheld? <i>*</i><FieldGuide field="taxWithheld" /></div>
                 <Choice name="Tax withheld" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
@@ -369,7 +376,7 @@ export function ReceiptFormPage() {
 
           {step === 'wht' && (
             <div className="form">
-              <Field label="Withholding tax rate (%)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
+              <Field label="Withholding tax rate, whole number without % (0 if none)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
               <Field label="Withholding tax amount (PHP)" error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
             </div>
           )}
@@ -423,6 +430,20 @@ export function ReceiptFormPage() {
 
               {rules.showDescription && <Field label="Description" hint="Optional" className="full"><input type="text" value={f.description} onChange={(ev) => set('description', ev.target.value)} placeholder="What was this for?" maxLength={500} /></Field>}
 
+              <Field label="Choose where to charge" className="full" error={e.chargeLocationId}>
+                <select value={f.chargeLocationId} onChange={(ev) => set('chargeLocationId', ev.target.value, 'chargeLocationId')}>
+                  <option value="">Choose</option>
+                  {(charges.data?.locations ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
+                </select>
+              </Field>
+              <div className="full">
+                <div className="q">New Reimbursement Code? (If not, write the reimbursement code) <i>*</i></div>
+                <Choice name="New Reimbursement Code" value={f.newCode} onChange={(v) => set('newCode', v, 'newReimbursementCode', 'reimbursementCode')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'Other', sub: 'Write the reimbursement code' }]} />
+                {e.newReimbursementCode && <span className="err">{e.newReimbursementCode}</span>}
+              </div>
+              {f.newCode === 'no' && <Field label="Reimbursement code" className="full" error={e.reimbursementCode}><input type="text" value={f.reimbursementCode} maxLength={40} onChange={(ev) => set('reimbursementCode', ev.target.value, 'reimbursementCode')} autoFocus /></Field>}
+
               <div className="full">
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
                 <div className="review">
@@ -435,10 +456,14 @@ export function ReceiptFormPage() {
                   {steps.includes('spend') && inv('Reason for spending', f.spendReason || '-')}
                   {steps.includes('spend') && inv('Classification', f.classification ? classificationText(f.classification, f.classificationOther) : '-')}
                   {inv('Gross amount', money(f.amount))}
-                  {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
+                  {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)} · VAT-exempt ${money(f.vatExempt)} · discount ${money(f.discount)}`)}
+                  {inv('Where to charge', (charges.data?.locations ?? []).find((c) => String(c.id) === f.chargeLocationId)?.name ?? rec?.form.chargeLocation?.name ?? '-')}
                   {impact?.computable && impact.difference > 0 && f.withheld !== '' && inv(f.withheld === 'no' ? 'Potential loss' : 'Potential savings', peso(impact.difference))}
                   {f.bir === 'yes' && rules.askWithholding && inv('Tax withheld', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
+                <div className="q" style={{ marginTop: 14 }}>Review the details <i>*</i></div>
+                <Choice name="Review the details" value={f.reviewed} onChange={(v) => set('reviewed', v, 'detailsReviewed')} options={[{ value: 'yes', label: 'Yes', sub: 'I have checked the answers above' }, { value: 'no', label: 'No' }]} />
+                {e.detailsReviewed && <span className="err">{e.detailsReviewed}</span>}
                 {rec && rec.possibleDuplicates.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>Possible duplicate</b><span>Same invoice, or same vendor, amount and date, as {rec.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link></span>)}. If this is a different purchase, carry on.</span></div></div>}
                 {submitBlockers.length > 0 && <div className="callout bad" style={{ marginTop: 12, marginBottom: 0 }} role="alert"><Icon name="info" /><div><b>This cannot be submitted yet</b>{submitBlockers.map((c) => <span key={c.message} style={{ display: 'block' }}>{c.message}</span>)}<button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => { const at = steps.indexOf('vat'); if (at >= 0) { setStepIx(at); toTop(); } }}>Go to the VAT details</button></div></div>}
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}

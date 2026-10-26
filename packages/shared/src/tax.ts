@@ -43,7 +43,7 @@ export const isCompleteTin = (s: string | null | undefined) => /^\d{3}-\d{3}-\d{
 
 /* ---------- what the "Tax withheld?" answer costs ---------- */
 export interface ImpactInput {
-  birInvoice?: boolean | null; amount: number; vatableAmount?: number | null; vatAmount?: number | null;
+  birInvoice?: boolean | null; amount: number; vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null;
   withheld?: boolean | null; whtRate?: number | null;
 }
 
@@ -70,7 +70,7 @@ const none = (rate: number, source: 'entered' | 'default', gross: number): TaxIm
   ({ computable: false, rate, rateSource: source, net: 0, gross, ifYes: 0, ifNo: 0, difference: 0, potentialLoss: 0, potentialSavings: 0 });
 
 /**
- * Yes: the withholding tax is worked out on the net amount (the vatable amount, without VAT). No: on the gross amount.
+ * Yes: the withholding tax is worked out on the net amount (the vatable and VAT-exempt amounts, without VAT). No: on the gross amount.
  * The difference is the rate times the VAT. Every figure here is a potential one, not a verified one.
  * The rate is the one typed on the form when there is one, otherwise the administrator's default.
  */
@@ -80,7 +80,8 @@ export function taxImpact(f: ImpactInput, rules: AppSettings = DEFAULT_SETTINGS)
   const source = entered ? 'entered' : 'default';
   const gross = f.amount;
   if (f.birInvoice !== true || !rules.askWithholding || f.vatableAmount === null || f.vatableAmount === undefined) return none(rate, source, gross);
-  const net = Number(f.vatableAmount);
+  // The net amount is what is left of the gross once the VAT is taken out: the vatable sales and any VAT-exempt sales.
+  const net = round2(Number(f.vatableAmount) + Number(f.vatExemptAmount ?? 0));
   const ifYes = round2(net * rate / 100);
   const ifNo = round2(gross * rate / 100);
   const difference = Math.max(0, round2(ifNo - ifYes));
@@ -121,7 +122,7 @@ export interface FormCheck { field: string; level: CheckLevel; message: string; 
 
 export interface VatCheckInput {
   birInvoice?: boolean | null; amount: number; vatType?: string | null;
-  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+  vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
 
 /**
@@ -134,15 +135,17 @@ export function vatChecks(f: VatCheckInput, rules: AppSettings = DEFAULT_SETTING
   if (f.birInvoice !== true) return out;
   const close = (a: number, b: number) => Math.abs(a - b) <= rules.tolerance + 1e-9;
   const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
-  const vatable = n(f.vatableAmount), vat = n(f.vatAmount), rate = n(f.whtRate), wht = n(f.whtAmount);
+  const vatable = n(f.vatableAmount), vat = n(f.vatAmount), exempt = n(f.vatExemptAmount) ?? 0, rate = n(f.whtRate), wht = n(f.whtAmount);
   const strict = rules.askWithholding && f.withheld === true;
   const ordinary: CheckLevel = strict ? 'error' : 'warn';
   const totalLevel: CheckLevel = strict ? 'error' : 'blockSubmit';
 
-  if (vatable !== null && vat !== null && !close(vatable + vat, f.amount)) {
+  // The invoice gross (Total Sales, VAT inclusive) is the vatable sales, the VAT and the VAT-exempt sales. A discount is a deduction after it, so it is not part of this.
+  if (vatable !== null && vat !== null && !close(vatable + vat + exempt, f.amount)) {
+    const parts = exempt ? `vatable amount ${vatable.toFixed(2)} plus VAT ${vat.toFixed(2)} plus VAT-exempt ${exempt.toFixed(2)}` : `vatable amount ${vatable.toFixed(2)} plus VAT ${vat.toFixed(2)}`;
     out.push({
       field: 'vatAmount', level: totalLevel, total: true,
-      message: `The total does not match: vatable amount ${vatable.toFixed(2)} plus VAT ${vat.toFixed(2)} is ${(vatable + vat).toFixed(2)}, but the invoice gross amount is ${f.amount.toFixed(2)}.${strict ? '' : ' Correct it before submitting.'}`,
+      message: `The total does not match: ${parts} is ${(vatable + vat + exempt).toFixed(2)}, but the invoice gross amount is ${f.amount.toFixed(2)}.${strict ? '' : ' Correct it before submitting.'}`,
     });
   }
   if (f.vatType === 'vatable' && vatable !== null && vat !== null && !close(vatable * (rules.vatRate / 100), vat)) {
@@ -152,7 +155,7 @@ export function vatChecks(f: VatCheckInput, rules: AppSettings = DEFAULT_SETTING
     out.push({ field: 'vatAmount', level: ordinary, message: 'The invoice is marked non-vatable, but a VAT amount was entered.' });
   }
   if (f.withheld === true && rules.askWithholding && rate !== null && wht !== null) {
-    const base = vatable ?? f.amount;
+    const base = vatable === null ? f.amount : vatable + exempt;
     if (!close(base * rate / 100, wht)) {
       out.push({ field: 'whtAmount', level: 'error', message: `${rate}% of ${base.toFixed(2)} is ${(base * rate / 100).toFixed(2)}, but a withholding amount of ${wht.toFixed(2)} was entered.` });
     }

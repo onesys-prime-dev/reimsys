@@ -27,6 +27,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.comment               TO 'reimsy
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.passwordtoken          TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.setting               TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.sequence              TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.charge_location       TO 'reimsys_app'@'localhost';
 
 -- Audit log: read and append only.
 GRANT SELECT, INSERT ON reimsys.auditlog TO 'reimsys_app'@'localhost';

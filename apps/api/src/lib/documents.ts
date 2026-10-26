@@ -27,7 +27,7 @@ function toBuffer(doc: PDFKit.PDFDocument): Promise<Buffer> {
 export async function buildReimbursementPdf(receiptId: number) {
   const r = await prisma.receipt.findUniqueOrThrow({
     where: { id: receiptId },
-    include: { category: true, encoder: true, document: true, evidence: { where: { deletedAt: null } } },
+    include: { category: true, chargeLocation: true, encoder: true, document: true, evidence: { where: { deletedAt: null } } },
   });
   const people = await prisma.user.findMany({ where: { id: { in: [r.checkedById, r.decidedById].filter((x): x is number => !!x) } } });
   const nameOf = (id: number | null) => people.find((p) => p.id === id)?.name ?? '-';
@@ -64,8 +64,12 @@ export async function buildReimbursementPdf(receiptId: number) {
     row('VAT', r.vatType === 'vatable' ? 'Vatable' : r.vatType === 'non_vatable' ? 'Non-vatable' : '-');
     row('Vatable amount', money(r.vatableAmount));
     row('VAT amount', money(r.vatAmount));
+    row('VAT-exempt amount', money(r.vatExemptAmount));
+    row('Discount', money(r.discountAmount));
     row('Tax withheld', r.withheld ? `${Number(r.whtRate ?? 0)}%  ·  ${money(r.whtAmount)}` : r.withheld === false ? 'None' : '-');
   }
+  if (r.chargeLocation) row('Charged to', r.chargeLocation.name);
+  if (r.newReimbursementCode !== null) row('Reimbursement code', r.newReimbursementCode ? 'New code' : r.reimbursementCode || '-');
   row('Description', r.description || '-');
   row('Evidence files', String(r.evidence.length));
   doc.moveTo(L, y).lineTo(L + W, y).strokeColor('#d6dfe2').stroke();

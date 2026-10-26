@@ -34,7 +34,7 @@ export async function impactRows(auth: AuthContext, filter: { from?: string; to?
   };
   const rows = await prisma.receipt.findMany({ where, include: { encoder: { select: { id: true, name: true } } }, orderBy: { receiptDate: 'desc' }, take: 5000 });
   return rows.map((r) => {
-    const f = { birInvoice: r.birInvoice, amount: Number(r.amount), vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate) };
+    const f = { birInvoice: r.birInvoice, amount: Number(r.amount), vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), withheld: r.withheld, whtRate: dec(r.whtRate) };
     const t = taxImpact(f, rules);
     return {
       id: r.id, refNo: r.refNo, status: r.status, vendor: r.payee, date: r.receiptDate.toISOString().slice(0, 10), employeeId: r.encoder.id, employee: r.encoder.name,

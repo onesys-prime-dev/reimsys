@@ -79,8 +79,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Tax withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount)]);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Tax withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)', 'VAT-exempt amount', 'Discount', 'Where to charge', 'Reimbursement code'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount), num(r.vatExemptAmount), num(r.discountAmount), r.chargeLocation?.name ?? '', r.newReimbursementCode === false ? r.reimbursementCode ?? '' : r.newReimbursementCode ? 'New code' : '']);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -98,7 +98,7 @@ receiptsRouter.get('/export', async (req, res) => {
 });
 
 receiptsRouter.post('/', requirePerm('receipt.create'), async (req, res) => {
-  const data = makeReceiptSchema(getSettings()).parse(req.body);
+  const data = makeReceiptSchema(getSettings(), false).parse(req.body);
   const r = await prisma.$transaction(async (tx) =>
     tx.receipt.create({ data: { refNo: await nextReceiptRef(tx), encoderId: req.auth!.user.id, ...formColumns(data) }, include: receiptInclude }),
   );
@@ -117,7 +117,7 @@ receiptsRouter.patch('/:id', requirePerm('receipt.create'), async (req, res) => 
   const r = await loadVisible(req.auth!, idParam(req.params.id));
   assertOwner(req.auth!, r);
   if (!canEditReceipt(r.status as ReceiptStatus)) throw conflict('This receipt can no longer be edited.', 'INVALID_STATE');
-  const data = makeReceiptSchema(getSettings()).parse(req.body);
+  const data = makeReceiptSchema(getSettings(), false).parse(req.body);
   const updated = await prisma.receipt.update({ where: { id: r.id }, data: formColumns(data), include: receiptInclude });
   await audit(req, {
     action: 'receipt.updated', entityType: 'receipt', entityId: r.id, summary: 'updated the receipt',
@@ -150,7 +150,8 @@ receiptsRouter.post('/:id/copy', requirePerm('receipt.create'), async (req, res)
         birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, classificationOther: r.classificationOther,
         seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason, invoiceNo: r.invoiceNo,
         vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType, vatType: r.vatType, vatableAmount: r.vatableAmount,
-        vatAmount: r.vatAmount, withheld: r.withheld, whtRate: r.whtRate, whtAmount: r.whtAmount,
+        vatAmount: r.vatAmount, vatExemptAmount: r.vatExemptAmount, discountAmount: r.discountAmount, withheld: r.withheld, whtRate: r.whtRate, whtAmount: r.whtAmount,
+        chargeLocationId: r.chargeLocationId, newReimbursementCode: r.newReimbursementCode, reimbursementCode: r.reimbursementCode,
       },
       include: receiptInclude,
     }),
@@ -299,8 +300,15 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     if (r.birInvoice === null || (r.birInvoice && !r.transactionType)) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
     // The VAT details must agree before the form can be submitted: always for the total, and for every amount when tax was withheld.
     const num = (v: { toString(): string } | null) => (v === null ? null : Number(v));
-    const blockers = vatChecks({ birInvoice: r.birInvoice, amount: Number(r.amount), vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings()).filter((c) => c.level !== 'warn');
+    const blockers = vatChecks({ birInvoice: r.birInvoice, amount: Number(r.amount), vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), vatExemptAmount: num(r.vatExemptAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings()).filter((c) => c.level !== 'warn');
     if (blockers.length) throw badRequest(`Fix these before submitting: ${blockers.map((c) => c.message).join(' ')}`, blockers.some((c) => c.total) ? 'TOTAL_MISMATCH' : 'VAT_MISMATCH');
+    // The last page of the form: where to charge, the reimbursement code, the person's own review, and (with a BIR invoice) the VAT-exempt amount and discount.
+    const missing: string[] = [];
+    if (!r.chargeLocationId) missing.push('where to charge');
+    if (r.newReimbursementCode === null || (r.newReimbursementCode === false && !r.reimbursementCode)) missing.push('the reimbursement code');
+    if (r.birInvoice && (r.vatExemptAmount === null || r.discountAmount === null)) missing.push('the VAT-exempt amount and discount');
+    if (r.detailsReviewed !== true) missing.push('"Review the details" answered Yes');
+    if (missing.length) throw badRequest(`Open the receipt and complete ${missing.join(', ')} before submitting.`, 'FORM_INCOMPLETE');
     if (r.vendorTin && !isCompleteTin(r.vendorTin)) throw badRequest('Enter the complete vendor TIN (000-000-000-00000) before submitting.', 'TIN_INCOMPLETE');
   }
   const now = new Date();

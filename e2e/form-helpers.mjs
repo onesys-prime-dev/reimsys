@@ -15,6 +15,14 @@ export async function fillQuickForm(page, { payee, amount = '100', date, descrip
   await page.click('button:has-text("Next")');
   await page.waitForSelector('.drop');
   if (description) await page.getByLabel(/Description/).fill(description);
+  await completeLastPage(page);
+}
+
+/** The last page also asks where to charge, whether the reimbursement code is new, and for the person's own review. */
+export async function completeLastPage(page) {
+  await page.getByLabel('Choose where to charge').selectOption({ index: 1 });
+  await page.getByRole('radiogroup', { name: 'New Reimbursement Code' }).getByRole('radio', { name: /^Yes/ }).click();
+  await page.getByRole('radiogroup', { name: 'Review the details' }).getByRole('radio', { name: /^Yes/ }).click();
 }
 
 /** From an edit screen, press Next until the last step. */
