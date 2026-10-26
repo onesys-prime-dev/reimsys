@@ -17,7 +17,7 @@ importsRouter.use(requireAuth, requirePerm('receipt.import'));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const MAX_ROWS = 2000;
-const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'withheld', 'wht_rate', 'wht_amount', 'description', 'encoder_email'];
+const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'tax_withheld', 'wht_rate', 'wht_amount', 'description', 'encoder_email'];
 
 const idParam = (v: unknown) => {
   const n = Number(v);
@@ -28,7 +28,7 @@ const idParam = (v: unknown) => {
 const norm = (h: string) => h.trim().toLowerCase().replace(/[\s-]+/g, '_');
 const ALIAS: Record<string, string> = {
   paid_to: 'payee', vendor: 'payee', vendor_name: 'payee', date: 'receipt_date', invoice_date: 'receipt_date', amount_php: 'amount', gross_amount: 'amount',
-  no_bir_reason: 'reason_for_spending', reason: 'reason_for_spending', encoder: 'encoder_email', email: 'encoder_email', transaction_type: 'type', business_transaction: 'type', bir: 'bir_invoice', tin: 'vendor_tin',
+  no_bir_reason: 'reason_for_spending', reason: 'reason_for_spending', encoder: 'encoder_email', email: 'encoder_email', transaction_type: 'type', business_transaction: 'type', bir: 'bir_invoice', tin: 'vendor_tin', withheld: 'tax_withheld',
 };
 const yesNo = (v: string | undefined) => (/^(yes|y|true|1)$/i.test((v ?? '').trim()) ? true : /^(no|n|false|0)$/i.test((v ?? '').trim()) ? false : undefined);
 /** "Meeting, Seminar, or Convention", "meal" or "Other: team building" -> the stored code and, for Other, the person's words. */
@@ -120,7 +120,7 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
         reasonForSpending: r.reason_for_spending, ...readClassification(r.classification, r.classification_other),
         invoiceNo: r.invoice_no, vendorAddress: r.vendor_address, vendorTin: r.vendor_tin, transactionType: (r.type ?? '').toLowerCase(),
         vatType: (r.vat_type ?? '').toLowerCase().replace(/[\s-]+/g, '_'), vatableAmount: num(r.vatable_amount), vatAmount: num(r.vat_amount),
-        withheld: yesNo(r.withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
+        withheld: yesNo(r.tax_withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
       } : { birInvoice: false, vendorAddress: 'x', reasonForSpending: 'xxx', classification: 'fuel' }),
     };
     const parsed = makeReceiptSchema(getSettings()).safeParse(candidate);

@@ -1,4 +1,4 @@
-import type { ReceiptAction, ReceiptStatus, ReturnIssueCode } from '@reimsys/shared';
+import type { ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;
@@ -35,6 +35,8 @@ export interface ReceiptDetail extends ReceiptBrief {
   description: string | null;
   form: ReceiptForm;
   warnings: string[];
+  impact: TaxImpact;
+  incompleteReasons: string[];
   checkedBy: string | null; checkedAt: string | null; checkNote: string | null;
   decidedBy: string | null; decidedAt: string | null; decisionNote: string | null;
   lastNote: string | null;

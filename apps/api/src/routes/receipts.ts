@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import ExcelJS from 'exceljs';
 import type { Prisma } from '@prisma/client';
 import {
-  EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, receiptWarnings,
+  EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, vatChecks, isCompleteTin,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
   cleanFormData, VAT_LABEL, classificationText, issuesText, issuesFor, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
 } from '@reimsys/shared';
@@ -79,7 +79,7 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)'];
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Tax withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)'];
   const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount)]);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
@@ -297,11 +297,11 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     if (!n) throw badRequest('Add at least one photo or PDF of the receipt before submitting.', 'NO_EVIDENCE');
     // Receipts made before the form changed, or imported from the old template, have no invoice answers yet.
     if (r.birInvoice === null || (r.birInvoice && !r.transactionType)) throw badRequest('Open the receipt and fill in the invoice details before submitting.', 'FORM_INCOMPLETE');
-    if (getSettings().warningsBlock) {
-      const num = (v: { toString(): string } | null) => (v === null ? null : Number(v));
-      const w = receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings());
-      if (w.length) throw badRequest(`Fix these before submitting: ${w.join(' ')}`, 'WARNINGS_BLOCK');
-    }
+    // The VAT details must agree before the form can be submitted: always for the total, and for every amount when tax was withheld.
+    const num = (v: { toString(): string } | null) => (v === null ? null : Number(v));
+    const blockers = vatChecks({ birInvoice: r.birInvoice, amount: Number(r.amount), vatType: r.vatType, vatableAmount: num(r.vatableAmount), vatAmount: num(r.vatAmount), withheld: r.withheld, whtRate: num(r.whtRate), whtAmount: num(r.whtAmount) }, getSettings()).filter((c) => c.level !== 'warn');
+    if (blockers.length) throw badRequest(`Fix these before submitting: ${blockers.map((c) => c.message).join(' ')}`, blockers.some((c) => c.total) ? 'TOTAL_MISMATCH' : 'VAT_MISMATCH');
+    if (r.vendorTin && !isCompleteTin(r.vendorTin)) throw badRequest('Enter the complete vendor TIN (000-000-000-00000) before submitting.', 'TIN_INCOMPLETE');
   }
   const now = new Date();
   // Defence in depth: whatever the status says, a decision needs a recorded check by someone else.

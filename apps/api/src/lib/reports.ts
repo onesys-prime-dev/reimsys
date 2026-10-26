@@ -108,7 +108,7 @@ export function buildPdf(rows: Row[], t: Totals, f: { from: string; to: string; 
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     const L = 40, W = doc.page.width - 80;
-    const cols = [{ h: 'Document no.', w: 84 }, { h: 'Invoice no.', w: 90 }, { h: 'Date', w: 56 }, { h: 'Vendor', w: 112 }, { h: 'Type', w: 48 }, { h: 'Encoded by', w: 78 }, { h: 'VAT', w: 62 }, { h: 'Withheld', w: 62 }, { h: 'Paid', w: 74 }, { h: 'Amount', w: 0 }];
+    const cols = [{ h: 'Document no.', w: 84 }, { h: 'Invoice no.', w: 90 }, { h: 'Date', w: 56 }, { h: 'Vendor', w: 112 }, { h: 'Type', w: 48 }, { h: 'Encoded by', w: 78 }, { h: 'VAT', w: 62 }, { h: 'Tax withheld', w: 62 }, { h: 'Paid', w: 74 }, { h: 'Amount', w: 0 }];
     cols[9]!.w = W - cols.slice(0, 9).reduce((s, c) => s + c.w, 0);
     const header = () => {
       drawLogo(doc, L, 32, 38);
@@ -119,7 +119,7 @@ export function buildPdf(rows: Row[], t: Totals, f: { from: string; to: string; 
       const y = 94;
       doc.rect(L, y, W, 20).fill('#0c7480');
       cols.forEach((c) => {
-        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff').text(c.h.toUpperCase(), x + 4, y + 6, { width: c.w - 8, align: ['Amount', 'VAT', 'Withheld', 'Paid'].includes(c.h) ? 'right' : 'left' });
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff').text(c.h.toUpperCase(), x + 4, y + 6, { width: c.w - 8, align: ['Amount', 'VAT', 'Tax withheld', 'Paid'].includes(c.h) ? 'right' : 'left' });
         x += c.w;
       });
       return y + 24;
@@ -138,7 +138,7 @@ export function buildPdf(rows: Row[], t: Totals, f: { from: string; to: string; 
     });
     if (y > doc.page.height - 90) { doc.addPage(); y = header(); }
     doc.moveTo(L, y + 2).lineTo(L + W, y + 2).strokeColor('#12232b').stroke();
-    doc.font('Helvetica-Bold').fontSize(11).fillColor('#12232b').text(`Total   VAT ${php(t.vat)}   ·   Withheld ${php(t.wht)}   ·   Gross ${php(t.gross)}`, L, y + 10, { width: W, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#12232b').text(`Total   VAT ${php(t.vat)}   ·   Tax withheld ${php(t.wht)}   ·   Gross ${php(t.gross)}`, L, y + 10, { width: W, align: 'right' });
     doc.font('Helvetica').fontSize(10).fillColor('#12232b').text(`Paid ${php(t.paid)}   ·   Not yet paid ${php(t.unpaid)}`, L, y + 28, { width: W, align: 'right' });
     const n = doc.bufferedPageRange().count;
     for (let i = 0; i < n; i++) {

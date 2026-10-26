@@ -64,7 +64,7 @@ export async function buildReimbursementPdf(receiptId: number) {
     row('VAT', r.vatType === 'vatable' ? 'Vatable' : r.vatType === 'non_vatable' ? 'Non-vatable' : '-');
     row('Vatable amount', money(r.vatableAmount));
     row('VAT amount', money(r.vatAmount));
-    row('Withholding tax', r.withheld ? `${Number(r.whtRate ?? 0)}%  ·  ${money(r.whtAmount)}` : r.withheld === false ? 'None' : '-');
+    row('Tax withheld', r.withheld ? `${Number(r.whtRate ?? 0)}%  ·  ${money(r.whtAmount)}` : r.withheld === false ? 'None' : '-');
   }
   row('Description', r.description || '-');
   row('Evidence files', String(r.evidence.length));

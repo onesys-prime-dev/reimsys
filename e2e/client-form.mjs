@@ -77,7 +77,7 @@ check('an invoice not under the company skips the three ticks', notCo.status ===
 const tax = await ana.post('/receipts', full({ invoiceNo: 'TX-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
 check('tax withheld finishes after the withholding step, with no reason for spending', tax.status === 201 && tax.data.receipt.form.reasonForSpending === null, JSON.stringify(tax.data?.error));
 const noTax = await ana.post('/receipts', full({ invoiceNo: 'NT-' + stamp, reasonForSpending: undefined, classification: undefined }));
-check('without withheld tax the reason for spending is required', noTax.status === 400 && codes(noTax).includes('reasonForSpending'));
+check('without tax withheld the reason for spending is required', noTax.status === 400 && codes(noTax).includes('reasonForSpending'));
 check('answers that do not apply are not kept', nb.data.receipt.form.vatType === null && nb.data.receipt.form.vatAmount === null && nb.data.receipt.form.seenCompany === null && nb.data.receipt.form.transactionType === null);
 check('future invoice dates are refused', codes(await ana.post('/receipts', full({ receiptDate: '2999-01-01' }))).includes('receiptDate'));
 check('text in an amount is refused', (await ana.post('/receipts', full({ amount: 'abc' }))).status === 400);
@@ -85,10 +85,12 @@ check('negative VAT is refused', (await ana.post('/receipts', full({ vatAmount: 
 check('a vendor name that looks like a formula is stored as typed, not run', (await ana.post('/receipts', full({ invoiceNo: 'F-' + stamp, payee: '=HYPERLINK("http://evil")' }))).status === 201);
 
 console.log('\nWarnings never block');
-const odd = await ana.post('/receipts', full({ invoiceNo: 'O-' + stamp, vatAmount: 50, vendorTin: 'ABC' }));
-check('numbers that do not add up still save', odd.status === 201);
+const odd = await ana.post('/receipts', full({ invoiceNo: 'O-' + stamp, vatAmount: 50 }));
+check('numbers that do not add up still save as a draft', odd.status === 201);
 check('and are flagged for the Checker', odd.data.receipt.warnings.length >= 2, JSON.stringify(odd.data.receipt.warnings));
-check('a badly formed TIN is flagged', odd.data.receipt.warnings.some((x) => /TIN/.test(x)));
+check('a TIN that is not complete is refused', codes(await ana.post('/receipts', full({ invoiceNo: 'O2-' + stamp, vendorTin: 'ABC' }))).includes('vendorTin') && codes(await ana.post('/receipts', full({ invoiceNo: 'O3-' + stamp, vendorTin: '123-456-789' }))).includes('vendorTin'));
+const loose = await ana.post('/receipts', full({ invoiceNo: 'O4-' + stamp, vendorTin: '12345678900000' }));
+check('a TIN typed without hyphens is saved in the formatted way', loose.status === 201 && loose.data.receipt.form.vendorTin === '123-456-789-00000', JSON.stringify(loose.data?.error));
 const dup = (await ana.post('/receipts', full())).data?.receipt;
 check('the same vendor TIN and invoice no. is flagged as a possible duplicate', (dup?.possibleDuplicates ?? []).length >= 1, JSON.stringify(dup?.possibleDuplicates));
 
@@ -178,13 +180,24 @@ try {
   check('with "no BIR" switched off it is refused', codes(await ana.post('/receipts', noneOk)).includes('birInvoice'));
   const noTin = await ana.post('/receipts', full({ invoiceNo: 'S1-' + stamp, vendorTin: '', withheld: undefined }));
   check('with the TIN made optional it is accepted, and withholding is not asked', noTin.status === 201 && noTin.data.receipt.form.withheld === false, JSON.stringify(noTin.data?.error));
-  await admin.put('/app-settings', { ...s0.settings, warningsBlock: true });
+  await admin.put('/app-settings', { ...s0.settings }); // the questions are asked again for the rules below
   const bad = (await ana.post('/receipts', full({ invoiceNo: 'S2-' + stamp, vatAmount: 50 }))).data.receipt;
   await ana.req('POST', '/receipts/' + bad.id + '/evidence', upload('blk' + stamp));
   const cur = (await ana.get('/receipts/' + bad.id)).data.receipt;
-  check('with "stop on warnings" on, a receipt with wrong numbers cannot be submitted', (await ana.post('/receipts/' + bad.id + '/submit', { version: cur.version })).data?.error?.code === 'WARNINGS_BLOCK');
-  await admin.put('/app-settings', { ...s0.settings, warningsBlock: false });
-  check('and can be submitted once the setting is off', (await ana.post('/receipts/' + bad.id + '/submit', { version: cur.version })).data?.receipt?.status === 'submitted');
+  check('a total that does not add up cannot be submitted, whatever the Tax withheld answer', (await ana.post('/receipts/' + bad.id + '/submit', { version: cur.version })).data?.error?.code === 'TOTAL_MISMATCH');
+  await ana.req('PATCH', '/receipts/' + bad.id, full({ invoiceNo: 'S2-' + stamp, vatAmount: 120 }));
+  const fixed = (await ana.get('/receipts/' + bad.id)).data.receipt;
+  check('and can be submitted once the total is corrected', (await ana.post('/receipts/' + bad.id + '/submit', { version: fixed.version })).data?.receipt?.status === 'submitted');
+  const ord = (await ana.post('/receipts', full({ invoiceNo: 'S2b-' + stamp, vatableAmount: 1020, vatAmount: 100 }))).data.receipt;
+  await ana.req('POST', '/receipts/' + ord.id + '/evidence', upload('ord' + stamp));
+  const ordCur = (await ana.get('/receipts/' + ord.id)).data.receipt;
+  check('Tax withheld No: an ordinary mismatch (VAT not 12%) still lets the receipt be submitted', (await ana.post('/receipts/' + ord.id + '/submit', { version: ordCur.version })).data?.receipt?.status === 'submitted');
+  const yes = (await ana.post('/receipts', full({ invoiceNo: 'S2c-' + stamp, vatableAmount: 1020, vatAmount: 100, withheld: true, whtRate: 2, whtAmount: 20.4 }))).data.receipt;
+  await ana.req('POST', '/receipts/' + yes.id + '/evidence', upload('yes' + stamp));
+  const yesCur = (await ana.get('/receipts/' + yes.id)).data.receipt;
+  check('Tax withheld Yes: the same mismatch cannot be submitted', (await ana.post('/receipts/' + yes.id + '/submit', { version: yesCur.version })).data?.error?.code === 'VAT_MISMATCH');
+  const impact = (await ana.get('/dashboard/tax-impact')).data;
+  check('the dashboard figures add up: potential loss is rate x VAT of the receipts answered No', impact?.totals?.potentialLoss > 0 && impact.scope === 'own', JSON.stringify(impact?.totals));
   await admin.put('/app-settings', { ...s0.settings, evidenceMaxFiles: 1 });
   const two = (await ana.post('/receipts', full({ invoiceNo: 'S3-' + stamp }))).data.receipt;
   await ana.req('POST', '/receipts/' + two.id + '/evidence', upload('one' + stamp));

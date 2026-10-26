@@ -236,7 +236,8 @@ export function ReceiptDetailPage() {
                       <dt>VAT</dt><dd>{r.form.vatType ? VAT_LABEL[r.form.vatType as keyof typeof VAT_LABEL] ?? r.form.vatType : '-'}</dd>
                       <dt>Vatable amount</dt><dd>{r.form.vatableAmount === null ? '-' : money(r.form.vatableAmount)}</dd>
                       <dt>VAT amount</dt><dd>{r.form.vatAmount === null ? '-' : money(r.form.vatAmount)}</dd>
-                      <dt>Withheld tax</dt><dd>{yn(r.form.withheld)}</dd>
+                      <dt>Tax withheld</dt><dd>{yn(r.form.withheld)}</dd>
+                      {r.impact.computable && r.impact.difference > 0 && r.form.withheld !== null && <><dt>{r.form.withheld ? 'Potential savings' : 'Potential loss'}</dt><dd>{money(r.impact.difference)} <small className="muted">potential, not verified: {r.impact.rate}% of the VAT</small></dd></>}
                       {r.form.withheld && <><dt>Withholding</dt><dd>{r.form.whtRate}% · {r.form.whtAmount === null ? '-' : money(r.form.whtAmount)}</dd></>}
                     </>
                   )}

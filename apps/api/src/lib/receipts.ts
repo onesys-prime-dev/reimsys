@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, receiptWarnings, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { availableActions, canEditReceipt, receiptWarnings, taxImpact, incompleteReasons, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import { getSettings } from './appSettings.js';
@@ -92,6 +92,8 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     description: r.description,
     form: receiptForm(r),
     warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }, getSettings()),
+    impact: taxImpact({ birInvoice: r.birInvoice, amount: Number(r.amount), vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate) }, getSettings()),
+    incompleteReasons: incompleteReasons({ birInvoice: r.birInvoice, invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld }, getSettings()),
     checkedBy: name(r.checkedById), checkedAt: r.checkedAt, checkNote: r.checkNote,
     decidedBy: name(r.decidedById), decidedAt: r.decidedAt, decisionNote: r.decisionNote,
     lastNote: r.lastNote,

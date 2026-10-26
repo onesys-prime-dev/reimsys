@@ -711,3 +711,37 @@ section.card[id]{scroll-margin-top:84px}
 /* Make the evidence loading sign easy to notice: a bigger spinner in the accent colour and text in the normal ink colour */
 .ev-wrap .ev-loading{color:var(--ink);font-size:1rem;gap:14px;background:color-mix(in srgb,var(--surface) 96%,transparent)}
 .ev-wrap .ev-loading .spin{width:44px;height:44px;border-width:5px;border-color:var(--accent-soft);border-top-color:var(--accent)}
+
+/* Field guides: a small button beside a question opens that question's sample picture over the whole screen */
+.fg-open{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;vertical-align:middle;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--accent);cursor:pointer}
+.fg-open:hover{background:var(--soft)}
+.fg-full{position:fixed;inset:0;z-index:80;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:8px;padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:rgba(8,16,20,.94)}
+.fg-close{align-self:flex-end;flex:none;min-height:44px}
+.fg-stage{position:relative;flex:1;min-height:0;display:flex}
+.fg-stage .zp.fg-zp{flex:1;height:auto;min-height:0;background:transparent;border-radius:0}
+.fg-zp .zp-bar{display:none}
+.fg-zp .zp-in img{max-width:100%;max-height:100%;border-radius:0;background:#fff}
+.fg-msg{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:16px;color:#fff;font-weight:600}
+.fg-msg .spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:guidespin .8s linear infinite}
+
+/* A check sitting right under the field it is about: yellow lets the person carry on, red does not */
+.note{display:block;margin-top:2px;padding:8px 10px;border-radius:8px;font-weight:400;font-size:.84rem;line-height:1.4}
+.note b{font-weight:700}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+
+/* Tax impact on the dashboard */
+.tibars{display:grid;gap:6px;margin:8px 0 18px}
+.tibar{display:grid;grid-template-columns:56px 1fr;grid-template-areas:'l t' '. v';gap:2px 10px;align-items:center;font-size:.84rem}
+.tibar-l{grid-area:l;color:var(--muted)}.tibar-t{grid-area:t;display:grid;gap:3px}.tibar-v{grid-area:v;color:var(--muted);font-variant-numeric:tabular-nums}
+.tibar-t i,.tilegend i{display:block;height:8px;border-radius:4px;min-width:2px}
+.tibar-t i.loss,.tilegend i.loss{background:var(--bad)}.tibar-t i.save,.tilegend i.save{background:var(--ok)}
+.tilegend{display:flex;gap:16px;font-size:.84rem;color:var(--muted)}.tilegend span{display:flex;align-items:center;gap:6px}.tilegend i{width:14px;height:8px}
+tr.sub td{background:var(--soft);font-size:.86rem}
+.tilegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+@media(max-width:640px){.tilegrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+
+.fwrap{position:relative;min-width:0}
+.fwrap>label.f>span:first-child{padding-right:36px}
+.fg-slot{position:absolute;top:-3px;right:0}
+.fg-slot .fg-open{margin-left:0}

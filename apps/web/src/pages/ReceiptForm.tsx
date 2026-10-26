@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { InvoiceGuide } from '../components/InvoiceGuide';
+import { FieldGuide } from '../components/FieldGuide';
+import { TinInput } from '../components/TinInput';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
+import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, taxImpact, vatChecks, type FormCheck, type AppSettings, type Company } from '@reimsys/shared';
 import { api, errMsg, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { FilePreview } from '../components/FilePreview';
@@ -35,7 +36,7 @@ const EMPTY: FormState = {
 
 type StepId = 'bir' | 'underco' | 'company' | 'invoice' | 'vat' | 'wht' | 'spend' | 'evidence';
 const STEP_TITLE: Record<StepId, string> = {
-  bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Withholding tax', spend: 'Reason for spending', evidence: 'Proof and review',
+  bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Tax withheld', spend: 'Reason for spending', evidence: 'Proof and review',
 };
 const STEP_FIELDS: Record<StepId, string[]> = {
   bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
@@ -139,7 +140,7 @@ export function ReceiptFormPage() {
     s.push('invoice');
     const taxWithheld = f.bir === 'yes' && rules.askWithholding && f.withheld === 'yes';
     if (f.bir === 'yes') { s.push('vat'); if (taxWithheld) s.push('wht'); }
-    // As in the client's chart, a receipt with withheld tax finishes after the withholding step; every other path asks why the money was spent.
+    // As in the client's chart, a receipt with tax withheld finishes after the withholding step; every other path asks why the money was spent.
     if (!taxWithheld) s.push('spend');
     s.push('evidence');
     return s;
@@ -159,15 +160,24 @@ export function ReceiptFormPage() {
   const total = files.length + queued.length;
   const required = f.bir === 'yes';
 
-  const warnings = useMemo(() => {
+  const figures = useMemo(() => {
     const n = (v: string) => (v.trim() === '' || Number.isNaN(Number(v)) ? null : Number(v));
     const amount = n(f.amount);
-    if (amount === null) return [];
-    return receiptWarnings({
+    if (amount === null) return null;
+    return {
       birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat),
       withheld: f.withheld === '' ? null : f.withheld === 'yes', whtRate: n(f.whtRate), whtAmount: n(f.whtAmount),
-    }, rules);
-  }, [f, rules]);
+    };
+  }, [f]);
+  const warnings = useMemo(() => (figures ? receiptWarnings(figures, rules) : []), [figures, rules]);
+  /** The VAT checks, each with its level. They are shown right under the field they are about. */
+  const checks = useMemo<FormCheck[]>(() => (figures ? vatChecks(figures, rules) : []), [figures, rules]);
+  const impact = useMemo(() => (figures ? taxImpact(figures, rules) : null), [figures, rules]);
+  /** Red problems that stop the form being submitted, wherever the person is in the form. */
+  const submitBlockers = checks.filter((c) => c.level !== 'warn');
+  const notes = (field: string) => checks.filter((c) => c.field === field).map((c) => (
+    <span key={c.message} className={`note ${c.level === 'warn' ? 'warn' : 'bad'}`} role={c.level === 'warn' ? 'status' : 'alert'}><b>{c.level === 'warn' ? 'Check this' : c.level === 'blockSubmit' ? 'Fix before submitting' : 'Fix to continue'}</b> {c.message}</span>
+  ));
 
   /** Problems in the whole form, grouped by the field they belong to. */
   const validate = () => {
@@ -180,6 +190,9 @@ export function ReceiptFormPage() {
     const { errs } = validate();
     const mine = Object.fromEntries(Object.entries(errs).filter(([k]) => STEP_FIELDS[step].includes(k) && step !== 'evidence'));
     setErrors((e) => ({ ...e, ...mine }));
+    // Tax withheld = Yes is strict: amounts on this page that do not match stop the person here.
+    const stop = checks.some((c) => c.level === 'error' && STEP_FIELDS[step].includes(c.field));
+    if (stop) { window.setTimeout(() => document.querySelector('.note.bad')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     if (Object.keys(mine).length) { window.setTimeout(() => document.querySelector('.err')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     setStepIx((i) => Math.min(i + 1, steps.length - 1));
     toTop();
@@ -208,6 +221,13 @@ export function ReceiptFormPage() {
 
   async function save(andSubmit: boolean) {
     const { parsed, errs } = validate();
+    if (andSubmit && submitBlockers.length) {
+      const at = steps.indexOf('vat');
+      if (at >= 0) setStepIx(at);
+      toast('The amounts do not add up. Correct them before submitting.', 'bad');
+      window.setTimeout(() => document.querySelector('.note.bad')?.scrollIntoView({ block: 'center' }), 50);
+      return;
+    }
     if (andSubmit && !total) errs.evidence = 'Add at least one photo or PDF of the receipt.';
     setErrors(errs);
     if (Object.keys(errs).length || !parsed.success) {
@@ -302,47 +322,55 @@ export function ReceiptFormPage() {
 
           {step === 'invoice' && (
             <div className="form">
-              {required && <div className="full"><InvoiceGuide step="invoice" /></div>}
-              <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
-              {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
-              <Field label="Vendor complete name" className="full" error={e.payee}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
-              <Field label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
-              {required && <Field label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>}
-              <Field label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
+                            <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate} guide={required ? <FieldGuide field="invoiceDate" /> : undefined}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
+              {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo} guide={<FieldGuide field="invoiceNo" />}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
+              <Field label="Vendor complete name" className="full" error={e.payee} guide={required ? <FieldGuide field="vendorName" /> : undefined}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
+              <Field label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress} guide={required ? <FieldGuide field="vendorAddress" /> : undefined}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
+              {required && <Field label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin} guide={<FieldGuide field="vendorTin" />}><TinInput value={f.vendorTin} onChange={(v) => set('vendorTin', v, 'vendorTin')} /></Field>}
+              <Field label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount} guide={required ? <FieldGuide field="grossAmount" /> : undefined}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
               {required && <div className="full">
                 <div className="q">Business transaction? <i>*</i></div>
                 <Choice name="Business transaction" value={f.type} onChange={(v) => set('type', v, 'transactionType')} options={[{ value: 'product', label: 'Product' }, { value: 'service', label: 'Service' }]} />
                 {e.transactionType && <span className="err">{e.transactionType}</span>}
               </div>}
-              {warnings.filter((w) => w.includes('TIN')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><span>{w}</span></div></div>)}
             </div>
           )}
 
           {step === 'vat' && (
             <div className="form">
-              <div className="full"><InvoiceGuide step="vat" /></div>
               <div className="full">
                 <div className="q">Vatable or non-vatable? <i>*</i></div>
                 <Choice name="VAT type" value={f.vatType} onChange={(v) => set('vatType', v, 'vatType')} options={[{ value: 'vatable', label: 'Vatable', sub: '"VAT" can be seen in the letterhead of the invoice' }, { value: 'non_vatable', label: 'Non-vatable', sub: '"NON-VAT" appeared in the letterhead of the invoice' }]} />
                 {e.vatType && <span className="err">{e.vatType}</span>}
               </div>
-              <Field label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
-              <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" /></Field>
+              <Field label="Vatable amount, without VAT and any deduction (PHP)" hint="VATable Sales only, not VAT-Exempt" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
+              <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
               {rules.askWithholding && <div className="full">
-                <div className="q">Withheld tax? <i>*</i></div>
-                <Choice name="Withheld tax" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
+                <div className="q">Tax withheld? <i>*</i><FieldGuide field="taxWithheld" /></div>
+                <Choice name="Tax withheld" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
                 {e.withheld && <span className="err">{e.withheld}</span>}
+                {impact?.computable && impact.difference > 0 && f.withheld !== '' && (
+                  <div className={`callout ${f.withheld === 'no' ? 'warn' : 'ok'}`} style={{ marginTop: 10, marginBottom: 0 }} role="status" data-testid="tax-impact">
+                    <Icon name="info" />
+                    <div>
+                      <b>{f.withheld === 'no' ? `Potential loss: ${peso(impact.potentialLoss)}` : `Potential savings: ${peso(impact.potentialSavings)}`}</b>
+                      <span>
+                        {f.withheld === 'no'
+                          ? `Answering No means the tax is worked out on the gross amount (${peso(impact.gross)} × ${impact.rate}% = ${peso(impact.ifNo)}) instead of the net amount (${peso(impact.net)} × ${impact.rate}% = ${peso(impact.ifYes)}). Answering Yes could save ${peso(impact.difference)}.`
+                          : `Answering Yes works the tax out on the net amount (${peso(impact.net)} × ${impact.rate}% = ${peso(impact.ifYes)}) instead of the gross amount (${peso(impact.gross)} × ${impact.rate}% = ${peso(impact.ifNo)}). That is ${peso(impact.difference)} less than answering No.`}
+                        {' '}These are potential figures, not verified. {impact.rateSource === 'default' ? `The usual rate of ${impact.rate}% is used because none was entered.` : `The rate you entered (${impact.rate}%) is used.`}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>}
-              {warnings.filter((w) => !w.includes('TIN') && !w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
             </div>
           )}
 
           {step === 'wht' && (
             <div className="form">
-              <div className="full"><InvoiceGuide step="wht" /></div>
-              <Field label="Withholding tax rate (%)" error={e.whtRate}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
-              <Field label="Withholding tax amount (PHP)" error={e.whtAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" /></Field>
-              {warnings.filter((w) => w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
+              <Field label="Withholding tax rate (%)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
+              <Field label="Withholding tax amount (PHP)" error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
             </div>
           )}
 
@@ -408,9 +436,11 @@ export function ReceiptFormPage() {
                   {steps.includes('spend') && inv('Classification', f.classification ? classificationText(f.classification, f.classificationOther) : '-')}
                   {inv('Gross amount', money(f.amount))}
                   {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
-                  {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
+                  {impact?.computable && impact.difference > 0 && f.withheld !== '' && inv(f.withheld === 'no' ? 'Potential loss' : 'Potential savings', peso(impact.difference))}
+                  {f.bir === 'yes' && rules.askWithholding && inv('Tax withheld', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
                 {rec && rec.possibleDuplicates.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>Possible duplicate</b><span>Same invoice, or same vendor, amount and date, as {rec.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link></span>)}. If this is a different purchase, carry on.</span></div></div>}
+                {submitBlockers.length > 0 && <div className="callout bad" style={{ marginTop: 12, marginBottom: 0 }} role="alert"><Icon name="info" /><div><b>This cannot be submitted yet</b>{submitBlockers.map((c) => <span key={c.message} style={{ display: 'block' }}>{c.message}</span>)}<button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => { const at = steps.indexOf('vat'); if (at >= 0) { setStepIx(at); toTop(); } }}>Go to the VAT details</button></div></div>}
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}
               </div>
             </div>
@@ -420,7 +450,7 @@ export function ReceiptFormPage() {
             {stepIx > 0 && <button type="button" className="btn" disabled={busy} onClick={back}>Back</button>}
             {!last && <button type="submit" className="btn pri">Next</button>}
             {last && <button type="submit" className="btn" disabled={busy}>Save draft</button>}
-            {last && <button type="button" className="btn pri" disabled={busy} onClick={() => void save(true)}>{rec?.status === 'returned' ? 'Resubmit for checking' : 'Submit for checking'}</button>}
+            {last && <button type="button" className="btn pri" disabled={busy || submitBlockers.length > 0} onClick={() => void save(true)}>{rec?.status === 'returned' ? 'Resubmit for checking' : 'Submit for checking'}</button>}
           </div>
         </form>
       </section>

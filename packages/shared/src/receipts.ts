@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type AppSettings } from './settings';
 import { RETURN_ISSUE_CODES } from './returnIssues';
+import { formatTin, isCompleteTin, vatChecks } from './tax';
 export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved', 'paid'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
@@ -92,7 +93,7 @@ const receiptShape = z.object({
   invoiceNo: optional(z.string().trim().max(60)),
   payee: z.string().trim().min(2, 'Enter the vendor name.').max(160),
   vendorAddress: optional(z.string().trim().max(300)),
-  vendorTin: optional(z.string().trim().max(30)),
+  vendorTin: optional(z.string().trim().max(30).transform(formatTin).refine((s) => s === '' || isCompleteTin(s), 'Enter the complete TIN: 14 digits, written 000-000-000-00000.').transform((s) => s || null)),
   amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
   transactionType: optional(z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) })),
   vatType: optional(z.enum(VAT_TYPES)),
@@ -235,7 +236,6 @@ export const bulkSchema = z.object({
 export const commentSchema = z.object({ body: z.string().trim().min(1, 'Write a comment first.').max(1000, 'Keep it under 1,000 characters.') });
 
 /* ---------- warnings (never block, only flag) ---------- */
-export const TIN_PATTERN = /^\d{3}-?\d{3}-?\d{3}(-?\d{3,5})?$/;
 export const VAT_RATE = DEFAULT_SETTINGS.vatRate;
 
 export interface FormFigures {
@@ -243,26 +243,14 @@ export interface FormFigures {
   vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
 
-/** Things worth a second look. The Med Ref sees them while typing; the Checker and Approver see them on the receipt. */
+/** Things worth a second look, as plain sentences. The Checker and Approver see them on the receipt. See vatChecks for the same checks with a level. */
 export function receiptWarnings(f: FormFigures, rules: AppSettings = DEFAULT_SETTINGS): string[] {
   const out: string[] = [];
-  const close = (a: number, b: number) => Math.abs(a - b) <= rules.tolerance + 1e-9;
-  const VAT_RATE = rules.vatRate;
-  const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
-  const vatable = n(f.vatableAmount), vat = n(f.vatAmount), rate = n(f.whtRate), wht = n(f.whtAmount);
-  if (f.vendorTin && !TIN_PATTERN.test(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
+  if (f.vendorTin && !isCompleteTin(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
   if (f.birInvoice === false) return out;
-  if (f.vatType === 'vatable' && vatable !== null && vat !== null) {
-    if (!close(vatable + vat, f.amount)) out.push(`Vatable amount plus VAT (${(vatable + vat).toFixed(2)}) is not the same as the invoice gross amount (${f.amount.toFixed(2)}).`);
-    if (!close(vatable * (VAT_RATE / 100), vat)) out.push(`VAT is usually ${VAT_RATE}% of the vatable amount (${(vatable * VAT_RATE / 100).toFixed(2)}), but ${vat.toFixed(2)} was entered.`);
-  }
-  if (f.vatType === 'non_vatable' && vat !== null && vat !== 0) out.push('The invoice is marked non-vatable, but a VAT amount was entered.');
-  if (f.vatType === 'non_vatable' && vatable !== null && !close(vatable, f.amount)) out.push('For a non-vatable invoice the amount without VAT is usually the same as the gross amount.');
-  if (f.withheld && rate !== null && wht !== null) {
-    const base = vatable ?? f.amount;
-    if (!close(base * rate / 100, wht)) out.push(`${rate}% of ${base.toFixed(2)} is ${(base * rate / 100).toFixed(2)}, but a withholding amount of ${wht.toFixed(2)} was entered.`);
-  }
-  if (f.withheld === false && ((wht ?? 0) > 0 || (rate ?? 0) > 0)) out.push('Withholding tax was answered No, but a rate or amount was entered.');
+  const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+  for (const c of vatChecks(f, rules)) out.push(c.message);
+  if (f.withheld === false && ((n(f.whtAmount) ?? 0) > 0 || (n(f.whtRate) ?? 0) > 0)) out.push('Tax withheld was answered No, but a rate or amount was entered.');
   return out;
 }
 
