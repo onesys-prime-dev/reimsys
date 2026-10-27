@@ -24,7 +24,7 @@ const GUIDES: Record<GuideField, { image: string; label: string }> = {
   whtAmount: { image: 'withholding', label: 'withholding tax amount' },
 };
 
-/** A small button beside a question that opens that question's picture over the whole screen: the picture and a Close button, nothing else. */
+/** A small button beside a question that opens that question's picture in a window of its own size over a dimmed page: the picture and a Close button, nothing else. */
 export function FieldGuide({ field }: { field: GuideField }) {
   const [open, setOpen] = useState(false);
   const g = GUIDES[field];
@@ -54,7 +54,8 @@ export function FieldGuide({ field }: { field: GuideField }) {
         <Icon name="info" size={16} />
       </button>
       {open && createPortal(
-        <div className="fg-full" role="dialog" aria-modal="true" aria-label={`Where to find the ${g.label} on the invoice`}>
+        <div className="fg-full" role="dialog" aria-modal="true" aria-label={`Where to find the ${g.label} on the invoice`} onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
+          <div className="fg-card">
           <button ref={closer} type="button" className="btn fg-close" onClick={close}><Icon name="x" size={18} />Close</button>
           <div className="fg-stage">
             {!failed && (
@@ -64,6 +65,7 @@ export function FieldGuide({ field }: { field: GuideField }) {
             )}
             {!loaded && !failed && <div className="fg-msg" role="status"><span className="spin" aria-hidden="true" /><span>Loading the picture…</span></div>}
             {failed && <div className="fg-msg" role="alert"><span>The picture could not be loaded. Check your connection.</span><button type="button" className="btn sm" onClick={() => { setFailed(false); setLoaded(false); setRetry((n) => n + 1); }}>Try again</button></div>}
+          </div>
           </div>
         </div>,
         document.body,

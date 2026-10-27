@@ -34,6 +34,8 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
       ok(`${label}: "${name}" opens the ${image} picture`, await p.waitForFunction((i) => { const x = document.querySelector('.fg-full img'); return !!x && x.complete && x.naturalWidth > 0 && x.getAttribute('src').includes(`/guide/${i}.png`); }, image, { timeout: 8000 }).then(() => true).catch(() => false));
       const box = await dlg.boundingBox();
       ok(`${label}: "${name}" covers the whole screen`, Math.abs(box.width - size.width) < 2 && Math.abs(box.height - size.height) < 2, JSON.stringify(box));
+      const card = await p.locator('.fg-card').boundingBox();
+      ok(`${label}: "${name}" is a window of a manageable size, not the whole screen`, card.width <= 545 && card.height <= 705 && card.width <= size.width - 16 && card.height <= size.height - 16 && card.x >= 0 && card.y >= 0 && card.x + card.width <= size.width && card.y + card.height <= size.height, JSON.stringify(card));
       const img = await p.locator('.fg-full img').boundingBox();
       // the picture uses as much of the free space as its shape allows: it touches the width or the height of the space under the Close button
       const stage = await p.locator('.fg-stage').boundingBox();
