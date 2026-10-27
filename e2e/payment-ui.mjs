@@ -130,7 +130,7 @@ const appr = await open('paolo.v@example.com');
 await appr.page.waitForSelector('.tiles');
 const apTiles = await appr.page.locator('.tiles').innerText();
 ok('the approver sees approved-not-paid and paid', apTiles.includes('Approved, not paid') && apTiles.includes('Paid'));
-ok('a long invoice number stays inside its column in the lists', await appr.page.evaluate(() => [...document.querySelectorAll('.row .c-cat')].every((el) => el.scrollWidth <= el.clientWidth + 1)));
+ok('a long invoice number stays inside its column in the lists, and does not make the row tall (it is cut short, with the full text on hover)', await appr.page.evaluate(() => [...document.querySelectorAll('.row')].every((row) => { const c = row.querySelector('.c-cat'); return !c || (c.getBoundingClientRect().right <= row.getBoundingClientRect().right + 1 && row.getBoundingClientRect().height < 110); })));
 await acc.page.goto('/reports');
 const payField = acc.page.getByLabel('Payment');
 const hasPayField = await payField.waitFor({ timeout: 5000 }).then(() => true, () => false);
