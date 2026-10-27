@@ -13,7 +13,7 @@ interface Employee {
   employeeId: number; employee: string; receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number; recurring: boolean;
   submissions: { id: number; refNo: string; vendor: string; date: string; potentialLoss: number; reasons: string[] }[];
 }
-interface Impact { scope: 'all' | 'own'; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
+interface Impact { scope: 'all' | 'own'; people?: { id: number; name: string }[]; employeeId?: number | null; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
 
 const monthName = (m: string) => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
 
@@ -56,8 +56,9 @@ function TaxImpactSection() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [tab, setTab] = useState<Tab>('months');
-  const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) }).toString();
-  const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
+  const [who, setWho] = useState('');
+  const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}) }).toString();
+  const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
   const t = d.data?.totals;
   const all = d.data?.scope === 'all';
   const maxBar = Math.max(1, ...(d.data?.months ?? []).map((m) => Math.max(m.potentialLoss, m.potentialSavings)));
@@ -66,11 +67,12 @@ function TaxImpactSection() {
   return (
     <div className="taximpact stack" aria-label="Tax withheld figures">
       <div className="tifilterbar">
-        <span className="muted">{all ? 'All receipts with a BIR invoice' : 'Your receipts with a BIR invoice'}</span>
+        <span className="muted">{!all ? 'Your receipts with a BIR invoice' : who ? `Receipts with a BIR invoice: ${d.data?.people?.find((p) => String(p.id) === who)?.name ?? ''}` : 'All receipts with a BIR invoice, everyone'}</span>
         <div className="tifilter">
+          {all && <label className="f"><span>Employee</span><select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Employee"><option value="">Everyone</option>{(d.data?.people ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
           <label className="f"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
           <label className="f"><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" /></label>
-          {(from || to) && <button type="button" className="btn sm ghost" onClick={() => { setFrom(''); setTo(''); }}>Clear</button>}
+          {(from || to || who) && <button type="button" className="btn sm ghost" onClick={() => { setFrom(''); setTo(''); setWho(''); }}>Clear</button>}
         </div>
       </div>
 

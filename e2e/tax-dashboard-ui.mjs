@@ -29,7 +29,8 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   await m.waitForURL(/\/tax-impact$/);
   await m.waitForSelector('.taximpact .tile b');
   ok('the details page has the five figures', (await m.locator('.taximpact .tile').count()) === 5);
-  ok('the dates are side by side, not stacked', await m.evaluate(() => { const l = [...document.querySelectorAll('.tifilter label')].map((x) => x.getBoundingClientRect()); return l.length === 2 && (Math.abs(l[0].top - l[1].top) < 4 || innerWidth < 500); }));
+  ok('the dates are side by side, not stacked', await m.evaluate(() => { const l = [...document.querySelectorAll('.tifilter label')].filter((x) => /^(From|To)$/.test(x.querySelector('span').textContent)).map((x) => x.getBoundingClientRect()); return l.length === 2 && (Math.abs(l[0].top - l[1].top) < 4 || innerWidth < 500); }));
+  await m.waitForSelector('.tibars');
   ok('the detail is in tabs: by month, largest losses and employee evaluation, with only one open at a time', (await m.getByRole('tab').count()) === 3 && (await m.locator('.tibars').count()) === 1 && (await m.locator('.taximpact table').count()) === 0);
   ok('the long explanation is folded away until asked for', !(await m.locator('.tihow p').first().isVisible()));
   await m.getByRole('tab', { name: /Largest losses/ }).click();
@@ -56,6 +57,29 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('and no other person is named', !(await a.locator('.taximpact table').allInnerTexts()).join(' ').includes('Liza'));
   ok('no sideways scrolling', await noSideways(a));
 }
+console.log('\nThe administrator: everyone as a whole, and one person at a time');
+{
+  const ad = await open('admin@example.com', { width: 1366, height: 800 });
+  await ad.goto('/tax-impact'); await ad.waitForSelector('.taximpact .tile b');
+  const sel = ad.getByLabel('Employee');
+  ok('the administrator can choose an employee, with "Everyone" first', (await sel.count()) === 1 && (await sel.locator('option').first().innerText()) === 'Everyone' && (await sel.locator('option').count()) >= 2);
+  const whole = await ad.locator('[data-testid=ti-loss]').innerText();
+  ok('with Everyone chosen the figures are the whole', /everyone/i.test(await ad.locator('.tifilterbar').innerText()));
+  const names = await sel.locator('option').allInnerTexts();
+  await sel.selectOption({ index: 1 });
+  await ad.waitForTimeout(700);
+  const person = names[1];
+  ok('choosing a person says whose figures these are', (await ad.locator('.tifilterbar').innerText()).includes(person), await ad.locator('.tifilterbar').innerText());
+  ok('and the list of people does not shrink', (await sel.locator('option').count()) === names.length);
+  const one = await ad.locator('[data-testid=ti-loss]').innerText();
+  ok('one person is never more than the whole', Number(one.replace(/[^\d.]/g, '')) <= Number(whole.replace(/[^\d.]/g, '')), one + ' vs ' + whole);
+  await ad.getByRole('tab', { name: /Employee evaluation/ }).click();
+  ok('the employee table is only that person', (await ad.locator('[data-testid=ti-employees] > tbody > tr:not(.sub)').count()) <= 1);
+  await ad.getByRole('button', { name: 'Clear' }).click();
+  await ad.waitForTimeout(500);
+  ok('Clear goes back to everyone', (await sel.inputValue()) === '' && (await ad.locator('[data-testid=ti-loss]').innerText()) === whole);
+}
+
 console.log('\nShort windows: the bottom of the dashboard can always be reached');
 for (const h of [560, 640, 720, 800, 900]) {
   const m = await open('liza.santos@example.com', { width: 1519, height: h });

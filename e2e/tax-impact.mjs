@@ -61,6 +61,22 @@ check('the dashboard follows', (await call(U.ana, 'GET', '/dashboard/tax-impact'
 check('a rate over 100 is refused', (await call(U.admin, 'PUT', '/app-settings', { ...settings, defaultWhtRate: 150 })).s === 400);
 await call(U.admin, 'PUT', '/app-settings', settings);
 
+console.log('\nAdministrator: the whole, and one person at a time');
+{
+  const whole = (await call(U.admin, 'GET', '/dashboard/tax-impact')).d;
+  const first = whole.people[0];
+  check('the list of people comes with the figures', whole.scope === 'all' && whole.people.length >= 1 && whole.people.every((x) => x.id && x.name), JSON.stringify(whole.people));
+  const one = (await call(U.admin, 'GET', '/dashboard/tax-impact?employeeId=' + first.id)).d;
+  check('one person: only their receipts', one.employeeId === first.id && one.employees.every((e) => e.employeeId === first.id) && one.worst.every((w) => w.employeeId === first.id), JSON.stringify(one.totals));
+  check('and the list of people does not shrink when one is chosen', one.people.length === whole.people.length);
+  const sum = whole.people.length === 1 ? whole.totals.potentialLoss : null;
+  let total = 0;
+  for (const x of whole.people) total += (await call(U.admin, 'GET', '/dashboard/tax-impact?employeeId=' + x.id)).d.totals.potentialLoss;
+  check('the people add up to the whole', Math.abs(total - whole.totals.potentialLoss) < 0.011, total + ' vs ' + whole.totals.potentialLoss);
+  const peek = (await call(U.ana, 'GET', '/dashboard/tax-impact?employeeId=' + (first.id + 1000))).d;
+  check('a Med Ref who asks for someone else still gets only their own, and no list of people', peek.scope === 'own' && peek.people.length === 0 && peek.employeeId === null, JSON.stringify(peek.totals));
+}
+
 console.log('\nNot signed in');
 check('the figures need a sign-in', (await fetch(B + '/dashboard/tax-impact', { headers: { 'x-requested-with': 'reimsys' } })).status === 401);
 console.log(failed ? `\n${failed} FAILED` : '\nAll checks passed');

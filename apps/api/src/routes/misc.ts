@@ -130,10 +130,15 @@ dashboardRouter.get('/tax-impact', async (req, res) => {
   const date = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
   const all = seesEveryone(auth);
   const employeeId = all && Number.isInteger(Number(req.query.employeeId)) && Number(req.query.employeeId) > 0 ? Number(req.query.employeeId) : undefined;
-  const rows = await impactRows(auth, { from: date(req.query.from), to: date(req.query.to), employeeId });
+  // Everyone's rows first: the list of people to choose from must not shrink when one person is chosen.
+  const everyone = await impactRows(auth, { from: date(req.query.from), to: date(req.query.to) });
+  const people = all ? [...new Map(everyone.map((r) => [r.employeeId, r.employee])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const rows = Object.assign(employeeId ? everyone.filter((r) => r.employeeId === employeeId) : everyone, { truncated: (everyone as { truncated?: boolean }).truncated });
   const worst = rows.filter((r) => r.potentialLoss > 0 || r.reasons.length).sort((a, b) => b.potentialLoss - a.potentialLoss).slice(0, 10);
   res.json({
     scope: all ? 'all' : 'own',
+    people,
+    employeeId: employeeId ?? null,
     rate: getSettings().defaultWhtRate,
     totals: totalsOf(rows),
     truncated: (rows as { truncated?: boolean }).truncated === true,
