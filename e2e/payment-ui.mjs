@@ -47,6 +47,8 @@ if (await acc.page.locator('.side .nav >> text=Ready to pay').count()) {
   await acc.page.click('.side .nav >> text=Ready to pay');
   await acc.page.waitForSelector(`text=${r1.refNo}`);
 }
+// the queue refreshes live as receipts are approved, so wait until both people's receipts are drawn
+await acc.page.waitForSelector(`text=${r3.refNo}`); await acc.page.waitForTimeout(500);
 ok('the queue shows the approved receipts grouped by person', await acc.page.locator('.card', { hasText: 'Ana Reyes' }).locator(`text=${r1.refNo}`).isVisible() && await acc.page.locator('.card', { hasText: 'Mark Dela Cruz' }).locator(`text=${r3.refNo}`).isVisible());
 await shot(acc.page, 'pay-1-queue');
 await acc.page.goto(`/receipts/${paidBefore.id}`);

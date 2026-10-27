@@ -62,6 +62,9 @@ console.log('\nThe administrator: everyone as a whole, and one person at a time'
   const ad = await open('admin@example.com', { width: 1366, height: 800 });
   await ad.goto('/tax-impact'); await ad.waitForSelector('.taximpact .tile b');
   const sel = ad.getByLabel('Employee');
+  // the list of people arrives with the figures, a moment after the page shows
+  await sel.waitFor({ timeout: 10000 }).catch(() => undefined);
+  for (let i = 0; i < 30 && (await sel.locator('option').count()) < 2; i++) await ad.waitForTimeout(200);
   ok('the administrator can choose an employee, with "Everyone" first', (await sel.count()) === 1 && (await sel.locator('option').first().innerText()) === 'Everyone' && (await sel.locator('option').count()) >= 2);
   const whole = await ad.locator('[data-testid=ti-loss]').innerText();
   ok('with Everyone chosen the figures are the whole', /everyone/i.test(await ad.locator('.tifilterbar').innerText()));

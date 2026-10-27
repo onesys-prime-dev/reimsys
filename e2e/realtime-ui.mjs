@@ -132,7 +132,8 @@ try {
   await lizaDash.screenshot({ path: path.join(out, '4-offline.png') });
   await sleep(800); // let the old process let go of the port
   const logFd = fs.openSync(path.join(out, 'restarted-server.log'), 'w');
-  server = spawn(process.execPath, ['dist/server.js'], { cwd: path.resolve('apps/api'), env, stdio: ['ignore', logFd, logFd], detached: true });
+  // Started from the source (as the development server is), so the restarted server is never an older build than the one that was running.
+  server = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], { cwd: path.resolve('apps/api'), env, stdio: ['ignore', logFd, logFd], detached: true });
   server.unref();
   let up = false;
   for (let i = 0; i < 40 && !up; i++) { up = await fetch(WEB + '/api/health').then((r) => r.ok).catch(() => false); if (!up) await sleep(500); }
