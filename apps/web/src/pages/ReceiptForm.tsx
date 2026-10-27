@@ -61,7 +61,8 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
     spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '', classificationOther: x.classificationOther ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
     type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount), vatExempt: n(x.vatExemptAmount), discount: n(x.discountAmount),
-    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '', newCode: yn(x.newReimbursementCode) as FormState['newCode'], reimbursementCode: x.reimbursementCode ?? '', reviewed: yn(x.detailsReviewed) as FormState['reviewed'],
+    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '', newCode: yn(x.newReimbursementCode) as FormState['newCode'], reimbursementCode: x.reimbursementCode ?? '', reviewed: '' as FormState['reviewed'], // opening a receipt to edit asks for the review again
+   
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
   };
 };
@@ -170,7 +171,9 @@ export function ReceiptFormPage() {
     if (amount === null) return null;
     return {
       birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat), vatExemptAmount: n(f.vatExempt) ?? 0,
-      withheld: f.withheld === '' ? null : f.withheld === 'yes', whtRate: n(f.whtRate), whtAmount: n(f.whtAmount),
+      withheld: f.withheld === '' ? null : f.withheld === 'yes',
+      // A rate typed earlier under "Yes" is not kept when the answer is No, so the estimate must not use it either.
+      whtRate: f.withheld === 'yes' ? n(f.whtRate) : null, whtAmount: f.withheld === 'yes' ? n(f.whtAmount) : null,
     };
   }, [f]);
   const warnings = useMemo(() => (figures ? receiptWarnings(figures, rules) : []), [figures, rules]);

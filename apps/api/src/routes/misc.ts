@@ -136,6 +136,7 @@ dashboardRouter.get('/tax-impact', async (req, res) => {
     scope: all ? 'all' : 'own',
     rate: getSettings().defaultWhtRate,
     totals: totalsOf(rows),
+    truncated: (rows as { truncated?: boolean }).truncated === true,
     months: byMonth(rows),
     worst,
     employees: all ? byEmployee(rows) : [],

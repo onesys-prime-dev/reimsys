@@ -12,7 +12,7 @@ interface Employee {
   employeeId: number; employee: string; receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number; recurring: boolean;
   submissions: { id: number; refNo: string; vendor: string; date: string; potentialLoss: number; reasons: string[] }[];
 }
-interface Impact { scope: 'all' | 'own'; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
+interface Impact { scope: 'all' | 'own'; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
 
 const monthName = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('en-PH', { month: 'short', year: '2-digit' });
 
@@ -39,6 +39,7 @@ export function TaxImpactSection() {
         <p className="muted" style={{ marginTop: 0 }}>
           {all ? 'All receipts with a BIR invoice.' : 'Your receipts with a BIR invoice.'} These are <b>potential</b> figures, not verified: answering Yes works the tax out on the net amount and answering No on the gross amount, so the difference is the rate times the VAT.
           {d.data && ` Where no rate was entered, the usual rate of ${d.data.rate}% is used.`}
+          {d.data?.truncated && ' Only the newest 20,000 receipts are counted here. Narrow the dates to see the rest.'}
         </p>
         <div className="tilegrid" data-testid="ti-tiles">
           <div className="tile alert"><small>Potential loss (answered No)</small><b data-testid="ti-loss">{t ? money(t.potentialLoss) : '–'}</b></div>

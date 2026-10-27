@@ -22,6 +22,7 @@ export interface ImpactRow {
  * The tax figures of every receipt this person can see, worked out from the saved answers with the same shared code the form uses.
  * Drafts and disapproved receipts are left out: they never reach payment. Everything is a potential figure, not a verified one.
  */
+const LIMIT = 20000;
 export async function impactRows(auth: AuthContext, filter: { from?: string; to?: string; employeeId?: number } = {}): Promise<ImpactRow[]> {
   const rules = getSettings();
   const where: Prisma.ReceiptWhereInput = {
@@ -33,8 +34,10 @@ export async function impactRows(auth: AuthContext, filter: { from?: string; to?
       filter.from || filter.to ? { receiptDate: { ...(filter.from ? { gte: new Date(filter.from + 'T00:00:00Z') } : {}), ...(filter.to ? { lte: new Date(filter.to + 'T00:00:00Z') } : {}) } } : {},
     ],
   };
-  const rows = await prisma.receipt.findMany({ where, include: { encoder: { select: { id: true, name: true } } }, orderBy: { receiptDate: 'desc' }, take: 5000 });
-  return rows.map((r) => {
+  const rows = await prisma.receipt.findMany({ where, include: { encoder: { select: { id: true, name: true } } }, orderBy: { receiptDate: 'desc' }, take: LIMIT + 1 });
+  const cut = rows.length > LIMIT;
+  if (cut) rows.pop();
+  return Object.assign(rows.map((r) => {
     const f = { birInvoice: r.birInvoice, amount: Number(r.amount), vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), withheld: r.withheld, whtRate: dec(r.whtRate) };
     const t = taxImpact(f, rules);
     return {
@@ -43,7 +46,7 @@ export async function impactRows(auth: AuthContext, filter: { from?: string; to?
       potentialLoss: t.potentialLoss, potentialSavings: t.potentialSavings, computable: t.computable,
       reasons: incompleteReasons({ birInvoice: r.birInvoice, invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: f.vatableAmount, vatAmount: f.vatAmount, withheld: r.withheld }, rules),
     };
-  });
+  }), { truncated: cut });
 }
 
 const sum = (rows: ImpactRow[], pick: (r: ImpactRow) => number) => round2(rows.reduce((t, r) => t + pick(r), 0));

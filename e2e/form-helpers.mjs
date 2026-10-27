@@ -29,4 +29,6 @@ export async function completeLastPage(page) {
 export async function toLastStep(page) {
   for (let i = 0; i < 6 && !(await page.locator('.drop').count()); i++) await page.click('button:has-text("Next")');
   await page.waitForSelector('.drop');
+  // An edited receipt asks for the review again.
+  await page.getByRole('radiogroup', { name: 'Review the details' }).getByRole('radio', { name: /^Yes/ }).click();
 }

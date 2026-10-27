@@ -156,3 +156,11 @@ describe('the total note goes under the amount that is wrong', () => {
     expect(where({ vatType: 'non_vatable', amount: 500, vatableAmount: 400, vatAmount: 0 })).toEqual(['vatableAmount']);
   });
 });
+
+describe('a TIN with no digits', () => {
+  it('is refused instead of being dropped without a word', () => {
+    const f = { birInvoice: 'yes', invoiceUnderCompany: 'no', transactionType: 'product', invoiceNo: 'A', vendorAddress: 'Cebu', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', vatExemptAmount: '0', discountAmount: '0', withheld: 'no', reasonForSpending: 'Water', classification: 'fuel', receiptDate: '2026-10-12', payee: 'Corner', amount: '1120', chargeLocationId: '1', newReimbursementCode: 'yes' };
+    expect(receiptProblems({ ...f, vendorTin: 'ABC' }).vendorTin).toMatch(/made of numbers/);
+    expect(receiptProblems({ ...f, vendorTin: '123-456-789-00000' }).vendorTin).toBeUndefined();
+  });
+});

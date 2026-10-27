@@ -93,7 +93,7 @@ const receiptShape = z.object({
   invoiceNo: optional(z.string().trim().max(60)),
   payee: z.string().trim().min(2, 'Enter the vendor name.').max(160),
   vendorAddress: optional(z.string().trim().max(300)),
-  vendorTin: optional(z.string().trim().max(30).transform(formatTin).refine((s) => s === '' || isCompleteTin(s), 'Enter the complete TIN: 14 digits, written 000-000-000-00000.').transform((s) => s || null)),
+  vendorTin: optional(z.string().trim().max(30).refine((s) => s === '' || /\d/.test(s), 'The TIN is made of numbers: 14 digits, written 000-000-000-00000.').transform(formatTin).refine((s) => s === '' || isCompleteTin(s), 'Enter the complete TIN: 14 digits, written 000-000-000-00000.').transform((s) => s || null)),
   amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
   transactionType: optional(z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) })),
   vatType: optional(z.enum(VAT_TYPES)),

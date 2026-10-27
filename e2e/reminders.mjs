@@ -16,6 +16,10 @@ const waitDecide = await step(U.liza, await (async () => { const r = await make(
 const waitPay = await (async () => { let r = await make('Remind pay'); await look(U.liza, r); r = await step(U.liza, r, 'check'); await look(U.paolo, r); return step(U.paolo, r, 'approve'); })();
 const waitFix = await (async () => { const r = await make('Remind fix'); await look(U.liza, r); return step(U.liza, r, 'return', { note: 'Please retake.' }); })();
 const fresh = await make('Remind fresh');
+// A reminder lists every overdue receipt in one notice, and a development copy keeps the old ones from earlier test runs, which would push these five out of the
+// notice text. So the other waiting receipts are made to look new first (their waiting clocks are reset; nothing else about them changes).
+const mine = [waitCheck, waitDecide, waitPay, waitFix, fresh].map((r) => r.id).join(',');
+sql(`UPDATE receipt SET submittedAt = NOW(), checkedAt = IF(checkedAt IS NULL, NULL, NOW()), decidedAt = IF(decidedAt IS NULL, NULL, NOW()), updatedAt = NOW() WHERE id NOT IN (${mine}) AND status IN ('submitted','checked','approved','returned');`);
 sql(`UPDATE receipt SET submittedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitCheck.id};
      UPDATE receipt SET checkedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitDecide.id};
      UPDATE receipt SET decidedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitPay.id};
