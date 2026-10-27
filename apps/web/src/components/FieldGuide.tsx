@@ -28,7 +28,7 @@ const GUIDES: Record<GuideField, { image: string; label: string }> = {
 export function FieldGuide({ field }: { field: GuideField }) {
   const [open, setOpen] = useState(false);
   const g = GUIDES[field];
-  const src = `/guide/${g.image}.png`;
+  const src = `/guide/${g.image}.webp`;
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);

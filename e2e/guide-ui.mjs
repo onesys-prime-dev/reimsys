@@ -31,7 +31,7 @@ for (const [label, size] of [['desktop', { width: 1280, height: 860 }], ['phone'
       await btn.click();
       const dlg = p.locator('.fg-full');
       await dlg.waitFor();
-      ok(`${label}: "${name}" opens the ${image} picture`, await p.waitForFunction((i) => { const x = document.querySelector('.fg-full img'); return !!x && x.complete && x.naturalWidth > 0 && x.getAttribute('src').includes(`/guide/${i}.png`); }, image, { timeout: 8000 }).then(() => true).catch(() => false));
+      ok(`${label}: "${name}" opens the ${image} picture`, await p.waitForFunction((i) => { const x = document.querySelector('.fg-full img'); return !!x && x.complete && x.naturalWidth > 0 && x.getAttribute('src').includes(`/guide/${i}.webp`); }, image, { timeout: 8000 }).then(() => true).catch(() => false));
       const box = await dlg.boundingBox();
       ok(`${label}: "${name}" covers the whole screen`, Math.abs(box.width - size.width) < 2 && Math.abs(box.height - size.height) < 2, JSON.stringify(box));
       const card = await p.locator('.fg-card').boundingBox();

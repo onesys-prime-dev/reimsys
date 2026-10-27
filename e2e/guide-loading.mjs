@@ -15,7 +15,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone
   const errors = [];
   p.on('pageerror', (e) => errors.push(String(e)));
   let mode = 'slow'; // slow | broken | normal
-  await p.route('**/guide/*.png*', async (route) => {
+  await p.route('**/guide/*.webp*', async (route) => {
     if (mode === 'broken') return route.abort('failed');
     if (mode === 'slow') await new Promise((x) => setTimeout(x, 1800));
     return route.continue();
