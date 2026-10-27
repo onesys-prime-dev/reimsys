@@ -1,5 +1,4 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { clearAllDrafts } from './formDraft';
 import { useAuth } from './auth';
 import { NotificationBell } from './components/Notifications';
 import { LiveLight, useLive } from './live';
@@ -80,7 +79,7 @@ function Shell() {
           <button className="iconbtn" onClick={() => nav('/help')} aria-label="Help" title="Help"><Icon name="info" /></button>
           <NotificationBell />
           <button className="iconbtn" onClick={() => nav('/profile')} aria-label="Profile"><Avatar name={me.name} userId={me.id} hasPhoto={me.hasPhoto} photoV={me.photoV} size={30} /></button>
-          <button className="iconbtn" onClick={() => { clearAllDrafts(); void signOut(); }} aria-label="Sign out"><Icon name="logout" /></button>
+          <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />
         <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${loc.pathname === '/reports' ? 'rfit' : ''} ${isForm(loc.pathname) ? 'narrow' : ''}`}>

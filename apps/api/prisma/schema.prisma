@@ -43,6 +43,7 @@ model RolePermission {
 
 model User {
   id                 Int       @id @default(autoincrement())
+  formDrafts         FormDraft[]
   email              String    @unique @db.VarChar(160)
   name               String    @db.VarChar(100)
   passwordHash       String    @db.VarChar(255)
@@ -125,6 +126,25 @@ model Category {
   @@map("category")
 }
 
+/// A form that was started and not finished. Saved as the person types, so a wrong exit loses nothing. Not a receipt: it is not listed, counted or seen by anyone else.
+model FormDraft {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The receipt being edited, or empty for a new one.
+  receiptId Int?
+  receipt   Receipt? @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  step      Int      @default(0)
+  /// The answers as typed (JSON text).
+  data      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, receiptId])
+  @@index([userId, updatedAt])
+  @@map("form_draft")
+}
+
 /// Where a receipt is charged ("Choose where to charge"). An administrator edits the list.
 model ChargeLocation {
   id        Int       @id @default(autoincrement())
@@ -173,6 +193,7 @@ model Receipt {
   // Last page of the form: where to charge.
   chargeLocationId     Int?
   chargeLocation       ChargeLocation?          @relation(fields: [chargeLocationId], references: [id])
+  formDrafts           FormDraft[]
   ckCompany       Boolean?
   ckTin           Boolean?
   ckAddress       Boolean?

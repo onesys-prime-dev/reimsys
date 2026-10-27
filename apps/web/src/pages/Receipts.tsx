@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BULK_MAX, RECEIPT_STATUSES, STATUS_LABEL, TRANSACTION_LABEL, TRANSACTION_TYPES, type ReceiptStatus } from '@reimsys/shared';
-import { ago, api, errMsg, fmtDate, money } from '../api';
+import { ago, api, errMsg, fmtDate, fmtDateTime, money } from '../api';
 import { useAuth } from '../auth';
 import type { ReceiptBrief } from '../types';
 import { Empty, Icon, Modal, StatusPill, useToast } from '../ui';
@@ -24,6 +24,23 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
       <span className="c-amt">{money(r.amount)}</span>
       <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className={`age ${late(r.submittedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.submittedAt) ? 'Waiting ' : ''}{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className={`age ${late(r.checkedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.checkedAt) ? 'Waiting, checked ' : 'checked '}{ago(r.checkedAt)}</span>}</span>
     </Link>
+  );
+}
+
+/** Forms that were started and not finished (saved as they were typed). Shown to the person who started them. */
+function UnfinishedForms() {
+  const { can } = useAuth();
+  const q = useQuery({ queryKey: ['form-drafts'], enabled: can('receipt.create'), queryFn: () => api<{ drafts: { id: number; receiptId: number | null; vendor: string | null; amount: number | null; updatedAt: string }[] }>('/form-drafts') });
+  const list = q.data?.drafts ?? [];
+  if (!list.length) return null;
+  return (
+    <div className="callout ok" data-testid="unfinished-forms"><Icon name="info" /><div>
+      <b>{list.length === 1 ? 'You have an unfinished form' : `You have ${list.length} unfinished forms`}</b>
+      {list.slice(0, 3).map((d) => (
+        <span key={d.id} style={{ display: 'block' }}><Link to={d.receiptId ? `/receipts/${d.receiptId}/edit` : `/receipts/new?draft=${d.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>{d.vendor ?? 'No vendor yet'}{d.amount !== null ? ` · ${money(d.amount)}` : ''}</Link> · saved {fmtDateTime(d.updatedAt)}</span>
+      ))}
+      {list.length > 3 && <span style={{ display: 'block' }}>and {list.length - 3} more in New receipt.</span>}
+    </div></div>
   );
 }
 
@@ -86,6 +103,8 @@ export function ReceiptsPage() {
           {can('receipt.create') && <Link className="btn pri" to="/receipts/new"><Icon name="plus" size={18} />New receipt</Link>}
         </div>
       </div>
+
+      <UnfinishedForms />
 
       <section className="card tcard">
       <div className="panel-bar">

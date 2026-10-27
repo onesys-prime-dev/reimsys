@@ -29,7 +29,7 @@ const env = z
 /** The live session limits. Starts from the environment; the Settings screen changes it without a restart. */
 export const sessionLimits = { idleMs: env.SESSION_IDLE_MINUTES * 60_000, maxMs: env.SESSION_MAX_HOURS * 3_600_000 };
 
-export const config = {``
+export const config = {
   isProd: env.NODE_ENV === 'production',
   port: env.PORT,
   webOrigin: env.WEB_ORIGIN.split(',')[0]!.trim(),
