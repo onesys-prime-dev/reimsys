@@ -548,7 +548,7 @@ input,select,textarea{border-radius:10px}
 
 @media(min-width:821px){
   /* Dashboard: fits the window; the queue and the recent activity scroll inside their own cards. */
-  .page.dash{height:max(620px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:24px}
+  .page.dash{min-height:max(620px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:24px}
   .page.dash>*{flex:none}
   .page.dash>.grid2{flex:1 1 auto;min-height:420px;align-items:stretch}
   .page.dash .grid2>.stack{min-height:0;display:flex;flex-direction:column;gap:16px}

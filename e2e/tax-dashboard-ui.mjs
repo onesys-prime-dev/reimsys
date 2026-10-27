@@ -56,6 +56,15 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('and no other person is named', !(await a.locator('.taximpact table').allInnerTexts()).join(' ').includes('Liza'));
   ok('no sideways scrolling', await noSideways(a));
 }
+console.log('\nShort windows: the bottom of the dashboard can always be reached');
+for (const h of [560, 640, 720, 800, 900]) {
+  const m = await open('liza.santos@example.com', { width: 1519, height: h });
+  await m.waitForSelector('.row');
+  await m.evaluate(() => { document.querySelector('.main').scrollTop = 99999; });
+  await m.waitForTimeout(250);
+  const r = await m.evaluate(() => ({ bottom: Math.round(document.querySelector('.page.dash .grid2').getBoundingClientRect().bottom), h: innerHeight }));
+  ok(`a window ${h}px high: once scrolled to the end the cards end inside the window with room below them`, r.bottom <= r.h - 12, JSON.stringify(r));
+}
 await b.close();
 console.log(failed ? `\n${failed} FAILED` : '\nAll checks passed');
 process.exit(failed ? 1 : 0);
