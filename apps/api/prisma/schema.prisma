@@ -170,10 +170,9 @@ model Receipt {
   withheld        Boolean?
   whtRate         Decimal?                 @db.Decimal(5, 2)
   whtAmount       Decimal?                 @db.Decimal(12, 2)
-  // Last page of the form: where to charge, and the person's own review of the details.
+  // Last page of the form: where to charge.
   chargeLocationId     Int?
   chargeLocation       ChargeLocation?          @relation(fields: [chargeLocationId], references: [id])
-  detailsReviewed      Boolean?
   ckCompany       Boolean?
   ckTin           Boolean?
   ckAddress       Boolean?

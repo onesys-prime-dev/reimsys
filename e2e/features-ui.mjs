@@ -3,7 +3,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 // The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt.
-const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'fuel', chargeLocationId: 1, detailsReviewed: true };
+const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Test receipt', classification: 'fuel', chargeLocationId: 1 };
 const WEB = process.env.WEB ?? 'http://localhost:4000';
 const out = process.argv[2] ?? '.';
 fs.mkdirSync(out, { recursive: true });

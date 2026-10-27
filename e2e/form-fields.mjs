@@ -1,5 +1,5 @@
 // Checks the answers added from the client's Google Form against a running API: VAT-exempt amount and discount, where to charge (an editable list),
-// "Review the details", and the new classification list. Needs the API (4000). Usage: node e2e/form-fields.mjs
+// and the new classification list. Needs the API (4000). Usage: node e2e/form-fields.mjs
 import { call, loginAll, today, PNG, B, H } from './payment-helpers.mjs';
 
 const U = await loginAll();
@@ -25,7 +25,7 @@ check('switched off, it is hidden from the form list but the administrator still
 check('without a sign-in the list is refused', (await fetch(B + '/charge-locations', { headers: { 'x-requested-with': 'reimsys' } })).status === 401);
 
 console.log('\nThe VAT-exempt amount counts in the total, the discount does not');
-const base = { receiptDate: '2026-10-12', payee: 'Fields Test ' + stamp, amount: 1620, birInvoice: true, invoiceUnderCompany: false, vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, vatExemptAmount: 500, discountAmount: 50, withheld: false, reasonForSpending: 'Supplies', classification: 'meal_personal', chargeLocationId: list[0].id, detailsReviewed: true };
+const base = { receiptDate: '2026-10-12', payee: 'Fields Test ' + stamp, amount: 1620, birInvoice: true, invoiceUnderCompany: false, vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, vatExemptAmount: 500, discountAmount: 50, withheld: false, reasonForSpending: 'Supplies', classification: 'meal_personal', chargeLocationId: list[0].id };
 async function upload(url, headers, make) { for (let i = 0; i < 8; i++) { const r = await fetch(url, { method: 'POST', headers, body: make() }); if (r.status !== 429) return r; await new Promise((x) => setTimeout(x, 10_000)); } } // the upload limit is 60 a minute, which the tests before this one can use up
 async function submit(extra, tag) {
   const r = (await call(U.ana, 'POST', '/receipts', { ...base, invoiceNo: tag + stamp, ...extra }));
@@ -47,7 +47,6 @@ check('a negative discount is refused', codes(await call(U.ana, 'POST', '/receip
 console.log('\nThe last page must be complete before submitting');
 for (const [label, extra, code] of [
   ['no place to charge', { chargeLocationId: null }, 'FORM_INCOMPLETE'],
-  ['"Review the details" not answered Yes', { detailsReviewed: false }, 'FORM_INCOMPLETE'],
   ['no VAT-exempt amount', { vatExemptAmount: null, amount: 1120 }, 'FORM_INCOMPLETE'],
 ]) {
   const r = await submit(extra, 'L' + label.length);

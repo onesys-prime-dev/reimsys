@@ -12,7 +12,7 @@ const settings = (await call(U.admin, 'GET', '/app-settings')).d.settings;
 check('the default withholding rate is a setting', typeof settings.defaultWhtRate === 'number' && settings.defaultWhtRate > 0, JSON.stringify(settings));
 await call(U.admin, 'PUT', '/app-settings', { ...settings, defaultWhtRate: 2, askWithholding: true, requireVendorTin: true });
 
-const base = { receiptDate: DAY, amount: 1120, birInvoice: true, invoiceUnderCompany: false, vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, reasonForSpending: 'Supplies', classification: 'meal_personal', vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, detailsReviewed: true };
+const base = { receiptDate: DAY, amount: 1120, birInvoice: true, invoiceUnderCompany: false, vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, reasonForSpending: 'Supplies', classification: 'meal_personal', vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1 };
 async function upload(url, headers, make) { for (let i = 0; i < 8; i++) { const r = await fetch(url, { method: 'POST', headers, body: make() }); if (r.status !== 429) return r; await new Promise((x) => setTimeout(x, 10_000)); } } // the upload limit is 60 a minute, which the tests before this one can use up
 async function submitted(c, extra) {
   const r = (await call(c, 'POST', '/receipts', { ...base, ...extra })).d?.receipt;

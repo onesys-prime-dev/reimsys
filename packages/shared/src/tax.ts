@@ -175,6 +175,8 @@ export function vatChecks(f: VatCheckInput, rules: AppSettings = DEFAULT_SETTING
 function totalCulprit(vatable: number, vat: number, exempt: number, gross: number, rate: number, nonVatable: boolean, close: (a: number, b: number) => boolean): { field: string; hint: string } {
   const n2 = (n: number) => n.toFixed(2);
   const rest = round2(gross - exempt);
+  // The VAT-exempt sales are part of the gross, so they can never be more than it. Nothing sensible can be said about the other amounts until that is right.
+  if (rest <= 0) return { field: 'vatExemptAmount', hint: `The VAT-exempt amount cannot be as much as the gross amount (${n2(gross)}). Check it, or the gross amount on the invoice details.` };
   if (nonVatable) {
     if (vat !== 0) return { field: 'vatAmount', hint: 'The invoice is non-vatable, so the VAT amount should be 0.' };
     return { field: 'vatableAmount', hint: `With no VAT, the vatable amount should be about ${n2(rest)}.` };

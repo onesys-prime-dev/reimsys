@@ -315,7 +315,6 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     const missing: string[] = [];
     if (!r.chargeLocationId) missing.push('where to charge');
     if (r.birInvoice && (r.vatExemptAmount === null || r.discountAmount === null)) missing.push('the VAT-exempt amount and discount');
-    if (r.detailsReviewed !== true) missing.push('"Review the details" answered Yes');
     if (missing.length) throw badRequest(`Open the receipt and complete ${missing.join(', ')} before submitting.`, 'FORM_INCOMPLETE');
     if (r.vendorTin && !isCompleteTin(r.vendorTin)) throw badRequest('Enter the complete vendor TIN (000-000-000-00000) before submitting.', 'TIN_INCOMPLETE');
   }

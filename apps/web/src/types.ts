@@ -26,7 +26,7 @@ export interface ReceiptForm {
   birInvoice: boolean | null; invoiceUnderCompany: boolean | null; reasonForSpending: string | null; classification: string | null; classificationOther: string | null; seenCompany: boolean | null; seenTin: boolean | null; seenAddress: boolean | null; noBirReason: string | null;
   invoiceNo: string | null; vendorAddress: string | null; vendorTin: string | null; transactionType: string | null;
   vatType: string | null; vatableAmount: number | null; vatAmount: number | null; vatExemptAmount: number | null; discountAmount: number | null;
-  chargeLocation: { id: number; name: string } | null; detailsReviewed: boolean | null;
+  chargeLocation: { id: number; name: string } | null;
   withheld: boolean | null; whtRate: number | null; whtAmount: number | null;
   /** What the Checker confirmed can be seen on the invoice. Null until a check was made. */
   checked: { company: boolean | null; tin: boolean | null; address: boolean | null } | null;

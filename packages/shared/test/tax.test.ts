@@ -163,3 +163,13 @@ describe('a TIN with no digits', () => {
     expect(receiptProblems({ ...f, vendorTin: '123-456-789-00000' }).vendorTin).toBeUndefined();
   });
 });
+
+describe('a VAT-exempt amount larger than the gross', () => {
+  it('points at the VAT-exempt amount and never suggests a negative figure', () => {
+    // the case from the screen: gross 234, vatable 234,234, VAT 2,342, VAT-exempt 23,434
+    const c = vatChecks({ birInvoice: true, amount: 234, vatType: 'vatable', vatableAmount: 234234, vatAmount: 2342, vatExemptAmount: 23434, withheld: false } as never, rules).find((x) => x.total)!;
+    expect(c.field).toBe('vatExemptAmount');
+    expect(c.message).toContain('cannot be as much as the gross amount (234.00)');
+    expect(c.message).not.toMatch(/-d/);
+  });
+});

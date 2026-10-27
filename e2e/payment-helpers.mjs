@@ -4,7 +4,7 @@ export const ORIGIN = new URL(B).origin;
 const PW = 'Reimsys#2026';
 export const tag = 'Pay test ' + Date.now().toString().slice(-6);
 /** The reimbursement form's answers for a receipt with no BIR invoice: the shortest valid receipt. */
-export const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Payment test', classification: 'fuel', chargeLocationId: 1, detailsReviewed: true };
+export const F = { birInvoice: false, vendorAddress: 'Test Street, Test City', reasonForSpending: 'Payment test', classification: 'fuel', chargeLocationId: 1 };
 export const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 /** Today's date where the tester is, not in UTC. */
 export const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 10); };

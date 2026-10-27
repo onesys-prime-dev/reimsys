@@ -39,7 +39,7 @@ const stamp = Date.now();
 // A complete answer for "BIR invoice: yes", vatable, no withholding.
 const full = (over = {}) => ({
   birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
-  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, detailsReviewed: true, ...over,
+  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, ...over,
 });
 const codes = (r) => (r.data?.error?.issues ?? []).map((i) => i.path[0]);
 
@@ -208,7 +208,8 @@ try {
 } finally {
   await admin.put('/app-settings', s0.settings);
 }
-check('the settings are put back as they were', JSON.stringify((await ana.get('/app-settings')).data.settings) === JSON.stringify(s0.settings));
+const s1 = (await ana.get('/app-settings')).data.settings;
+check('the settings are put back as they were', JSON.stringify(s1) === JSON.stringify(s0.settings), JSON.stringify(Object.keys(s0.settings).filter((k) => s0.settings[k] !== s1[k]).map((k) => `${k}: ${s0.settings[k]} -> ${s1[k]}`)));
 const rs = await admin.post('/app-settings/reset');
 check('"reset to default" works', rs.status === 200 && JSON.stringify(rs.data.settings) === JSON.stringify(rs.data.defaults));
 await admin.put('/app-settings', s0.settings);
