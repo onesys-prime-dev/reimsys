@@ -11,6 +11,8 @@ import { LiveScanner } from '../components/LiveScanner';
 import { ScanDialog } from '../components/ScanDialog';
 import { pageToFile } from '../scanPage';
 import { Field, Icon, useToast } from '../ui';
+import { useAuth } from '../auth';
+import { clearDraft, readDraft, writeDraft } from '../formDraft';
 
 /** Back to the top of the screen. On a computer the area beside the menu scrolls, not the browser window. */
 const toTop = () => { document.querySelector('.main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); };
@@ -110,8 +112,16 @@ export function ReceiptFormPage() {
   const closePreview = () => setPreviewing((p) => { if (p?.revoke) URL.revokeObjectURL(p.url); return null; });
   const previewQueued = (x: File) => setPreviewing({ title: x.name, url: URL.createObjectURL(x), pdf: x.type === 'application/pdf' || /\.pdf$/i.test(x.name), revoke: true });
   const [over, setOver] = useState(false);
-  const [f, setF] = useState<FormState>(EMPTY);
-  const [stepIx, setStepIx] = useState(0);
+  const { me } = useAuth();
+  const userId = me?.id;
+  // What was typed is kept in this browser, so leaving the page by mistake does not lose it. A new receipt gets it back right away.
+  const [restoredAt, setRestoredAt] = useState<number | null>(null);
+  const firstDraft = useRef(id === null ? readDraft<FormState>(userId, null) : null);
+  const [f, setF] = useState<FormState>(() => (firstDraft.current ? { ...EMPTY, ...firstDraft.current.f } : EMPTY));
+  const [stepIx, setStepIx] = useState(() => firstDraft.current?.stepIx ?? 0);
+  const baseline = useRef(JSON.stringify(EMPTY));
+  const finished = useRef(false);
+  useEffect(() => { if (firstDraft.current) setRestoredAt(firstDraft.current.savedAt); }, []);
   const [params] = useSearchParams();
   const wantedStep = params.get('step');
   const jumped = useRef(false);
@@ -131,7 +141,31 @@ export function ReceiptFormPage() {
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
   const rec = existing.data?.receipt;
 
-  useEffect(() => { if (rec) { setF(fromReceipt(rec)); setReady(true); } }, [rec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!rec) return;
+    const saved = fromReceipt(rec);
+    baseline.current = JSON.stringify(saved);
+    // Changes that were typed but not saved come back, unless the receipt was changed elsewhere since.
+    const draft = readDraft<FormState>(userId, rec.id);
+    if (draft && draft.savedAt > Date.parse(rec.updatedAt) && JSON.stringify({ ...EMPTY, ...draft.f }) !== baseline.current) {
+      setF({ ...EMPTY, ...draft.f }); if (!wantedStep) setStepIx(draft.stepIx); setRestoredAt(draft.savedAt);
+    } else setF(saved);
+    setReady(true);
+  }, [rec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the answers as they are typed (a moment after the last key), and forget them once they match what is saved.
+  useEffect(() => {
+    if (!ready || finished.current) return;
+    const t = window.setTimeout(() => {
+      if (finished.current) return;
+      if (JSON.stringify(f) === baseline.current) clearDraft(userId, id); else writeDraft(userId, id, f, stepIx);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [f, stepIx, ready, userId, id]);
+  const startOver = () => {
+    clearDraft(userId, id); setRestoredAt(null); setStepIx(0); setErrors({});
+    setF(rec ? fromReceipt(rec) : EMPTY);
+  };
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K], ...errKeys: string[]) => {
     setF((p) => ({ ...p, [k]: v }));
@@ -257,6 +291,7 @@ export function ReceiptFormPage() {
         up.warnings.forEach((w) => toast(w));
       }
       if (andSubmit) current = (await api<{ receipt: ReceiptDetail }>(`/receipts/${current!.id}/submit`, { method: 'POST', body: { version: current!.version } })).receipt;
+      finished.current = true; clearDraft(userId, id); clearDraft(userId, current!.id);
       toast(andSubmit ? 'Submitted. Checkers have been notified.' : 'Draft saved.');
       qc.invalidateQueries({ queryKey: ['receipts'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -284,6 +319,10 @@ export function ReceiptFormPage() {
     <>
       <Link className="back" to={id ? `/receipts/${id}` : '/receipts'}><Icon name="back" size={18} />Back</Link>
       <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Answer the questions about the invoice, then attach a clear photo or PDF.</p></div></div>
+      {restoredAt !== null && (
+        <div className="callout ok" role="status" data-testid="draft-restored"><Icon name="info" /><div><b>Your unfinished form is back</b><span>It was saved on this device at {new Date(restoredAt).toLocaleString()}. A photo or PDF that was not saved has to be added again.</span>
+          <button type="button" className="btn sm ghost" style={{ marginTop: 6 }} onClick={startOver}>Start over</button></div></div>
+      )}
       {rec?.status === 'returned' && (rec.lastNote || rec.returnIssues.length > 0) && (
         <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b>{rec.returnIssues.filter((c) => c !== 'other').length > 0 && <span style={{ display: 'block' }}>{rec.returnIssues.filter((c) => c !== 'other').map(issueLabel).join(' · ')}</span>}{rec.lastNote && <span style={{ display: 'block' }}>{rec.lastNote}</span>}</div></div>
       )}

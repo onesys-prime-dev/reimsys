@@ -36,7 +36,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   const ctx = await browser.newContext({ viewport: size, baseURL: process.env.WEB ?? 'http://localhost:5173' });
   const p = await ctx.newPage();
   await p.goto('/'); await p.fill('input[type=email]', 'ana.reyes@example.com'); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
-  await p.goto('/receipts/new'); await p.waitForSelector('.steps');
+  await p.evaluate(() => localStorage.clear()); await p.goto('/receipts/new'); await p.waitForSelector('.steps');
 
   await next(p); await audit(p, 'step 1 (BIR invoice)');
   await radio(p, 'Yes'); await next(p);
@@ -72,7 +72,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   // Submit is blocked while the amounts mismatch, so look at the last page's own errors
   await audit(p, 'last step (nothing answered)');
   // the reason-for-spending step, on the path without tax withheld
-  await p.goto('/receipts/new'); await p.waitForSelector('.steps');
+  await p.evaluate(() => localStorage.clear()); await p.goto('/receipts/new'); await p.waitForSelector('.steps');
   await radio(p, 'No'); await next(p);
   await next(p); await audit(p, 'no-BIR invoice details (empty)');
   await p.getByLabel('Vendor complete name').fill('Errors Corner'); await p.getByLabel('Vendor complete address').fill('Cebu'); await p.getByLabel(/Amount paid to vendor/).fill('350');
