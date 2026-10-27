@@ -104,7 +104,9 @@ describe('validation', () => {
 
   it('asks for the withholding numbers only when tax was withheld', () => {
     expect(field({ ...base, withheld: 'yes' })).toEqual(expect.arrayContaining(['whtRate', 'whtAmount']));
-    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10', reasonForSpending: undefined, classification: undefined })).toEqual([]);
+    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10' })).toEqual([]);
+    // The reason for spending is still asked after the withholding step.
+    expect(field({ ...base, withheld: 'yes', whtRate: '1', whtAmount: '10', reasonForSpending: undefined, classification: undefined })).toEqual(expect.arrayContaining(['reasonForSpending', 'classification']));
     // ...and the ticks only matter when the invoice is under the company
     expect(field({ ...base, seenTin: false })).toContain('seenTin');
     expect(field({ ...base, invoiceUnderCompany: 'no', seenTin: false, seenCompany: false, seenAddress: false })).toEqual([]);
@@ -125,8 +127,8 @@ describe('validation', () => {
     expect(cleanFormData(n)).toMatchObject({ birInvoice: false, vatType: null, vatAmount: null, seenCompany: null, transactionType: null, classification: 'meal_personal' });
     // Not under the company: the three ticks are not asked and are dropped.
     expect(cleanFormData(receiptInputSchema.parse({ ...base, invoiceUnderCompany: 'no', seenCompany: false, seenTin: false, seenAddress: false }))).toMatchObject({ invoiceUnderCompany: false, seenCompany: null });
-    // Tax withheld finishes the form right after, so no reason for spending is kept.
-    expect(cleanFormData(receiptInputSchema.parse({ ...base, withheld: 'yes', whtRate: '2', whtAmount: '20', reasonForSpending: undefined, classification: undefined }))).toMatchObject({ withheld: true, reasonForSpending: null, classification: null });
+    // Tax withheld still asks why the money was spent, so the reason is kept.
+    expect(cleanFormData(receiptInputSchema.parse({ ...base, withheld: 'yes', whtRate: '2', whtAmount: '20' }))).toMatchObject({ withheld: true, reasonForSpending: base.reasonForSpending });
   });
 
   it('warns, but does not block, when the numbers do not add up', () => {

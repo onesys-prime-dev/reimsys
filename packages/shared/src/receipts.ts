@@ -115,7 +115,6 @@ interface Answers {
   vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null; discountAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
   chargeLocationId?: number | null;
 }
-const needsReason = (d: Answers, rules: AppSettings) => d.birInvoice === false || (d.birInvoice === true && !(rules.askWithholding && d.withheld === true));
 
 /** extras: also ask the answers added from the client's Google Form (VAT-exempt amount, discount, where to charge, reimbursement code). Imports and the API leave them to be completed before submitting. */
 function conditionalIssues(d: Answers, rules: AppSettings, extras = true): { path: string; message: string }[] {
@@ -153,12 +152,10 @@ function conditionalIssues(d: Answers, rules: AppSettings, extras = true): { pat
   if (extras) {
     missing(d.chargeLocationId, 'chargeLocationId', 'Choose where to charge.');
   }
-  // The reason and classification are asked on every path except when tax was withheld, which finishes right after that step.
-  if (needsReason(d, rules)) {
-    need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
-    need(d.classification, 'classification', 'Choose a classification.');
-    if (d.classification === 'other') need((d.classificationOther ?? '').length >= 2, 'classificationOther', 'Write what the other classification is.');
-  }
+  // The reason and classification are asked on every path, also after the withholding step.
+  need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
+  need(d.classification, 'classification', 'Choose a classification.');
+  if (d.classification === 'other') need((d.classificationOther ?? '').length >= 2, 'classificationOther', 'Write what the other classification is.');
   return out;
 }
 
@@ -273,7 +270,6 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
   const under = bir && d.invoiceUnderCompany === true;
   const wht = bir && rules.askWithholding && d.withheld === true;
   const t = (v: string | null | undefined) => (v ? v : null);
-  const reason = needsReason({ birInvoice: bir, withheld: d.withheld }, rules);
   return {
     birInvoice: bir,
     invoiceUnderCompany: bir ? d.invoiceUnderCompany ?? null : null,
@@ -281,9 +277,9 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
     noBirReason: null,
     invoiceNo: bir ? t(d.invoiceNo) : null, vendorAddress: t(d.vendorAddress), vendorTin: bir ? t(d.vendorTin) : null,
     transactionType: bir ? d.transactionType ?? null : null,
-    reasonForSpending: reason ? t(d.reasonForSpending) : null,
-    classification: reason ? d.classification ?? null : null,
-    classificationOther: reason && d.classification === 'other' ? t(d.classificationOther) : null,
+    reasonForSpending: t(d.reasonForSpending),
+    classification: d.classification ?? null,
+    classificationOther: d.classification === 'other' ? t(d.classificationOther) : null,
     vatType: bir ? d.vatType ?? null : null,
     vatableAmount: bir ? d.vatableAmount ?? null : null,
     vatAmount: bir ? d.vatAmount ?? null : null,

@@ -58,7 +58,7 @@ check('Product or Service is required', codes(await ana.post('/receipts', full({
 check('zero VAT is a real answer', (await ana.post('/receipts', full({ invoiceNo: 'Z-' + stamp, vatableAmount: 1120, vatAmount: 0, vatType: 'non_vatable' }))).status === 201);
 const w1 = await ana.post('/receipts', full({ invoiceNo: 'W1-' + stamp, withheld: true }));
 check('withholding needs a rate and an amount when "Yes"', w1.status === 400 && ['whtRate', 'whtAmount'].every((k) => codes(w1).includes(k)), JSON.stringify(codes(w1)));
-const w = await ana.post('/receipts', full({ invoiceNo: 'W2-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
+const w = await ana.post('/receipts', full({ invoiceNo: 'W2-' + stamp, withheld: true, whtRate: 2, whtAmount: 20 }));
 check('withholding saved with rate and amount', w.status === 201 && w.data.receipt.form.whtRate === 2 && w.data.receipt.form.whtAmount === 20);
 const none = { birInvoice: false, receiptDate: '2026-10-12', payee: 'Form Test Corner ' + stamp, amount: 350 };
 const noneBad = await ana.post('/receipts', none);
@@ -74,8 +74,10 @@ const oth3 = await ana.post('/receipts', { ...noneOk, classification: 'meal_pers
 check('the "Other" words are dropped when another classification is chosen', oth3.status === 201 && oth3.data.receipt.form.classificationOther === null);
 const notCo = await ana.post('/receipts', full({ invoiceNo: 'NC-' + stamp, invoiceUnderCompany: false, seenCompany: false, seenTin: false, seenAddress: false }));
 check('an invoice not under the company skips the three ticks', notCo.status === 201 && notCo.data.receipt.form.invoiceUnderCompany === false && notCo.data.receipt.form.seenCompany === null, JSON.stringify(notCo.data?.error));
-const tax = await ana.post('/receipts', full({ invoiceNo: 'TX-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
-check('tax withheld finishes after the withholding step, with no reason for spending', tax.status === 201 && tax.data.receipt.form.reasonForSpending === null, JSON.stringify(tax.data?.error));
+const tax = await ana.post('/receipts', full({ invoiceNo: 'TX-' + stamp, withheld: true, whtRate: 2, whtAmount: 20 }));
+check('tax withheld still asks for the reason for spending, as the client form does', tax.status === 201 && tax.data.receipt.form.reasonForSpending !== null, JSON.stringify(tax.data?.error));
+const taxNoReason = await ana.post('/receipts', full({ invoiceNo: 'TR-' + stamp, withheld: true, whtRate: 2, whtAmount: 20, reasonForSpending: undefined, classification: undefined }));
+check('tax withheld without a reason for spending is refused', taxNoReason.status === 400 && ['reasonForSpending', 'classification'].every((k) => codes(taxNoReason).includes(k)), JSON.stringify(codes(taxNoReason)));
 const noTax = await ana.post('/receipts', full({ invoiceNo: 'NT-' + stamp, reasonForSpending: undefined, classification: undefined }));
 check('without tax withheld the reason for spending is required', noTax.status === 400 && codes(noTax).includes('reasonForSpending'));
 check('answers that do not apply are not kept', nb.data.receipt.form.vatType === null && nb.data.receipt.form.vatAmount === null && nb.data.receipt.form.seenCompany === null && nb.data.receipt.form.transactionType === null);

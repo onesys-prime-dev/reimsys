@@ -145,8 +145,8 @@ export function ReceiptFormPage() {
     s.push('invoice');
     const taxWithheld = f.bir === 'yes' && rules.askWithholding && f.withheld === 'yes';
     if (f.bir === 'yes') { s.push('vat'); if (taxWithheld) s.push('wht'); }
-    // As in the client's chart, a receipt with tax withheld finishes after the withholding step; every other path asks why the money was spent.
-    if (!taxWithheld) s.push('spend');
+    // As in the client's form, the reason for spending is asked on every path, also after the withholding step.
+    s.push('spend');
     s.push('evidence');
     return s;
   }, [f.bir, f.underCo, f.withheld, rules.askWithholding]);

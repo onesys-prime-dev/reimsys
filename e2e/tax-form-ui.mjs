@@ -149,7 +149,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   ok('and blocks', (await title(p)) === 'Tax withheld');
   await p.getByLabel(/^Withholding tax amount/).fill('20');
   await next(p);
-  ok('then the last step, with no reason for spending', (await title(p)) === 'Proof and review');
+  ok('then the reason for spending, as in the client form', (await title(p)) === 'Reason for spending');
 
   console.log(' Wording');
   const text = await p.evaluate(() => document.body.innerText);

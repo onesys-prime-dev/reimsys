@@ -62,6 +62,10 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await next(p); await audit(p, 'Tax withheld (wrong amount)');
   await p.getByLabel(/^Withholding tax amount/).fill('20');
   await next(p);
+  // the client form asks the reason for spending after the withholding step too
+  await next(p); await audit(p, 'reason for spending after tax withheld (empty)');
+  await p.getByLabel('Specific reason for spending').fill('Water'); await p.getByRole('radio', { name: /^Fuel/ }).first().click();
+  await next(p);
   ok(`${label}: reached the last step`, (await p.locator('.steph').innerText()) === 'Proof and review');
   await p.click('button:has-text("Submit for checking")');
   // Submit is blocked while the amounts mismatch, so look at the last page's own errors
