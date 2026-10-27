@@ -18,11 +18,13 @@ async function audit(p, where) {
     const controls = [...block.querySelectorAll('input:not([type=file]), select, textarea, [role=radio], .drop')].filter((c) => c.offsetParent !== null || c.type === 'checkbox');
     const er = e.getBoundingClientRect();
     const last = (tickLabel ? [tickLabel] : controls).map((c) => c.getBoundingClientRect()).sort((a, b) => b.bottom - a.bottom)[0];
-    return { text: e.textContent.trim(), hasField: !!last, gap: last ? er.top - last.bottom : null, below: last ? er.top >= last.top : false, label: (block.querySelector('span, .q')?.textContent ?? '').trim().slice(0, 40) };
+    return { text: e.textContent.trim(), hasField: !!last, gap: last ? er.top - last.bottom : null, below: last ? er.top >= last.top : false, label: (block.querySelector('span, .q')?.textContent ?? '').trim().slice(0, 40), star: (() => { const heads = [...block.querySelectorAll('.q, label.f > span:first-child, .tick b, div.full > div:first-child')].filter((h) => h.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING); const h = heads[heads.length - 1] ?? block.querySelector('span'); return (tickLabel ?? h)?.textContent.slice(0, 200).includes('*'); })() };
   }));
   ok(`${where}: shows at least one error`, rows.length > 0);
   for (const r of rows) {
     ok(`${where}: "${r.text}" has its field (${r.label})`, r.hasField);
+    // a question the form refuses to leave empty is marked with the red *, as in the Google Form (the "warn" notes are not about an empty answer)
+    if (!/^Check this/.test(r.text)) ok(`${where}: "${r.text}" is on a question marked with *`, r.star, r.label);
     ok(`${where}: "${r.text}" is right under it`, r.hasField && r.below && r.gap >= -2 && r.gap < 60, JSON.stringify(r));
   }
   return rows.length;

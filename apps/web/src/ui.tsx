@@ -96,10 +96,10 @@ export function Modal({ title, onClose, children, className = '' }: { title: str
 
 /* ---------- small pieces ---------- */
 /** A labelled input. A guide button sits beside the label, outside it: inside a label it would become the thing the label belongs to, and the input would lose its name. */
-export const Field = ({ label, hint, error, children, className = '', guide }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string; guide?: ReactNode }) => {
+export const Field = ({ label, hint, error, children, className = '', guide, required }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string; guide?: ReactNode; required?: boolean }) => {
   const body = (
     <label className={`f ${guide ? '' : className}`}>
-      <span>{label} {hint && <span className="hint">{hint}</span>}</span>
+      <span>{label}{required && <i className="req" aria-hidden="true"> *</i>} {hint && <span className="hint">{hint}</span>}</span>
       {children}
       {error && <span className="err">{error}</span>}
     </label>

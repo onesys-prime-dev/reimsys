@@ -84,7 +84,7 @@ function Tick({ checked, onChange, label, value, error }: { checked: boolean; on
     <div className={`tick ${error ? 'bad' : ''}`}>
       <label>
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span><b>{label}</b><em>{value}</em></span>
+        <span><b>{label}<i className="req" aria-hidden="true"> *</i></b><em>{value}</em></span>
       </label>
       {error && <span className="err">{error}</span>}
     </div>
@@ -330,12 +330,12 @@ export function ReceiptFormPage() {
 
           {step === 'invoice' && (
             <div className="form">
-                            <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate} guide={required ? <FieldGuide field="invoiceDate" /> : undefined}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
-              {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo} guide={<FieldGuide field="invoiceNo" />}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
-              <Field label="Vendor complete name" className="full" error={e.payee} guide={required ? <FieldGuide field="vendorName" /> : undefined}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
-              <Field label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress} guide={required ? <FieldGuide field="vendorAddress" /> : undefined}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
-              {required && <Field label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin} guide={<FieldGuide field="vendorTin" />}><TinInput value={f.vendorTin} onChange={(v) => set('vendorTin', v, 'vendorTin')} /></Field>}
-              <Field label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount} guide={required ? <FieldGuide field="grossAmount" /> : undefined}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
+                            <Field required label={required ? 'Invoice date' : 'Date'} error={e.receiptDate} guide={required ? <FieldGuide field="invoiceDate" /> : undefined}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
+              {required && <Field required={rules.requireInvoiceNo} label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo} guide={<FieldGuide field="invoiceNo" />}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
+              <Field required label="Vendor complete name" className="full" error={e.payee} guide={required ? <FieldGuide field="vendorName" /> : undefined}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
+              <Field required={!required || rules.requireVendorAddress} label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress} guide={required ? <FieldGuide field="vendorAddress" /> : undefined}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
+              {required && <Field required={rules.requireVendorTin} label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin} guide={<FieldGuide field="vendorTin" />}><TinInput value={f.vendorTin} onChange={(v) => set('vendorTin', v, 'vendorTin')} /></Field>}
+              <Field required label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount} guide={required ? <FieldGuide field="grossAmount" /> : undefined}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
               {required && <div className="full">
                 <div className="q">Business transaction? <i>*</i></div>
                 <Choice name="Business transaction" value={f.type} onChange={(v) => set('type', v, 'transactionType')} options={[{ value: 'product', label: 'Product' }, { value: 'service', label: 'Service' }]} />
@@ -351,10 +351,10 @@ export function ReceiptFormPage() {
                 <Choice name="VAT type" value={f.vatType} onChange={(v) => set('vatType', v, 'vatType')} options={[{ value: 'vatable', label: 'Vatable', sub: '"VAT" can be seen in the letterhead of the invoice' }, { value: 'non_vatable', label: 'Non-vatable', sub: '"NON-VAT" appeared in the letterhead of the invoice' }]} />
                 {e.vatType && <span className="err">{e.vatType}</span>}
               </div>
-              <Field label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" />{notes('vatableAmount')}</Field>
-              <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
-              <Field label='VAT-exempt amount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" />{notes('vatExemptAmount')}</Field>
-              <Field label='Discount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
+              <Field required label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" />{notes('vatableAmount')}</Field>
+              <Field required label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
+              <Field required label='VAT-exempt amount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" />{notes('vatExemptAmount')}</Field>
+              <Field required label='Discount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
               {rules.askWithholding && <div className="full">
                 <div className="q">Tax withheld? <i>*</i><FieldGuide field="taxWithheld" /></div>
                 <Choice name="Tax withheld" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
@@ -379,14 +379,14 @@ export function ReceiptFormPage() {
 
           {step === 'wht' && (
             <div className="form">
-              <Field label="Withholding tax rate, whole number without % (0 if none)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
-              <Field label="Withholding tax amount (PHP)" error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
+              <Field required label="Withholding tax rate, whole number without % (0 if none)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
+              <Field required label="Withholding tax amount (PHP)" error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
             </div>
           )}
 
           {step === 'spend' && (
             <div className="form">
-              <Field label="Specific reason for spending" className="full" error={e.reasonForSpending}>
+              <Field required label="Specific reason for spending" className="full" error={e.reasonForSpending}>
                 <input type="text" value={f.spendReason} maxLength={300} onChange={(ev) => set('spendReason', ev.target.value, 'reasonForSpending')} autoFocus />
               </Field>
               <div className="full">
@@ -395,7 +395,7 @@ export function ReceiptFormPage() {
                 {e.classification && <span className="err">{e.classification}</span>}
               </div>
               {f.classification === 'other' && (
-                <Field label="Other classification" className="full" error={e.classificationOther}>
+                <Field required label="Other classification" className="full" error={e.classificationOther}>
                   <input type="text" value={f.classificationOther} maxLength={100} onChange={(ev) => set('classificationOther', ev.target.value, 'classificationOther')} placeholder="Write what it is" autoFocus />
                 </Field>
               )}
@@ -405,7 +405,7 @@ export function ReceiptFormPage() {
           {step === 'evidence' && (
             <div className="form">
               <div className="full">
-                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {MAX_FILES}</span></div>
+                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <i className="req" aria-hidden="true">*</i> <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {MAX_FILES}</span></div>
                 <div className={`drop ${over ? 'over' : ''}`} onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
                   <Icon name="upload" />
                   <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to {rules.evidenceMaxMb} MB each</div>
@@ -433,7 +433,7 @@ export function ReceiptFormPage() {
 
               {rules.showDescription && <Field label="Description" hint="Optional" className="full"><input type="text" value={f.description} onChange={(ev) => set('description', ev.target.value)} placeholder="What was this for?" maxLength={500} /></Field>}
 
-              <Field label="Choose where to charge" className="full" error={e.chargeLocationId}>
+              <Field required label="Choose where to charge" className="full" error={e.chargeLocationId}>
                 <select value={f.chargeLocationId} onChange={(ev) => set('chargeLocationId', ev.target.value, 'chargeLocationId')}>
                   <option value="">Choose</option>
                   {(charges.data?.locations ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -445,7 +445,7 @@ export function ReceiptFormPage() {
                 <Choice name="New Reimbursement Code" value={f.newCode} onChange={(v) => set('newCode', v, 'newReimbursementCode', 'reimbursementCode')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'Other', sub: 'Write the reimbursement code' }]} />
                 {e.newReimbursementCode && <span className="err">{e.newReimbursementCode}</span>}
               </div>
-              {f.newCode === 'no' && <Field label="Reimbursement code" className="full" error={e.reimbursementCode}><input type="text" value={f.reimbursementCode} maxLength={40} onChange={(ev) => set('reimbursementCode', ev.target.value, 'reimbursementCode')} autoFocus /></Field>}
+              {f.newCode === 'no' && <Field required label="Reimbursement code" className="full" error={e.reimbursementCode}><input type="text" value={f.reimbursementCode} maxLength={40} onChange={(ev) => set('reimbursementCode', ev.target.value, 'reimbursementCode')} autoFocus /></Field>}
 
               <div className="full">
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
