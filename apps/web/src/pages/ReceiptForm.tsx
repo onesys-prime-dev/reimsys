@@ -301,7 +301,7 @@ export function ReceiptFormPage() {
           {step === 'bir' && (
             <div className="form">
               <div className="full">
-                <div className="q">With BIR-registered invoice? <i>*</i></div>
+                <div className="q">With BIR-registered invoice? <i>*</i><FieldGuide field="birInvoice" /></div>
                 <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'Either of the sample invoices, as allowed' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
                 {e.birInvoice && <span className="err">{e.birInvoice}</span>}
               </div>

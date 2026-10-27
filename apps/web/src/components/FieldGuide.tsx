@@ -4,10 +4,11 @@ import { Icon } from '../ui';
 import { ZoomPan } from './ZoomPan';
 
 /** Each question or field that has a sample picture of its own. */
-export type GuideField = 'invoiceDate' | 'invoiceNo' | 'vendorName' | 'vendorAddress' | 'vendorTin' | 'grossAmount' | 'vatableAmount' | 'vatAmount' | 'vatExempt' | 'discount' | 'taxWithheld' | 'whtRate' | 'whtAmount';
+export type GuideField = 'birInvoice' | 'invoiceDate' | 'invoiceNo' | 'vendorName' | 'vendorAddress' | 'vendorTin' | 'grossAmount' | 'vatableAmount' | 'vatAmount' | 'vatExempt' | 'discount' | 'taxWithheld' | 'whtRate' | 'whtAmount';
 
 /** The sample invoice with the place to look marked, and the name of the field for the screen reader. */
 const GUIDES: Record<GuideField, { image: string; label: string }> = {
+  birInvoice: { image: 'overview', label: 'BIR-registered invoice' },
   invoiceDate: { image: 'overview', label: 'invoice date' },
   invoiceNo: { image: 'overview', label: 'invoice number' },
   vendorName: { image: 'overview', label: 'vendor name' },
