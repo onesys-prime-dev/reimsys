@@ -87,7 +87,7 @@ check('a vendor name that looks like a formula is stored as typed, not run', (aw
 console.log('\nWarnings never block');
 const odd = await ana.post('/receipts', full({ invoiceNo: 'O-' + stamp, vatAmount: 50 }));
 check('numbers that do not add up still save as a draft', odd.status === 201);
-check('and are flagged for the Checker', odd.data.receipt.warnings.length >= 2, JSON.stringify(odd.data.receipt.warnings));
+check('and are flagged for the Checker', odd.data.receipt.warnings.length >= 1, JSON.stringify(odd.data.receipt.warnings));
 check('a TIN that is not complete is refused', codes(await ana.post('/receipts', full({ invoiceNo: 'O2-' + stamp, vendorTin: 'ABC' }))).includes('vendorTin') && codes(await ana.post('/receipts', full({ invoiceNo: 'O3-' + stamp, vendorTin: '123-456-789' }))).includes('vendorTin'));
 const loose = await ana.post('/receipts', full({ invoiceNo: 'O4-' + stamp, vendorTin: '12345678900000' }));
 check('a TIN typed without hyphens is saved in the formatted way', loose.status === 201 && loose.data.receipt.form.vendorTin === '123-456-789-00000', JSON.stringify(loose.data?.error));

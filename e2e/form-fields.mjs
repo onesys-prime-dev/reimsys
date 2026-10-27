@@ -64,6 +64,18 @@ console.log('\nThe classification list');
 for (const c of ['notarial', 'representation_recreation']) check(`"${c}" is accepted`, (await call(U.ana, 'POST', '/receipts', { ...base, invoiceNo: 'C' + c + stamp, classification: c })).s === 201);
 for (const c of ['meal', 'representation']) check(`the old "${c}" is no longer on the list`, codes(await call(U.ana, 'POST', '/receipts', { ...base, invoiceNo: 'C' + c + stamp, classification: c })).includes('classification'));
 
+console.log('\nWhere to charge is checked');
+const badLoc = await call(U.ana, 'POST', '/receipts', { ...base, invoiceNo: 'L1' + stamp, chargeLocationId: 99999 });
+check('a place that is not in the list is refused, not a server error', badLoc.s === 400 && badLoc.d?.error?.code === 'BAD_CHARGE_LOCATION', JSON.stringify(badLoc.d));
+const loc = (await call(U.admin, 'POST', '/charge-locations', { name: 'Switched off ' + stamp })).d.location;
+await call(U.admin, 'PATCH', '/charge-locations/' + loc.id, { isActive: false });
+check('a place that is switched off cannot be chosen', (await call(U.ana, 'POST', '/receipts', { ...base, invoiceNo: 'L2' + stamp, chargeLocationId: loc.id })).s === 400);
+check('and a Med Ref cannot change the list', (await call(U.ana, 'POST', '/charge-locations', { name: 'Nope ' + stamp })).s === 403);
+
+console.log('\nThe dashboard figures only show other people to management');
+const acc = (await call(U.rica, 'GET', '/dashboard/tax-impact')).d;
+check('Accounting sees no other employee: no employee table and no receipts of others', acc?.scope === 'own' && acc.employees.length === 0 && acc.worst.length === 0 && acc.totals.receipts === 0, JSON.stringify(acc?.totals));
+
 console.log('\nThe export has the new columns');
 const csv = await (await fetch(B + '/receipts/export?format=csv&q=Fields%20Test', { headers: H(U.admin, false) })).text();
 check('VAT-exempt amount, discount, where to charge and reimbursement code', ['VAT-exempt amount', 'Discount', 'Where to charge', 'Reimbursement code', 'Makati Medical Center'].every((c) => csv.includes(c)));

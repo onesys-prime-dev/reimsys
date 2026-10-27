@@ -41,6 +41,13 @@ function formColumns(data: ReturnType<ReturnType<typeof makeReceiptSchema>['pars
   };
 }
 
+/** The place to charge must exist and be switched on (a receipt that already has a place switched off since keeps it). */
+async function assertChargeLocation(id: number | null | undefined, keep?: number | null) {
+  if (id === null || id === undefined || id === keep) return;
+  const c = await prisma.chargeLocation.findUnique({ where: { id } });
+  if (!c || !c.isActive) throw badRequest('Choose where to charge from the list.', 'BAD_CHARGE_LOCATION');
+}
+
 /* ---------- list, export, create ---------- */
 
 const SORTS: Record<string, Prisma.ReceiptOrderByWithRelationInput[]> = {
@@ -99,6 +106,7 @@ receiptsRouter.get('/export', async (req, res) => {
 
 receiptsRouter.post('/', requirePerm('receipt.create'), async (req, res) => {
   const data = makeReceiptSchema(getSettings(), false).parse(req.body);
+  await assertChargeLocation(data.chargeLocationId);
   const r = await prisma.$transaction(async (tx) =>
     tx.receipt.create({ data: { refNo: await nextReceiptRef(tx), encoderId: req.auth!.user.id, ...formColumns(data) }, include: receiptInclude }),
   );
@@ -118,6 +126,7 @@ receiptsRouter.patch('/:id', requirePerm('receipt.create'), async (req, res) => 
   assertOwner(req.auth!, r);
   if (!canEditReceipt(r.status as ReceiptStatus)) throw conflict('This receipt can no longer be edited.', 'INVALID_STATE');
   const data = makeReceiptSchema(getSettings(), false).parse(req.body);
+  await assertChargeLocation(data.chargeLocationId, r.chargeLocationId);
   const updated = await prisma.receipt.update({ where: { id: r.id }, data: formColumns(data), include: receiptInclude });
   await audit(req, {
     action: 'receipt.updated', entityType: 'receipt', entityId: r.id, summary: 'updated the receipt',

@@ -28,7 +28,8 @@ export async function impactRows(auth: AuthContext, filter: { from?: string; to?
     AND: [
       visibleWhere(auth),
       { birInvoice: true, status: { notIn: ['draft', 'disapproved'] } },
-      filter.employeeId ? { encoderId: filter.employeeId } : {},
+      // Only management sees other people's receipts here. Anyone else (Accounting can see approved receipts of everyone) gets their own.
+      seesEveryone(auth) ? (filter.employeeId ? { encoderId: filter.employeeId } : {}) : { encoderId: auth.user.id },
       filter.from || filter.to ? { receiptDate: { ...(filter.from ? { gte: new Date(filter.from + 'T00:00:00Z') } : {}), ...(filter.to ? { lte: new Date(filter.to + 'T00:00:00Z') } : {}) } } : {},
     ],
   };
