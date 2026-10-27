@@ -143,11 +143,11 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await next(p);
   ok('matching amounts let the person continue', (await title(p)) === 'Tax withheld');
   await p.getByLabel(/^Withholding tax rate/).fill('2');
-  await p.getByLabel('Withholding tax amount (PHP)').fill('25');
+  await p.getByLabel(/^Withholding tax amount/).fill('25');
   ok('the withholding amount that is not rate x net is red, under its field', (await p.locator('.note.bad').count()) === 1);
   await next(p);
   ok('and blocks', (await title(p)) === 'Tax withheld');
-  await p.getByLabel('Withholding tax amount (PHP)').fill('20');
+  await p.getByLabel(/^Withholding tax amount/).fill('20');
   await next(p);
   ok('then the last step, with no reason for spending', (await title(p)) === 'Proof and review');
 

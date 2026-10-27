@@ -91,7 +91,7 @@ ok('"Tax withheld: Yes" adds the Tax withheld step', (await stepTitle(p)) === 'T
 await next(p);
 ok('the rate and amount are required', (await errs(p)).length === 2);
 await p.getByLabel(/^Withholding tax rate/).fill('2');
-await p.getByLabel('Withholding tax amount (PHP)').fill('20');
+await p.getByLabel(/^Withholding tax amount/).fill('20');
 await next(p);
 ok('last step is proof and review', (await stepTitle(p)) === 'Proof and review');
 const review = await p.locator('.review').innerText();

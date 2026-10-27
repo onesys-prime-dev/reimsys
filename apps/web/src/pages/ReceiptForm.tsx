@@ -311,7 +311,7 @@ export function ReceiptFormPage() {
           {step === 'underco' && (
             <div className="form">
               <div className="full">
-                <div className="q">Invoice under <b>{co.name}</b>? <i>*</i></div>
+                <div className="q">With BIR-registered invoice under <b>{co.name}</b>? <i>*</i></div>
                 <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'Allowed by BIR only. You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
                 {e.invoiceUnderCompany && <span className="err">{e.invoiceUnderCompany}</span>}
               </div>
@@ -351,9 +351,9 @@ export function ReceiptFormPage() {
                 {e.vatType && <span className="err">{e.vatType}</span>}
               </div>
               <Field required label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" />{notes('vatableAmount')}</Field>
-              <Field required label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
-              <Field required label='VAT-exempt amount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" />{notes('vatExemptAmount')}</Field>
-              <Field required label='Discount, enter "0" if none or not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
+              <Field required label='VAT amount - indicate number "0" if NO VAT or VAT is not written or printed in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
+              <Field required label='VAT-exempt amount (VEA) - indicate number "0" if NO VEA or VEA is not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" />{notes('vatExemptAmount')}</Field>
+              <Field required label='Discount - indicate number "0" if NO discount or discount is not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
               {rules.askWithholding && <div className="full">
                 <div className="q">Tax withheld? <i>*</i><FieldGuide field="taxWithheld" /></div>
                 <Choice name="Tax withheld" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
@@ -378,8 +378,8 @@ export function ReceiptFormPage() {
 
           {step === 'wht' && (
             <div className="form">
-              <Field required label="Withholding tax rate, whole number without % (0 if none)" error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
-              <Field required label="Withholding tax amount (PHP)" error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
+              <Field required label='Withholding tax rate - indicate number "0" if none, or the whole number without % if there is withholding tax' error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
+              <Field required label='Withholding tax amount - indicate number "0" if none (PHP)' error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
             </div>
           )}
 
