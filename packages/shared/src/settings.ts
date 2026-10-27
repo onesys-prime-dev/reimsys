@@ -11,7 +11,7 @@ export const appSettingsSchema = z.object({
   /* the reimbursement form: rules */
   vatRate: num(0, 30, 'The VAT rate'),
   tolerance: num(0, 5, 'The tolerance'),
-  warningsBlock: z.boolean(),
+  defaultWhtRate: num(0, 100, 'The default withholding rate'),
   allowNoBir: z.boolean(),
   /* the reimbursement form: questions */
   requireInvoiceNo: z.boolean(),
@@ -41,7 +41,7 @@ export const appSettingsSchema = z.object({
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  vatRate: 12, tolerance: 0.02, warningsBlock: false, allowNoBir: true,
+  vatRate: 12, tolerance: 0.02, defaultWhtRate: 2, allowNoBir: true,
   requireInvoiceNo: true, requireVendorAddress: true, requireVendorTin: true, askWithholding: true, showDescription: true,
   evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, reminderCheckDays: 2, reminderDecideDays: 2, reminderPayDays: 3, reminderFixDays: 5, sessionIdleMinutes: 60, sessionMaxHours: 12,
   retentionMonths: 0, privacyRetention: '', privacyContact: '', privacyVersion: 1,
@@ -55,7 +55,7 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
     items: [
       { key: 'vatRate', label: 'VAT rate', help: 'Used to check that the VAT amount is the right share of the vatable amount.', kind: 'number', unit: '%', step: 0.5 },
       { key: 'tolerance', label: 'Rounding tolerance', help: 'Numbers that differ by no more than this are treated as equal.', kind: 'number', unit: 'PHP', step: 0.01 },
-      { key: 'warningsBlock', label: 'Stop submitting when the numbers do not add up', help: 'Off: the Med Ref sees a warning and can still submit. On: they must fix it first.', kind: 'bool' },
+      { key: 'defaultWhtRate', label: 'Default withholding tax rate', help: 'Used for the potential loss and savings estimate when no rate was typed, for example when "Tax withheld?" is answered No.', kind: 'number', unit: '%', step: 0.5 },
       { key: 'allowNoBir', label: 'Accept receipts without a BIR-registered invoice', help: 'Off: the "No" answer is not offered.', kind: 'bool' },
     ],
   },
@@ -66,7 +66,7 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
       { key: 'requireInvoiceNo', label: 'Invoice number is required', help: '', kind: 'bool' },
       { key: 'requireVendorAddress', label: 'Vendor address is required', help: '', kind: 'bool' },
       { key: 'requireVendorTin', label: 'Vendor TIN is required', help: '', kind: 'bool' },
-      { key: 'askWithholding', label: 'Ask about withholding tax', help: 'Off: the withholding question and step are left out and treated as "No".', kind: 'bool' },
+      { key: 'askWithholding', label: 'Ask about tax withheld', help: 'Off: the tax withheld question and step are left out and treated as "No".', kind: 'bool' },
       { key: 'showDescription', label: 'Show the optional description box', help: '', kind: 'bool' },
     ],
   },

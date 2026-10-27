@@ -1,21 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react';
-import { InvoiceGuide } from '../components/InvoiceGuide';
+import { FieldGuide } from '../components/FieldGuide';
+import { TinInput } from '../components/TinInput';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, type AppSettings, type Company } from '@reimsys/shared';
-import { api, errMsg, todayIso } from '../api';
+import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, taxImpact, vatChecks, type FormCheck, type AppSettings, type Company } from '@reimsys/shared';
+import { api, errMsg, fmtDateTime, money as pesoMoney, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { FilePreview } from '../components/FilePreview';
 import { LiveScanner } from '../components/LiveScanner';
 import { ScanDialog } from '../components/ScanDialog';
 import { pageToFile } from '../scanPage';
 import { Field, Icon, useToast } from '../ui';
+import { useFormDraft } from '../useFormDraft';
 
 /** Back to the top of the screen. On a computer the area beside the menu scrolls, not the browser window. */
 const toTop = () => { document.querySelector('.main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }); };
 
 const kb = (n: number) => (n > 1_048_576 ? `${(n / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,application/pdf';
+
+interface DraftBrief { id: number; receiptId: number | null; step: number; updatedAt: string; vendor: string | null; amount: number | null; invoiceNo: string | null }
+interface DraftFull extends DraftBrief { data: Partial<FormState> }
 
 /** Everything on the form, as text, exactly as typed. Turned into numbers and flags only when it is checked or saved. */
 interface FormState {
@@ -24,29 +29,31 @@ interface FormState {
   seenCompany: boolean; seenTin: boolean; seenAddress: boolean;
   spendReason: string; classification: '' | (typeof CLASSIFICATIONS)[number]; classificationOther: string;
   date: string; invoiceNo: string; payee: string; vendorAddress: string; vendorTin: string; amount: string; type: '' | 'product' | 'service';
-  vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string;
+  vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string; vatExempt: string; discount: string;
   withheld: '' | 'yes' | 'no'; whtRate: string; whtAmount: string;
   description: string;
+  chargeLocationId: string;
 }
 const EMPTY: FormState = {
   bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', classificationOther: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
-  type: '', vatType: '', vatable: '', vat: '', withheld: '', whtRate: '', whtAmount: '', description: '',
+  type: '', vatType: '', vatable: '', vat: '', vatExempt: '', discount: '', withheld: '', whtRate: '', whtAmount: '', description: '',
+  chargeLocationId: '',
 };
 
 type StepId = 'bir' | 'underco' | 'company' | 'invoice' | 'vat' | 'wht' | 'spend' | 'evidence';
 const STEP_TITLE: Record<StepId, string> = {
-  bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Withholding tax', spend: 'Reason for spending', evidence: 'Proof and review',
+  bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Tax withheld', spend: 'Reason for spending', evidence: 'Proof and review',
 };
 const STEP_FIELDS: Record<StepId, string[]> = {
-  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
+  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther', 'chargeLocationId'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
-  vat: ['vatType', 'vatableAmount', 'vatAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
+  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
   birInvoice: f.bir, invoiceUnderCompany: f.bir === 'yes' ? f.underCo : '', seenCompany: f.underCo === 'yes' ? f.seenCompany : null, seenTin: f.underCo === 'yes' ? f.seenTin : null, seenAddress: f.underCo === 'yes' ? f.seenAddress : null,
   reasonForSpending: f.spendReason, classification: f.classification, classificationOther: f.classificationOther, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
-  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
+  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, vatExemptAmount: f.vatExempt, discountAmount: f.discount, chargeLocationId: f.chargeLocationId, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
 const fromReceipt = (r: ReceiptDetail): FormState => {
@@ -57,7 +64,9 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
     bir: yn(x.birInvoice), underCo: x.birInvoice ? (x.invoiceUnderCompany === null ? 'yes' : yn(x.invoiceUnderCompany)) : '', seenCompany: !!x.seenCompany, seenTin: !!x.seenTin, seenAddress: !!x.seenAddress,
     spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '', classificationOther: x.classificationOther ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
-    type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount),
+    type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount), vatExempt: n(x.vatExemptAmount), discount: n(x.discountAmount),
+    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '',
+   
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
   };
 };
@@ -79,7 +88,7 @@ function Tick({ checked, onChange, label, value, error }: { checked: boolean; on
     <div className={`tick ${error ? 'bad' : ''}`}>
       <label>
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-        <span><b>{label}</b><em>{value}</em></span>
+        <span><b>{label}<i className="req" aria-hidden="true"> *</i></b><em>{value}</em></span>
       </label>
       {error && <span className="err">{error}</span>}
     </div>
@@ -105,16 +114,20 @@ export function ReceiptFormPage() {
   const closePreview = () => setPreviewing((p) => { if (p?.revoke) URL.revokeObjectURL(p.url); return null; });
   const previewQueued = (x: File) => setPreviewing({ title: x.name, url: URL.createObjectURL(x), pdf: x.type === 'application/pdf' || /\.pdf$/i.test(x.name), revoke: true });
   const [over, setOver] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const wantedStep = params.get('step');
+  /** A new form that was saved as a draft is opened by its number: /receipts/new?draft=12 */
+  const draftParam = id === null ? params.get('draft') : null;
+  const [restoredAt, setRestoredAt] = useState<number | null>(null);
   const [f, setF] = useState<FormState>(EMPTY);
   const [stepIx, setStepIx] = useState(0);
-  const [params] = useSearchParams();
-  const wantedStep = params.get('step');
+  const [done, setDone] = useState(false);
   const jumped = useRef(false);
   const [queued, setQueued] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   // When editing, the form stays hidden until the saved values are in it, so nothing flashes empty and nothing typed early gets overwritten.
-  const [ready, setReady] = useState(id === null);
+  const [ready, setReady] = useState(id === null && !draftParam);
 
   const company = useQuery({ queryKey: ['company'], queryFn: () => api<{ company: Company }>('/company') });
   const co = company.data?.company ?? DEFAULT_COMPANY;
@@ -122,10 +135,73 @@ export function ReceiptFormPage() {
   const rules = appSet.data?.settings ?? DEFAULT_SETTINGS;
   const MAX_FILES = rules.evidenceMaxFiles;
   const MAX_BYTES = rules.evidenceMaxMb * 1_048_576;
+  const charges = useQuery({ queryKey: ['charge-locations'], queryFn: () => api<{ locations: { id: number; name: string }[] }>('/charge-locations') });
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
   const rec = existing.data?.receipt;
 
-  useEffect(() => { if (rec) { setF(fromReceipt(rec)); setReady(true); } }, [rec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const untouched = useMemo(() => (rec ? fromReceipt(rec) : EMPTY), [rec]);
+  // What is typed is saved on the server as it goes, even half filled, so a wrong exit loses nothing.
+  const sync = useFormDraft<FormState>({ enabled: ready && !done, receiptId: id, state: f, step: stepIx, untouched });
+  const shown = useRef<string | null>(null); // the draft the form is showing
+  const drafts = useQuery({ queryKey: ['form-drafts'], enabled: id === null, queryFn: () => api<{ drafts: DraftBrief[] }>('/form-drafts') });
+
+  // Opening a receipt to edit: the form shows the saved receipt, or the changes that were typed after it was last saved.
+  useEffect(() => {
+    if (!rec) return;
+    const saved = fromReceipt(rec);
+    let alive = true;
+    (async () => {
+      try {
+        const list = await api<{ drafts: DraftBrief[] }>('/form-drafts');
+        const mine = list.drafts.find((d) => d.receiptId === rec.id);
+        if (mine && Date.parse(mine.updatedAt) > Date.parse(rec.updatedAt)) {
+          const d = await api<{ draft: DraftFull }>(`/form-drafts/${mine.id}`);
+          const s = { ...EMPTY, ...d.draft.data };
+          if (JSON.stringify(s) !== JSON.stringify(saved)) {
+            if (!alive) return;
+            setF(s); if (!wantedStep) setStepIx(d.draft.step); sync.adopt(d.draft.id, s, d.draft.step); setRestoredAt(Date.parse(d.draft.updatedAt)); setReady(true);
+            return;
+          }
+        }
+        if (mine) await api(`/form-drafts/${mine.id}`, { method: 'DELETE' }).catch(() => undefined); // older than the saved receipt, or the same as it
+      } catch { /* no saved changes could be read: the saved receipt is shown */ }
+      if (alive) { setF(saved); setReady(true); }
+    })();
+    return () => { alive = false; };
+  }, [rec?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A new form: open the unfinished one named in the address, or start fresh when "New receipt" is pressed while one is open.
+  useEffect(() => {
+    if (id !== null) return;
+    if (!draftParam) {
+      if (shown.current !== null) { shown.current = null; sync.adopt(null, EMPTY, 0); setF(EMPTY); setStepIx(0); setErrors({}); setRestoredAt(null); setReady(true); }
+      return;
+    }
+    if (shown.current === draftParam) return;
+    shown.current = draftParam;
+    setReady(false);
+    api<{ draft: DraftFull }>(`/form-drafts/${draftParam}`).then((d) => {
+      const s = { ...EMPTY, ...d.draft.data };
+      setF(s); setStepIx(d.draft.step); sync.adopt(d.draft.id, s, d.draft.step); setRestoredAt(Date.parse(d.draft.updatedAt)); setReady(true);
+    }).catch(() => {
+      toast('That unfinished form was not found. It may have been finished or discarded.', 'bad');
+      shown.current = null; setParams({}, { replace: true }); setReady(true);
+    });
+  }, [draftParam, id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The first save of a new form gives it a number, which goes into the address so a refresh opens the same form.
+  useEffect(() => {
+    if (id !== null || !ready) return;
+    if (sync.draftId !== null && String(sync.draftId) !== shown.current) { shown.current = String(sync.draftId); setParams({ draft: String(sync.draftId) }, { replace: true }); }
+    else if (sync.draftId === null && shown.current !== null && draftParam === shown.current) { shown.current = null; setParams({}, { replace: true }); } // the answers went back to empty, so the draft was dropped
+  }, [sync.draftId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startOver = async () => {
+    await sync.discard(); shown.current = null; setRestoredAt(null); setStepIx(0); setErrors({});
+    setF(untouched);
+    if (id === null) setParams({}, { replace: true });
+    qc.invalidateQueries({ queryKey: ['form-drafts'] });
+  };
+  const discardOther = async (draftId: number) => { await api(`/form-drafts/${draftId}`, { method: 'DELETE' }).catch(() => undefined); qc.invalidateQueries({ queryKey: ['form-drafts'] }); };
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K], ...errKeys: string[]) => {
     setF((p) => ({ ...p, [k]: v }));
@@ -139,8 +215,8 @@ export function ReceiptFormPage() {
     s.push('invoice');
     const taxWithheld = f.bir === 'yes' && rules.askWithholding && f.withheld === 'yes';
     if (f.bir === 'yes') { s.push('vat'); if (taxWithheld) s.push('wht'); }
-    // As in the client's chart, a receipt with withheld tax finishes after the withholding step; every other path asks why the money was spent.
-    if (!taxWithheld) s.push('spend');
+    // As in the client's form, the reason for spending is asked on every path, also after the withholding step.
+    s.push('spend');
     s.push('evidence');
     return s;
   }, [f.bir, f.underCo, f.withheld, rules.askWithholding]);
@@ -159,15 +235,26 @@ export function ReceiptFormPage() {
   const total = files.length + queued.length;
   const required = f.bir === 'yes';
 
-  const warnings = useMemo(() => {
+  const figures = useMemo(() => {
     const n = (v: string) => (v.trim() === '' || Number.isNaN(Number(v)) ? null : Number(v));
     const amount = n(f.amount);
-    if (amount === null) return [];
-    return receiptWarnings({
-      birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat),
-      withheld: f.withheld === '' ? null : f.withheld === 'yes', whtRate: n(f.whtRate), whtAmount: n(f.whtAmount),
-    }, rules);
-  }, [f, rules]);
+    if (amount === null) return null;
+    return {
+      birInvoice: f.bir === '' ? null : f.bir === 'yes', amount, vendorTin: f.vendorTin, vatType: f.vatType || null, vatableAmount: n(f.vatable), vatAmount: n(f.vat), vatExemptAmount: n(f.vatExempt) ?? 0,
+      withheld: f.withheld === '' ? null : f.withheld === 'yes',
+      // A rate typed earlier under "Yes" is not kept when the answer is No, so the estimate must not use it either.
+      whtRate: f.withheld === 'yes' ? n(f.whtRate) : null, whtAmount: f.withheld === 'yes' ? n(f.whtAmount) : null,
+    };
+  }, [f]);
+  const warnings = useMemo(() => (figures ? receiptWarnings(figures, rules) : []), [figures, rules]);
+  /** The VAT checks, each with its level. They are shown right under the field they are about. */
+  const checks = useMemo<FormCheck[]>(() => (figures ? vatChecks(figures, rules) : []), [figures, rules]);
+  const impact = useMemo(() => (figures ? taxImpact(figures, rules) : null), [figures, rules]);
+  /** Red problems that stop the form being submitted, wherever the person is in the form. */
+  const submitBlockers = checks.filter((c) => c.level !== 'warn');
+  const notes = (field: string) => checks.filter((c) => c.field === field).map((c) => (
+    <span key={c.message} className={`note ${c.level === 'warn' ? 'warn' : 'bad'}`} role={c.level === 'warn' ? 'status' : 'alert'}><b>{c.level === 'warn' ? 'Check this' : c.level === 'blockSubmit' ? 'Fix before submitting' : 'Fix to continue'}</b> {c.message}</span>
+  ));
 
   /** Problems in the whole form, grouped by the field they belong to. */
   const validate = () => {
@@ -180,6 +267,9 @@ export function ReceiptFormPage() {
     const { errs } = validate();
     const mine = Object.fromEntries(Object.entries(errs).filter(([k]) => STEP_FIELDS[step].includes(k) && step !== 'evidence'));
     setErrors((e) => ({ ...e, ...mine }));
+    // Tax withheld = Yes is strict: amounts on this page that do not match stop the person here.
+    const stop = checks.some((c) => c.level === 'error' && STEP_FIELDS[step].includes(c.field));
+    if (stop) { window.setTimeout(() => document.querySelector('.note.bad')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     if (Object.keys(mine).length) { window.setTimeout(() => document.querySelector('.err')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 0); return; }
     setStepIx((i) => Math.min(i + 1, steps.length - 1));
     toTop();
@@ -208,6 +298,13 @@ export function ReceiptFormPage() {
 
   async function save(andSubmit: boolean) {
     const { parsed, errs } = validate();
+    if (andSubmit && submitBlockers.length) {
+      const at = steps.indexOf('vat');
+      if (at >= 0) setStepIx(at);
+      toast('The amounts do not add up. Correct them before submitting.', 'bad');
+      window.setTimeout(() => document.querySelector('.note.bad')?.scrollIntoView({ block: 'center' }), 50);
+      return;
+    }
     if (andSubmit && !total) errs.evidence = 'Add at least one photo or PDF of the receipt.';
     setErrors(errs);
     if (Object.keys(errs).length || !parsed.success) {
@@ -230,6 +327,7 @@ export function ReceiptFormPage() {
         up.warnings.forEach((w) => toast(w));
       }
       if (andSubmit) current = (await api<{ receipt: ReceiptDetail }>(`/receipts/${current!.id}/submit`, { method: 'POST', body: { version: current!.version } })).receipt;
+      setDone(true); await sync.discard(); qc.invalidateQueries({ queryKey: ['form-drafts'] });
       toast(andSubmit ? 'Submitted. Checkers have been notified.' : 'Draft saved.');
       qc.invalidateQueries({ queryKey: ['receipts'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
@@ -256,7 +354,28 @@ export function ReceiptFormPage() {
   return (
     <>
       <Link className="back" to={id ? `/receipts/${id}` : '/receipts'}><Icon name="back" size={18} />Back</Link>
-      <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Answer the questions about the invoice, then attach a clear photo or PDF.</p></div></div>
+      <div className="ph"><div><h1>{id ? 'Edit receipt' : 'New receipt'}</h1><p>Answer the questions about the invoice, then attach a clear photo or PDF.</p><p className="draftstat" data-testid="draft-status" aria-live="polite">{sync.status === 'saving' ? 'Saving…' : sync.status === 'saved' ? 'All changes saved' : sync.status === 'failed' ? 'Could not save yet. Trying again. Your answers are still on this page.' : ''}</p></div></div>
+      {restoredAt !== null && (
+        <div className="callout ok" role="status" data-testid="draft-restored"><Icon name="info" /><div><b>Continuing your unfinished form</b><span>Last saved {fmtDateTime(new Date(restoredAt).toISOString())}. A photo or PDF that was not saved has to be added again.</span>
+          <button type="button" className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => void startOver()}>Start over</button></div></div>
+      )}
+      {id === null && !sync.draftId && ready && JSON.stringify(f) === JSON.stringify(EMPTY) && (drafts.data?.drafts.filter((d) => d.receiptId === null).length ?? 0) > 0 && (
+        <section className="card" data-testid="draft-list" style={{ marginBottom: 14 }}>
+          <div className="card-b">
+            <b>Unfinished forms</b>
+            <p className="muted" style={{ margin: '2px 0 8px', fontSize: '.85rem' }}>These were saved as you typed. Continue one, or start a new form below.</p>
+            {drafts.data!.drafts.filter((d) => d.receiptId === null).map((d) => (
+              <div key={d.id} className="rv" style={{ alignItems: 'center' }}>
+                <span>{d.vendor ?? 'No vendor yet'}{d.amount !== null ? ` · ${pesoMoney(d.amount)}` : ''}<small className="muted" style={{ display: 'block' }}>Saved {fmtDateTime(d.updatedAt)}</small></span>
+                <b style={{ display: 'flex', gap: 6 }}>
+                  <Link className="btn sm" to={`/receipts/new?draft=${d.id}`}>Continue</Link>
+                  <button type="button" className="btn sm ghost" aria-label={`Discard the unfinished form from ${fmtDateTime(d.updatedAt)}`} onClick={() => void discardOther(d.id)}>Discard</button>
+                </b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {rec?.status === 'returned' && (rec.lastNote || rec.returnIssues.length > 0) && (
         <div className="callout warn"><Icon name="undo" /><div><b>Returned for correction</b>{rec.returnIssues.filter((c) => c !== 'other').length > 0 && <span style={{ display: 'block' }}>{rec.returnIssues.filter((c) => c !== 'other').map(issueLabel).join(' · ')}</span>}{rec.lastNote && <span style={{ display: 'block' }}>{rec.lastNote}</span>}</div></div>
       )}
@@ -274,8 +393,8 @@ export function ReceiptFormPage() {
           {step === 'bir' && (
             <div className="form">
               <div className="full">
-                <div className="q">With BIR-registered invoice? <i>*</i></div>
-                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
+                <div className="q">With BIR-registered invoice? <i>*</i><FieldGuide field="birInvoice" /></div>
+                <Choice name="BIR-registered invoice" value={f.bir} onChange={(v) => set('bir', v, 'birInvoice')} options={[{ value: 'yes', label: 'Yes', sub: 'Either of the sample invoices, as allowed' }, ...(rules.allowNoBir ? [{ value: 'no' as const, label: 'No', sub: 'Only the date, vendor, address and amount are needed' }] : [])]} />
                 {e.birInvoice && <span className="err">{e.birInvoice}</span>}
               </div>
             </div>
@@ -284,8 +403,8 @@ export function ReceiptFormPage() {
           {step === 'underco' && (
             <div className="form">
               <div className="full">
-                <div className="q">Invoice under <b>{co.name}</b>? <i>*</i></div>
-                <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
+                <div className="q">With BIR-registered invoice under <b>{co.name}</b>? <i>*</i></div>
+                <Choice name="Invoice under the company" value={f.underCo} onChange={(v) => set('underCo', v, 'invoiceUnderCompany')} options={[{ value: 'yes', label: 'Yes', sub: 'Allowed by BIR only. You will confirm the name, TIN and address on it' }, { value: 'no', label: 'No' }]} />
                 {e.invoiceUnderCompany && <span className="err">{e.invoiceUnderCompany}</span>}
               </div>
             </div>
@@ -302,53 +421,63 @@ export function ReceiptFormPage() {
 
           {step === 'invoice' && (
             <div className="form">
-              {required && <div className="full"><InvoiceGuide step="invoice" /></div>}
-              <Field label={required ? 'Invoice date' : 'Date'} error={e.receiptDate}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
-              {required && <Field label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
-              <Field label="Vendor complete name" className="full" error={e.payee}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
-              <Field label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
-              {required && <Field label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin}><input type="text" inputMode="numeric" value={f.vendorTin} maxLength={30} onChange={(ev) => set('vendorTin', ev.target.value, 'vendorTin')} placeholder="000-000-000-00000" /></Field>}
-              <Field label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
+                            <Field required label={required ? 'Invoice date' : 'Date'} error={e.receiptDate} guide={required ? <FieldGuide field="invoiceDate" /> : undefined}><input type="date" value={f.date} max={todayIso()} onChange={(ev) => set('date', ev.target.value, 'receiptDate')} /></Field>
+              {required && <Field required={rules.requireInvoiceNo} label="Invoice no." hint={rules.requireInvoiceNo ? undefined : 'Optional'} error={e.invoiceNo} guide={<FieldGuide field="invoiceNo" />}><input type="text" value={f.invoiceNo} maxLength={60} onChange={(ev) => set('invoiceNo', ev.target.value, 'invoiceNo')} /></Field>}
+              <Field required label="Vendor complete name" className="full" error={e.payee} guide={required ? <FieldGuide field="vendorName" /> : undefined}><input type="text" value={f.payee} maxLength={160} onChange={(ev) => set('payee', ev.target.value, 'payee')} placeholder="Store or provider name" /></Field>
+              <Field required={!required || rules.requireVendorAddress} label="Vendor complete address" hint={!required || rules.requireVendorAddress ? undefined : 'Optional'} className="full" error={e.vendorAddress} guide={required ? <FieldGuide field="vendorAddress" /> : undefined}><input type="text" value={f.vendorAddress} maxLength={300} onChange={(ev) => set('vendorAddress', ev.target.value, 'vendorAddress')} /></Field>
+              {required && <Field required={rules.requireVendorTin} label="Vendor Tax ID No. (TIN)" hint={rules.requireVendorTin ? undefined : 'Optional'} error={e.vendorTin} guide={<FieldGuide field="vendorTin" />}><TinInput value={f.vendorTin} onChange={(v) => set('vendorTin', v, 'vendorTin')} /></Field>}
+              <Field required label={required ? 'Invoice gross amount, without any deduction (PHP)' : 'Amount paid to vendor (PHP)'} error={e.amount} guide={required ? <FieldGuide field="grossAmount" /> : undefined}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.amount} onChange={(ev) => set('amount', ev.target.value, 'amount')} placeholder="0.00" /></Field>
               {required && <div className="full">
                 <div className="q">Business transaction? <i>*</i></div>
                 <Choice name="Business transaction" value={f.type} onChange={(v) => set('type', v, 'transactionType')} options={[{ value: 'product', label: 'Product' }, { value: 'service', label: 'Service' }]} />
                 {e.transactionType && <span className="err">{e.transactionType}</span>}
               </div>}
-              {warnings.filter((w) => w.includes('TIN')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><span>{w}</span></div></div>)}
             </div>
           )}
 
           {step === 'vat' && (
             <div className="form">
-              <div className="full"><InvoiceGuide step="vat" /></div>
               <div className="full">
                 <div className="q">Vatable or non-vatable? <i>*</i></div>
                 <Choice name="VAT type" value={f.vatType} onChange={(v) => set('vatType', v, 'vatType')} options={[{ value: 'vatable', label: 'Vatable', sub: '"VAT" can be seen in the letterhead of the invoice' }, { value: 'non_vatable', label: 'Non-vatable', sub: '"NON-VAT" appeared in the letterhead of the invoice' }]} />
                 {e.vatType && <span className="err">{e.vatType}</span>}
               </div>
-              <Field label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" /></Field>
-              <Field label='VAT amount, enter "0" if no VAT in the invoice (PHP)' error={e.vatAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" /></Field>
+              <Field required label="Vatable amount, without VAT and any deduction (PHP)" error={e.vatableAmount} guide={<FieldGuide field="vatableAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatable} onChange={(ev) => set('vatable', ev.target.value, 'vatableAmount')} placeholder="0.00" />{notes('vatableAmount')}</Field>
+              <Field required label='VAT amount - indicate number "0" if NO VAT or VAT is not written or printed in the invoice (PHP)' error={e.vatAmount} guide={<FieldGuide field="vatAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vat} onChange={(ev) => set('vat', ev.target.value, 'vatAmount')} placeholder="0.00" />{notes('vatAmount')}</Field>
+              <Field required label='VAT-exempt amount (VEA) - indicate number "0" if NO VEA or VEA is not written or printed in the invoice (PHP)' error={e.vatExemptAmount} guide={<FieldGuide field="vatExempt" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.vatExempt} onChange={(ev) => set('vatExempt', ev.target.value, 'vatExemptAmount')} placeholder="0.00" />{notes('vatExemptAmount')}</Field>
+              <Field required label='Discount - indicate number "0" if NO discount or discount is not written or printed in the invoice (PHP)' error={e.discountAmount} guide={<FieldGuide field="discount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.discount} onChange={(ev) => set('discount', ev.target.value, 'discountAmount')} placeholder="0.00" /></Field>
               {rules.askWithholding && <div className="full">
-                <div className="q">Withheld tax? <i>*</i></div>
-                <Choice name="Withheld tax" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
+                <div className="q">Tax withheld? <i>*</i><FieldGuide field="taxWithheld" /></div>
+                <Choice name="Tax withheld" value={f.withheld} onChange={(v) => set('withheld', v, 'withheld')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }]} />
                 {e.withheld && <span className="err">{e.withheld}</span>}
+                {impact?.computable && impact.difference > 0 && f.withheld !== '' && (
+                  <div className={`callout ${f.withheld === 'no' ? 'warn' : 'ok'}`} style={{ marginTop: 10, marginBottom: 0 }} role="status" data-testid="tax-impact">
+                    <Icon name="info" />
+                    <div>
+                      <b>{f.withheld === 'no' ? `Potential loss: ${peso(impact.potentialLoss)}` : `Potential savings: ${peso(impact.potentialSavings)}`}</b>
+                      <span>
+                        {f.withheld === 'no'
+                          ? `Answering No means the tax is worked out on the gross amount (${peso(impact.gross)} × ${impact.rate}% = ${peso(impact.ifNo)}) instead of the net amount (${peso(impact.net)} × ${impact.rate}% = ${peso(impact.ifYes)}). Answering Yes could save ${peso(impact.difference)}.`
+                          : `Answering Yes works the tax out on the net amount (${peso(impact.net)} × ${impact.rate}% = ${peso(impact.ifYes)}) instead of the gross amount (${peso(impact.gross)} × ${impact.rate}% = ${peso(impact.ifNo)}). That is ${peso(impact.difference)} less than answering No.`}
+                        {' '}These are potential figures, not verified. {impact.rateSource === 'default' ? `The usual rate of ${impact.rate}% is used because none was entered.` : `The rate you entered (${impact.rate}%) is used.`}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>}
-              {warnings.filter((w) => !w.includes('TIN') && !w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
             </div>
           )}
 
           {step === 'wht' && (
             <div className="form">
-              <div className="full"><InvoiceGuide step="wht" /></div>
-              <Field label="Withholding tax rate (%)" error={e.whtRate}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
-              <Field label="Withholding tax amount (PHP)" error={e.whtAmount}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" /></Field>
-              {warnings.filter((w) => w.toLowerCase().includes('withhold')).map((w) => <div key={w} className="callout warn full" style={{ marginBottom: 0 }}><Icon name="info" /><div><b>Please double-check</b><span>{w}</span></div></div>)}
+              <Field required label='Withholding tax rate - indicate number "0" if none, or the whole number without % if there is withholding tax' error={e.whtRate} guide={<FieldGuide field="whtRate" />}><input type="number" step="0.01" min="0" max="100" inputMode="decimal" value={f.whtRate} onChange={(ev) => set('whtRate', ev.target.value, 'whtRate')} placeholder="e.g. 1" /></Field>
+              <Field required label='Withholding tax amount - indicate number "0" if none (PHP)' error={e.whtAmount} guide={<FieldGuide field="whtAmount" />}><input type="number" step="0.01" min="0" inputMode="decimal" value={f.whtAmount} onChange={(ev) => set('whtAmount', ev.target.value, 'whtAmount')} placeholder="0.00" />{notes('whtAmount')}</Field>
             </div>
           )}
 
           {step === 'spend' && (
             <div className="form">
-              <Field label="Specific reason for spending" className="full" error={e.reasonForSpending}>
+              <Field required label="Specific reason for spending" className="full" error={e.reasonForSpending}>
                 <input type="text" value={f.spendReason} maxLength={300} onChange={(ev) => set('spendReason', ev.target.value, 'reasonForSpending')} autoFocus />
               </Field>
               <div className="full">
@@ -357,17 +486,24 @@ export function ReceiptFormPage() {
                 {e.classification && <span className="err">{e.classification}</span>}
               </div>
               {f.classification === 'other' && (
-                <Field label="Other classification" className="full" error={e.classificationOther}>
+                <Field required label="Other classification" className="full" error={e.classificationOther}>
                   <input type="text" value={f.classificationOther} maxLength={100} onChange={(ev) => set('classificationOther', ev.target.value, 'classificationOther')} placeholder="Write what it is" autoFocus />
                 </Field>
               )}
+              <Field required label="Choose where to charge" className="full" error={e.chargeLocationId}>
+                <select value={f.chargeLocationId} onChange={(ev) => set('chargeLocationId', ev.target.value, 'chargeLocationId')}>
+                  <option value="">Choose</option>
+                  {(charges.data?.locations ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
+                </select>
+              </Field>
             </div>
           )}
 
           {step === 'evidence' && (
             <div className="form">
               <div className="full">
-                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {MAX_FILES}</span></div>
+                <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Evidence <i className="req" aria-hidden="true">*</i> <span className="hint muted" style={{ fontWeight: 400 }}>{total} of {MAX_FILES}</span></div>
                 <div className={`drop ${over ? 'over' : ''}`} onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
                   <Icon name="upload" />
                   <div style={{ marginTop: 6 }}><b style={{ color: 'var(--ink)' }}>Drop files here</b><br />JPG, PNG, WEBP, HEIC or PDF · up to {rules.evidenceMaxMb} MB each</div>
@@ -407,10 +543,13 @@ export function ReceiptFormPage() {
                   {steps.includes('spend') && inv('Reason for spending', f.spendReason || '-')}
                   {steps.includes('spend') && inv('Classification', f.classification ? classificationText(f.classification, f.classificationOther) : '-')}
                   {inv('Gross amount', money(f.amount))}
-                  {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)}`)}
-                  {f.bir === 'yes' && rules.askWithholding && inv('Withholding tax', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
+                  {f.bir === 'yes' && inv('VAT', `${f.vatType ? VAT_LABEL[f.vatType] : '-'} · vatable ${money(f.vatable)} · VAT ${money(f.vat)} · VAT-exempt ${money(f.vatExempt)} · discount ${money(f.discount)}`)}
+                  {inv('Where to charge', (charges.data?.locations ?? []).find((c) => String(c.id) === f.chargeLocationId)?.name ?? rec?.form.chargeLocation?.name ?? '-')}
+                  {impact?.computable && impact.difference > 0 && f.withheld !== '' && inv(f.withheld === 'no' ? 'Potential loss' : 'Potential savings', peso(impact.difference))}
+                  {f.bir === 'yes' && rules.askWithholding && inv('Tax withheld', f.withheld === 'yes' ? `${f.whtRate || '-'}% · ${money(f.whtAmount)}` : f.withheld === 'no' ? 'None' : '-')}
                 </div>
                 {rec && rec.possibleDuplicates.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>Possible duplicate</b><span>Same invoice, or same vendor, amount and date, as {rec.possibleDuplicates.map((d, i) => <span key={d.id}>{i > 0 && ', '}<Link to={`/receipts/${d.id}`} style={{ color: 'inherit', fontWeight: 600 }}>{d.refNo}</Link></span>)}. If this is a different purchase, carry on.</span></div></div>}
+                {submitBlockers.length > 0 && <div className="callout bad" style={{ marginTop: 12, marginBottom: 0 }} role="alert"><Icon name="info" /><div><b>This cannot be submitted yet</b>{submitBlockers.map((c) => <span key={c.message} style={{ display: 'block' }}>{c.message}</span>)}<button type="button" className="btn sm" style={{ marginTop: 8 }} onClick={() => { const at = steps.indexOf('vat'); if (at >= 0) { setStepIx(at); toTop(); } }}>Go to the VAT details</button></div></div>}
                 {warnings.length > 0 && <div className="callout warn" style={{ marginTop: 12, marginBottom: 0 }}><Icon name="info" /><div><b>The Checker will see these notes</b><span>{warnings.map((w) => <span key={w} style={{ display: 'block' }}>{w}</span>)}</span></div></div>}
               </div>
             </div>
@@ -420,7 +559,7 @@ export function ReceiptFormPage() {
             {stepIx > 0 && <button type="button" className="btn" disabled={busy} onClick={back}>Back</button>}
             {!last && <button type="submit" className="btn pri">Next</button>}
             {last && <button type="submit" className="btn" disabled={busy}>Save draft</button>}
-            {last && <button type="button" className="btn pri" disabled={busy} onClick={() => void save(true)}>{rec?.status === 'returned' ? 'Resubmit for checking' : 'Submit for checking'}</button>}
+            {last && <button type="button" className="btn pri" disabled={busy || submitBlockers.length > 0} onClick={() => void save(true)}>{rec?.status === 'returned' ? 'Resubmit for checking' : 'Submit for checking'}</button>}
           </div>
         </form>
       </section>

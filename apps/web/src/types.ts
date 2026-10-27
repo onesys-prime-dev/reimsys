@@ -1,4 +1,4 @@
-import type { ReceiptAction, ReceiptStatus, ReturnIssueCode } from '@reimsys/shared';
+import type { ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;
@@ -25,7 +25,8 @@ export interface EvidenceFile { id: number; fileName: string; mime: string; size
 export interface ReceiptForm {
   birInvoice: boolean | null; invoiceUnderCompany: boolean | null; reasonForSpending: string | null; classification: string | null; classificationOther: string | null; seenCompany: boolean | null; seenTin: boolean | null; seenAddress: boolean | null; noBirReason: string | null;
   invoiceNo: string | null; vendorAddress: string | null; vendorTin: string | null; transactionType: string | null;
-  vatType: string | null; vatableAmount: number | null; vatAmount: number | null;
+  vatType: string | null; vatableAmount: number | null; vatAmount: number | null; vatExemptAmount: number | null; discountAmount: number | null;
+  chargeLocation: { id: number; name: string } | null;
   withheld: boolean | null; whtRate: number | null; whtAmount: number | null;
   /** What the Checker confirmed can be seen on the invoice. Null until a check was made. */
   checked: { company: boolean | null; tin: boolean | null; address: boolean | null } | null;
@@ -35,6 +36,8 @@ export interface ReceiptDetail extends ReceiptBrief {
   description: string | null;
   form: ReceiptForm;
   warnings: string[];
+  impact: TaxImpact;
+  incompleteReasons: string[];
   checkedBy: string | null; checkedAt: string | null; checkNote: string | null;
   decidedBy: string | null; decidedAt: string | null; decisionNote: string | null;
   lastNote: string | null;

@@ -17,7 +17,7 @@ importsRouter.use(requireAuth, requirePerm('receipt.import'));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const MAX_ROWS = 2000;
-const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'withheld', 'wht_rate', 'wht_amount', 'description', 'encoder_email'];
+const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'vat_exempt_amount', 'discount', 'tax_withheld', 'wht_rate', 'wht_amount', 'charge_location', 'description', 'encoder_email'];
 
 const idParam = (v: unknown) => {
   const n = Number(v);
@@ -28,7 +28,7 @@ const idParam = (v: unknown) => {
 const norm = (h: string) => h.trim().toLowerCase().replace(/[\s-]+/g, '_');
 const ALIAS: Record<string, string> = {
   paid_to: 'payee', vendor: 'payee', vendor_name: 'payee', date: 'receipt_date', invoice_date: 'receipt_date', amount_php: 'amount', gross_amount: 'amount',
-  no_bir_reason: 'reason_for_spending', reason: 'reason_for_spending', encoder: 'encoder_email', email: 'encoder_email', transaction_type: 'type', business_transaction: 'type', bir: 'bir_invoice', tin: 'vendor_tin',
+  no_bir_reason: 'reason_for_spending', reason: 'reason_for_spending', encoder: 'encoder_email', email: 'encoder_email', transaction_type: 'type', business_transaction: 'type', bir: 'bir_invoice', tin: 'vendor_tin', withheld: 'tax_withheld',
 };
 const yesNo = (v: string | undefined) => (/^(yes|y|true|1)$/i.test((v ?? '').trim()) ? true : /^(no|n|false|0)$/i.test((v ?? '').trim()) ? false : undefined);
 /** "Meeting, Seminar, or Convention", "meal" or "Other: team building" -> the stored code and, for Other, the person's words. */
@@ -38,7 +38,9 @@ function readClassification(v: string | undefined, other: string | undefined) {
   const m = /^other\s*[:\-]?\s*(.*)$/i.exec(s);
   if (m) return { classification: 'other', classificationOther: (m[1] || other || '').trim() || undefined };
   const lower = s.toLowerCase();
-  const code = CLASSIFICATIONS.find((c) => c === lower || CLASSIFICATION_LABEL[c].toLowerCase() === lower || lower.startsWith(c));
+  // The words of the old list still work: Meal is Meal - Personal, Representation is Representation - Meal.
+  const legacy: Record<string, string> = { meal: 'meal_personal', representation: 'representation_meal' };
+  const code = CLASSIFICATIONS.find((c) => c === lower || CLASSIFICATION_LABEL[c].toLowerCase() === lower) ?? legacy[lower] ?? CLASSIFICATIONS.find((c) => lower.startsWith(c.split('_')[0]!));
   return { classification: code ?? lower };
 }
 const num = (v: string | undefined) => (v ?? '').replace(/[₱,%\s]|php/gi, '');
@@ -82,8 +84,8 @@ async function readRows(file: Express.Multer.File): Promise<Record<string, strin
 
 importsRouter.get('/template', (_req, res) => {
   const sample = [
-    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'Other: Clinic supplies', 'vatable', '1000.00', '120.00', 'no', '', '', 'Clinic supplies', ''],
-    ['Corner Store', '2026-10-12', '', '', 'Mandaue City, Cebu', '350.00', '', 'no', '', '', 'Water refills for the clinic', 'meal', '', '', '', '', '', '', '', ''],
+    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'Other: Clinic supplies', 'vatable', '1000.00', '120.00', '0', '0', 'no', '', '', 'Makati Medical Center', 'Clinic supplies', ''],
+    ['Corner Store', '2026-10-12', '', '', 'Mandaue City, Cebu', '350.00', '', 'no', '', '', 'Water refills for the clinic', 'meal - personal', '', '', '', '', '', '', '', '', 'Makati Medical Center', '', ''],
   ];
   res.type('text/csv').attachment('reimsys-import-template.csv').send(toCsv([TEMPLATE_HEAD, ...sample]));
 });
@@ -97,6 +99,7 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
   const importerIsEncoder = auth.permissions.has('receipt.create');
 
   const encoders = await prisma.user.findMany({ where: { isActive: true, role: { permissions: { some: { permission: { code: 'receipt.create' } } } } }, select: { id: true, email: true } });
+  const chargeLocations = await prisma.chargeLocation.findMany({ where: { isActive: true }, select: { id: true, name: true } });
   const valid: { payee: string; receiptDate: string; amount: number; description: string | null; form: ReturnType<typeof cleanFormData> | null; encoderId: number }[] = [];
   const errors: { row: number; message: string }[] = [];
 
@@ -119,11 +122,12 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
         birInvoice: yesNo(r.bir_invoice), invoiceUnderCompany: yesNo(r.invoice_under_company) ?? (yesNo(r.bir_invoice) ? true : undefined), seenCompany: yesNo(r.company_check), seenTin: yesNo(r.company_check), seenAddress: yesNo(r.company_check),
         reasonForSpending: r.reason_for_spending, ...readClassification(r.classification, r.classification_other),
         invoiceNo: r.invoice_no, vendorAddress: r.vendor_address, vendorTin: r.vendor_tin, transactionType: (r.type ?? '').toLowerCase(),
-        vatType: (r.vat_type ?? '').toLowerCase().replace(/[\s-]+/g, '_'), vatableAmount: num(r.vatable_amount), vatAmount: num(r.vat_amount),
-        withheld: yesNo(r.withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
+        vatType: (r.vat_type ?? '').toLowerCase().replace(/[\s-]+/g, '_'), vatableAmount: num(r.vatable_amount), vatAmount: num(r.vat_amount), vatExemptAmount: num(r.vat_exempt_amount), discountAmount: num(r.discount),
+        chargeLocationId: chargeLocations.find((c) => c.name.toLowerCase() === (r.charge_location ?? '').trim().toLowerCase())?.id,
+        withheld: yesNo(r.tax_withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
       } : { birInvoice: false, vendorAddress: 'x', reasonForSpending: 'xxx', classification: 'fuel' }),
     };
-    const parsed = makeReceiptSchema(getSettings()).safeParse(candidate);
+    const parsed = makeReceiptSchema(getSettings(), false).safeParse(candidate);
     if (!parsed.success) {
       const label: Record<string, string> = { receiptDate: 'invoice_date', payee: 'vendor', amount: 'gross_amount', birInvoice: 'bir_invoice', transactionType: 'type', reasonForSpending: 'reason_for_spending', classification: 'classification', classificationOther: 'classification', invoiceUnderCompany: 'invoice_under_company', seenCompany: 'company_check', seenTin: 'company_check', seenAddress: 'company_check' };
       return void errors.push({ row: rowNo, message: parsed.error.issues.map((x) => `${label[String(x.path[0])] ?? x.path[0]}: ${x.message}`).join(' ') });

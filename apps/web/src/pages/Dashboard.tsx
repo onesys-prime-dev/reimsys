@@ -6,6 +6,7 @@ import { useAuth } from '../auth';
 import type { ReceiptBrief } from '../types';
 import { Empty, Icon } from '../ui';
 import { ReceiptRow } from './Receipts';
+import { TaxImpactSummary } from './TaxImpact';
 
 interface Dash {
   counts: Record<string, number>;
@@ -74,6 +75,8 @@ export function DashboardPage() {
       <div className="tiles">
         {tiles.map((t) => <Link key={t.label} className={`tile ${t.alert ? 'alert' : ''}`} to={t.to}><small>{t.label}</small><b>{d.data ? t.value : '–'}</b></Link>)}
       </div>
+
+      <TaxImpactSummary />
 
       <div className="grid2">
         <div className="stack">

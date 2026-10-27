@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, receiptWarnings, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { availableActions, canEditReceipt, receiptWarnings, taxImpact, incompleteReasons, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import { getSettings } from './appSettings.js';
@@ -22,6 +22,7 @@ export const receiptInclude = {
   category: true,
   encoder: { select: { id: true, name: true } },
   document: true,
+  chargeLocation: { select: { id: true, name: true } },
   payment: { include: { recordedBy: { select: { id: true, name: true } } } },
 } satisfies Prisma.ReceiptInclude;
 
@@ -40,7 +41,8 @@ export function receiptForm(r: ReceiptRow) {
   return {
     birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, classificationOther: r.classificationOther, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
     invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType,
-    vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount),
+    vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), discountAmount: dec(r.discountAmount),
+    chargeLocation: r.chargeLocation,
     withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount),
     checked: r.ckCompany === null && r.ckTin === null && r.ckAddress === null ? null : { company: r.ckCompany, tin: r.ckTin, address: r.ckAddress },
   };
@@ -91,7 +93,9 @@ export async function receiptDetail(auth: AuthContext, r: ReceiptRow) {
     ...receiptBrief(r),
     description: r.description,
     form: receiptForm(r),
-    warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }, getSettings()),
+    warnings: receiptWarnings({ birInvoice: r.birInvoice, amount: Number(r.amount), vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount) }, getSettings()),
+    impact: taxImpact({ birInvoice: r.birInvoice, amount: Number(r.amount), vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), withheld: r.withheld, whtRate: dec(r.whtRate) }, getSettings()),
+    incompleteReasons: incompleteReasons({ birInvoice: r.birInvoice, invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), withheld: r.withheld }, getSettings()),
     checkedBy: name(r.checkedById), checkedAt: r.checkedAt, checkNote: r.checkNote,
     decidedBy: name(r.decidedById), decidedAt: r.decidedAt, decisionNote: r.decisionNote,
     lastNote: r.lastNote,

@@ -95,13 +95,17 @@ export function Modal({ title, onClose, children, className = '' }: { title: str
 }
 
 /* ---------- small pieces ---------- */
-export const Field = ({ label, hint, error, children, className = '' }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string }) => (
-  <label className={`f ${className}`}>
-    <span>{label} {hint && <span className="hint">{hint}</span>}</span>
-    {children}
-    {error && <span className="err">{error}</span>}
-  </label>
-);
+/** A labelled input. A guide button sits beside the label, outside it: inside a label it would become the thing the label belongs to, and the input would lose its name. */
+export const Field = ({ label, hint, error, children, className = '', guide, required }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string; guide?: ReactNode; required?: boolean }) => {
+  const body = (
+    <label className={`f ${guide ? '' : className}`}>
+      <span>{label}{required && <i className="req" aria-hidden="true"> *</i>} {hint && <span className="hint">{hint}</span>}</span>
+      {children}
+      {error && <span className="err">{error}</span>}
+    </label>
+  );
+  return guide ? <div className={`fwrap ${className}`}>{body}<span className="fg-slot">{guide}</span></div> : body;
+};
 
 export const Empty = ({ title, children }: { title: string; children?: ReactNode }) => (
   <div className="empty"><b>{title}</b>{children}</div>

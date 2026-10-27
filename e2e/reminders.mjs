@@ -16,10 +16,14 @@ const waitDecide = await step(U.liza, await (async () => { const r = await make(
 const waitPay = await (async () => { let r = await make('Remind pay'); await look(U.liza, r); r = await step(U.liza, r, 'check'); await look(U.paolo, r); return step(U.paolo, r, 'approve'); })();
 const waitFix = await (async () => { const r = await make('Remind fix'); await look(U.liza, r); return step(U.liza, r, 'return', { note: 'Please retake.' }); })();
 const fresh = await make('Remind fresh');
-sql(`UPDATE receipt SET submittedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitCheck.id};
-     UPDATE receipt SET checkedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitDecide.id};
-     UPDATE receipt SET decidedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitPay.id};
-     UPDATE receipt SET updatedAt = NOW() - INTERVAL 6 DAY WHERE id = ${waitFix.id};`);
+// A reminder lists every overdue receipt in one notice, and a development copy keeps the old ones from earlier test runs, which would push these five out of the
+// notice text. So the other waiting receipts are made to look new first (their waiting clocks are reset; nothing else about them changes).
+const mine = [waitCheck, waitDecide, waitPay, waitFix, fresh].map((r) => r.id).join(',');
+sql(`UPDATE receipt SET submittedAt = UTC_TIMESTAMP(3), checkedAt = IF(checkedAt IS NULL, NULL, UTC_TIMESTAMP(3)), decidedAt = IF(decidedAt IS NULL, NULL, UTC_TIMESTAMP(3)), updatedAt = UTC_TIMESTAMP(3) WHERE id NOT IN (${mine}) AND status IN ('submitted','checked','approved','returned');`);
+sql(`UPDATE receipt SET submittedAt = UTC_TIMESTAMP(3) - INTERVAL 6 DAY WHERE id = ${waitCheck.id};
+     UPDATE receipt SET checkedAt = UTC_TIMESTAMP(3) - INTERVAL 6 DAY WHERE id = ${waitDecide.id};
+     UPDATE receipt SET decidedAt = UTC_TIMESTAMP(3) - INTERVAL 6 DAY WHERE id = ${waitPay.id};
+     UPDATE receipt SET updatedAt = UTC_TIMESTAMP(3) - INTERVAL 6 DAY WHERE id = ${waitFix.id};`);
 
 const sent = await call(U.admin, 'POST', '/email-log/reminders-now', {});
 ok('an administrator can send the reminders now', sent.s === 200 && sent.d.sent > 0);

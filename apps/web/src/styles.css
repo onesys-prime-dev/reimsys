@@ -548,7 +548,7 @@ input,select,textarea{border-radius:10px}
 
 @media(min-width:821px){
   /* Dashboard: fits the window; the queue and the recent activity scroll inside their own cards. */
-  .page.dash{height:max(620px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:24px}
+  .page.dash{min-height:max(620px,calc(100dvh - var(--topH)));display:flex;flex-direction:column;padding-bottom:24px}
   .page.dash>*{flex:none}
   .page.dash>.grid2{flex:1 1 auto;min-height:420px;align-items:stretch}
   .page.dash .grid2>.stack{min-height:0;display:flex;flex-direction:column;gap:16px}
@@ -711,3 +711,73 @@ section.card[id]{scroll-margin-top:84px}
 /* Make the evidence loading sign easy to notice: a bigger spinner in the accent colour and text in the normal ink colour */
 .ev-wrap .ev-loading{color:var(--ink);font-size:1rem;gap:14px;background:color-mix(in srgb,var(--surface) 96%,transparent)}
 .ev-wrap .ev-loading .spin{width:44px;height:44px;border-width:5px;border-color:var(--accent-soft);border-top-color:var(--accent)}
+
+/* Field guides: a small button beside a question opens that question's sample picture over the whole screen */
+.fg-open{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;vertical-align:middle;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--accent);cursor:pointer}
+.fg-open:hover{background:var(--soft)}
+.fg-full{position:fixed;inset:0;z-index:80;height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:rgba(8,16,20,.6)}
+.fg-card{display:flex;flex-direction:column;gap:8px;width:min(100%,540px);height:min(100%,700px);padding:10px;background:var(--surface);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.fg-close{align-self:flex-end;flex:none;min-height:44px}
+.fg-stage{position:relative;flex:1;min-height:0;display:flex;background:var(--soft);border-radius:10px;overflow:hidden}
+.fg-stage .zp.fg-zp{flex:1;height:auto;min-height:0;background:transparent;border-radius:0}
+.fg-zp .zp-bar{display:none}
+.fg-zp .zp-in img{max-width:100%;max-height:100%;border-radius:0;background:#fff}
+.fg-msg{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--ink);font-weight:600}
+.fg-msg .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:guidespin .8s linear infinite}
+
+/* A check sitting right under the field it is about: yellow lets the person carry on, red does not */
+.note{display:block;margin-top:2px;padding:8px 10px;border-radius:8px;font-weight:400;font-size:.84rem;line-height:1.4}
+.note b{font-weight:700}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+
+/* Tax impact on the dashboard */
+.tibars{display:grid;gap:6px;margin:8px 0 18px}
+.tibar{display:grid;grid-template-columns:72px 1fr;grid-template-areas:'l t' '. v';gap:2px 10px;align-items:center;font-size:.84rem}
+.tibar-l{grid-area:l;color:var(--muted)}.tibar-t{grid-area:t;display:grid;gap:3px}.tibar-v{grid-area:v;color:var(--muted);font-variant-numeric:tabular-nums}
+.tibar-t i,.tilegend i{display:block;height:8px;border-radius:4px;min-width:2px}
+.tibar-t i.loss,.tilegend i.loss{background:var(--bad)}.tibar-t i.save,.tilegend i.save{background:var(--ok)}
+.tilegend{display:flex;gap:16px;font-size:.84rem;color:var(--muted)}.tilegend span{display:flex;align-items:center;gap:6px}.tilegend i{width:14px;height:8px}
+tr.sub td{background:var(--soft);font-size:.86rem}
+.tilegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+@media(max-width:640px){.tilegrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+
+.fwrap{position:relative;min-width:0}
+.fwrap>label.f>span:first-child{padding-right:36px}
+.fg-slot{position:absolute;top:-3px;right:0}
+.fg-slot .fg-open{margin-left:0}
+
+/* The dashboard's tax row: three tiles and a link, small enough to sit between the status tiles and the queue */
+.tisum{margin:0 0 16px}
+.tisum-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.tisum-h h2{margin:0;font-size:1rem}.tisum-h h2 small{font-weight:500;color:var(--muted);margin-left:6px;font-size:.82rem}
+.tisum-t{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tisum-t .tile b{font-size:1.4rem}
+@media(max-width:640px){.tisum-t{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tisum-t .tile:last-child{grid-column:1/-1}}
+/* the filters on the tax page: dates side by side, never stacked */
+.tifilter{margin:0;display:flex;gap:10px;flex-wrap:wrap}
+.tifilter label.f{flex-direction:row;align-items:center;gap:6px;white-space:nowrap}
+.taximpact .card-b>p.muted{max-width:70ch}
+/* the monthly chart: one line per month, the label, the two bars, then the amounts */
+.tibar{grid-template-columns:76px minmax(0,1fr) auto;grid-template-areas:'l t v';gap:10px}
+.tibar-t{align-self:center}
+.tibar-v{white-space:nowrap;font-size:.8rem}
+@media(max-width:640px){.tibar{grid-template-columns:76px minmax(0,1fr);grid-template-areas:'l t' '. v'}.tibar-v{white-space:normal}}
+
+/* The tax page: one filter line, the figures, a note that opens on demand, then the detail in tabs */
+.tifilterbar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
+.taximpact .tilegrid{margin-bottom:0}
+.tihow{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:0 14px}
+.tihow summary{cursor:pointer;padding:10px 0;font-weight:600;font-size:.9rem;color:var(--muted)}
+.tihow p{margin:0 0 10px;font-size:.9rem;max-width:75ch}
+.tipanes{padding:0 8px;margin-bottom:0}
+.tipanes .n{display:inline-block;margin-left:4px;padding:0 7px;border-radius:99px;background:var(--soft);font-size:.78rem;color:var(--muted)}
+.taximpact .tibars{margin:0}
+/* a long invoice number or vendor never makes a list row tall: it is cut with an ellipsis (the full text is in the tooltip) */
+.row .c-cat{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal}
+.row .c-amt{white-space:nowrap;text-align:right}
+@media(max-width:820px){.row .c-cat{white-space:normal;overflow-wrap:anywhere}}
+
+/* the red * on a question the form requires, as in the Google Form */
+i.req{color:var(--bad);font-style:normal;font-weight:700}
+.draftstat{margin:2px 0 0;min-height:1.2em;font-size:.8rem;color:var(--muted)}

@@ -47,6 +47,8 @@ if (await acc.page.locator('.side .nav >> text=Ready to pay').count()) {
   await acc.page.click('.side .nav >> text=Ready to pay');
   await acc.page.waitForSelector(`text=${r1.refNo}`);
 }
+// the queue refreshes live as receipts are approved, so wait until both people's receipts are drawn
+await acc.page.waitForSelector(`text=${r3.refNo}`); await acc.page.waitForTimeout(500);
 ok('the queue shows the approved receipts grouped by person', await acc.page.locator('.card', { hasText: 'Ana Reyes' }).locator(`text=${r1.refNo}`).isVisible() && await acc.page.locator('.card', { hasText: 'Mark Dela Cruz' }).locator(`text=${r3.refNo}`).isVisible());
 await shot(acc.page, 'pay-1-queue');
 await acc.page.goto(`/receipts/${paidBefore.id}`);
@@ -130,7 +132,7 @@ const appr = await open('paolo.v@example.com');
 await appr.page.waitForSelector('.tiles');
 const apTiles = await appr.page.locator('.tiles').innerText();
 ok('the approver sees approved-not-paid and paid', apTiles.includes('Approved, not paid') && apTiles.includes('Paid'));
-ok('a long invoice number stays inside its column in the lists', await appr.page.evaluate(() => [...document.querySelectorAll('.row .c-cat')].every((el) => el.scrollWidth <= el.clientWidth + 1)));
+ok('a long invoice number stays inside its column in the lists, and does not make the row tall (it is cut short, with the full text on hover)', await appr.page.evaluate(() => [...document.querySelectorAll('.row')].every((row) => { const c = row.querySelector('.c-cat'); return !c || (c.getBoundingClientRect().right <= row.getBoundingClientRect().right + 1 && row.getBoundingClientRect().height < 110); })));
 await acc.page.goto('/reports');
 const payField = acc.page.getByLabel('Payment');
 const hasPayField = await payField.waitFor({ timeout: 5000 }).then(() => true, () => false);

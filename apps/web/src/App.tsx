@@ -5,6 +5,7 @@ import { LiveLight, useLive } from './live';
 import { SessionGuard } from './components/SessionGuard';
 import { Suspense, lazy } from 'react';
 import { DashboardPage } from './pages/Dashboard';
+import { TaxImpactPage } from './pages/TaxImpact';
 import { ForcePasswordPage } from './pages/ForcePassword';
 import { LoginPage } from './pages/Login';
 import { HelpPage } from './pages/Help';
@@ -85,6 +86,7 @@ function Shell() {
           <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/tax-impact" element={<TaxImpactPage />} />
             <Route path="/receipts" element={<ReceiptsPage />} />
             <Route path="/receipts/new" element={can('receipt.create') ? <ReceiptFormPage /> : <Navigate to="/receipts" replace />} />
             <Route path="/receipts/import" element={can('receipt.import') ? <ImportPage /> : <Navigate to="/receipts" replace />} />

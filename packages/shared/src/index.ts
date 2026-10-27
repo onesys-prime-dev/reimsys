@@ -170,6 +170,7 @@ export * from './privacy';
 export * from './text';
 export * from './reminders';
 export * from './settings';
+export * from './tax';
 
 export const mailSettingsSchema = z.object({
   host: z.string().trim().min(1, 'Enter the mail server address.').max(255).regex(/^[A-Za-z0-9.-]+$/, 'The server address should look like smtp.gmail.com.'),

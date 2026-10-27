@@ -78,7 +78,7 @@ export function ReportViewPage() {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left' }}>Document</th><th style={{ textAlign: 'left' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Withheld</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Gross</th>
+                <th style={{ textAlign: 'left' }}>Invoice no.</th><th style={{ textAlign: 'left' }}>Vendor</th><th style={{ textAlign: 'left' }}>Type</th><th style={{ textAlign: 'right' }}>VAT</th><th style={{ textAlign: 'right' }}>Tax withheld</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Gross</th>
               </tr>
             </thead>
             <tbody>

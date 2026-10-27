@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_SETTINGS, type AppSettings } from './settings';
 import { RETURN_ISSUE_CODES } from './returnIssues';
+import { formatTin, isCompleteTin, vatChecks } from './tax';
 export const RECEIPT_STATUSES = ['draft', 'submitted', 'returned', 'checked', 'approved', 'disapproved', 'reserved', 'paid'] as const;
 export type ReceiptStatus = (typeof RECEIPT_STATUSES)[number];
 
@@ -66,11 +67,11 @@ const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'fa
 export const TRANSACTION_TYPES = ['product', 'service'] as const;
 export const VAT_TYPES = ['vatable', 'non_vatable'] as const;
 export const TRANSACTION_LABEL: Record<(typeof TRANSACTION_TYPES)[number], string> = { product: 'Product', service: 'Service' };
-/** In the same order and words as the client's form. "Other" comes with the person's own words. */
-export const CLASSIFICATIONS = ['fuel', 'meeting', 'representation', 'transportation', 'parking', 'printing', 'meal', 'other'] as const;
+/** In the same order and words as the client's Google Form. "Other" comes with the person's own words. */
+export const CLASSIFICATIONS = ['fuel', 'meal_personal', 'meeting', 'notarial', 'parking', 'printing', 'representation_meal', 'representation_recreation', 'transportation', 'other'] as const;
 export const CLASSIFICATION_LABEL: Record<(typeof CLASSIFICATIONS)[number], string> = {
-  fuel: 'Fuel', meeting: 'Meeting, Seminar, or Convention', representation: 'Representation', transportation: 'Transportation',
-  parking: 'Parking', printing: 'Printing or Photocopying', meal: 'Meal', other: 'Other',
+  fuel: 'Fuel', meal_personal: 'Meal - Personal', meeting: 'Meeting, Seminar, or Convention', notarial: 'Notarial', parking: 'Parking', printing: 'Printing or Photocopying',
+  representation_meal: 'Representation - Meal', representation_recreation: 'Representation - Recreation', transportation: 'Transportation', other: 'Other',
 };
 /** The classification as people read it: the label, or "Other: what they wrote". */
 export const classificationText = (c: string | null | undefined, other?: string | null) =>
@@ -92,12 +93,15 @@ const receiptShape = z.object({
   invoiceNo: optional(z.string().trim().max(60)),
   payee: z.string().trim().min(2, 'Enter the vendor name.').max(160),
   vendorAddress: optional(z.string().trim().max(300)),
-  vendorTin: optional(z.string().trim().max(30)),
+  vendorTin: optional(z.string().trim().max(30).refine((s) => s === '' || /\d/.test(s), 'The TIN is made of numbers: 14 digits, written 000-000-000-00000.').transform(formatTin).refine((s) => s === '' || isCompleteTin(s), 'Enter the complete TIN: 14 digits, written 000-000-000-00000.').transform((s) => s || null)),
   amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
   transactionType: optional(z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) })),
   vatType: optional(z.enum(VAT_TYPES)),
   vatableAmount: optional(money('vatable amount')),
   vatAmount: optional(money('VAT amount')),
+  vatExemptAmount: optional(money('VAT-exempt amount')),
+  discountAmount: optional(money('discount')),
+  chargeLocationId: optional(z.coerce.number().int().positive()),
   withheld: optional(flag),
   whtRate: optional(money('withholding rate').refine((n) => n <= 100, 'The rate cannot be over 100.')),
   whtAmount: optional(money('withholding amount')),
@@ -108,11 +112,12 @@ const receiptShape = z.object({
 interface Answers {
   birInvoice?: boolean | null; invoiceUnderCompany?: boolean | null; reasonForSpending?: string | null; classification?: string | null; classificationOther?: string | null; transactionType?: string | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
   invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
-  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+  vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null; discountAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+  chargeLocationId?: number | null;
 }
-const needsReason = (d: Answers, rules: AppSettings) => d.birInvoice === false || (d.birInvoice === true && !(rules.askWithholding && d.withheld === true));
 
-function conditionalIssues(d: Answers, rules: AppSettings): { path: string; message: string }[] {
+/** extras: also ask the answers added from the client's Google Form (VAT-exempt amount, discount, where to charge, reimbursement code). Imports and the API leave them to be completed before submitting. */
+function conditionalIssues(d: Answers, rules: AppSettings, extras = true): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [];
   const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };
   const missing = (v: unknown, path: string, message: string) => { if (v === null || v === undefined) out.push({ path, message }); };
@@ -130,6 +135,10 @@ function conditionalIssues(d: Answers, rules: AppSettings): { path: string; mess
     need(d.vatType, 'vatType', 'Choose Vatable or Non-vatable.');
     missing(d.vatableAmount, 'vatableAmount', 'Enter the vatable amount.');
     missing(d.vatAmount, 'vatAmount', 'Enter the VAT amount, or 0 if there is none.');
+    if (extras) {
+      missing(d.vatExemptAmount, 'vatExemptAmount', 'Enter the VAT-exempt amount, or 0 if there is none.');
+      missing(d.discountAmount, 'discountAmount', 'Enter the discount, or 0 if there is none.');
+    }
     if (rules.askWithholding) missing(d.withheld, 'withheld', 'Choose Yes or No.');
     if (d.withheld && rules.askWithholding) {
       missing(d.whtRate, 'whtRate', 'Enter the withholding tax rate.');
@@ -140,19 +149,20 @@ function conditionalIssues(d: Answers, rules: AppSettings): { path: string; mess
   } else if (d.birInvoice === false) {
     need(d.vendorAddress, 'vendorAddress', 'Enter the vendor address.');
   }
-  // The reason and classification are asked on every path except when tax was withheld, which finishes right after that step.
-  if (needsReason(d, rules)) {
-    need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
-    need(d.classification, 'classification', 'Choose a classification.');
-    if (d.classification === 'other') need((d.classificationOther ?? '').length >= 2, 'classificationOther', 'Write what the other classification is.');
+  if (extras) {
+    missing(d.chargeLocationId, 'chargeLocationId', 'Choose where to charge.');
   }
+  // The reason and classification are asked on every path, also after the withholding step.
+  need((d.reasonForSpending ?? '').length >= 3, 'reasonForSpending', 'Write the specific reason for spending.');
+  need(d.classification, 'classification', 'Choose a classification.');
+  if (d.classification === 'other') need((d.classificationOther ?? '').length >= 2, 'classificationOther', 'Write what the other classification is.');
   return out;
 }
 
 /** The form's rules with the administrator's settings applied. */
-export const makeReceiptSchema = (rules: AppSettings = DEFAULT_SETTINGS) =>
+export const makeReceiptSchema = (rules: AppSettings = DEFAULT_SETTINGS, extras = true) =>
   receiptShape.superRefine((d, ctx) => {
-    for (const i of conditionalIssues(d, rules)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
+    for (const i of conditionalIssues(d, rules, extras)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.message });
   });
 export const receiptInputSchema = makeReceiptSchema();
 
@@ -160,7 +170,7 @@ export const receiptInputSchema = makeReceiptSchema();
  * Every problem in the form, by field, even when several things are wrong at once. (A schema stops at the first kind of
  * mistake, which would hide the "tick this box" messages behind an empty vendor name.)
  */
-export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings = DEFAULT_SETTINGS): Record<string, string> {
+export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings = DEFAULT_SETTINGS, extras = true): Record<string, string> {
   const out: Record<string, string> = {};
   const r = receiptShape.safeParse(raw);
   if (!r.success) for (const i of r.error.issues) out[String(i.path[0])] ||= i.message;
@@ -170,8 +180,9 @@ export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings
   for (const i of conditionalIssues({
     birInvoice: b(raw.birInvoice), invoiceUnderCompany: b(raw.invoiceUnderCompany), reasonForSpending: t(raw.reasonForSpending), classification: t(raw.classification), classificationOther: t(raw.classificationOther), transactionType: t(raw.transactionType), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
     invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
-    vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
-  }, rules)) out[i.path] ||= i.message;
+    vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), vatExemptAmount: n(raw.vatExemptAmount), discountAmount: n(raw.discountAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
+    chargeLocationId: n(raw.chargeLocationId),
+  }, rules, extras)) out[i.path] ||= i.message;
   return out;
 }
 export type ReceiptInput = z.infer<typeof receiptInputSchema>;
@@ -235,34 +246,21 @@ export const bulkSchema = z.object({
 export const commentSchema = z.object({ body: z.string().trim().min(1, 'Write a comment first.').max(1000, 'Keep it under 1,000 characters.') });
 
 /* ---------- warnings (never block, only flag) ---------- */
-export const TIN_PATTERN = /^\d{3}-?\d{3}-?\d{3}(-?\d{3,5})?$/;
 export const VAT_RATE = DEFAULT_SETTINGS.vatRate;
 
 export interface FormFigures {
   birInvoice?: boolean | null; amount: number; vendorTin?: string | null; vatType?: string | null;
-  vatableAmount?: number | null; vatAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
+  vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
 }
 
-/** Things worth a second look. The Med Ref sees them while typing; the Checker and Approver see them on the receipt. */
+/** Things worth a second look, as plain sentences. The Checker and Approver see them on the receipt. See vatChecks for the same checks with a level. */
 export function receiptWarnings(f: FormFigures, rules: AppSettings = DEFAULT_SETTINGS): string[] {
   const out: string[] = [];
-  const close = (a: number, b: number) => Math.abs(a - b) <= rules.tolerance + 1e-9;
-  const VAT_RATE = rules.vatRate;
-  const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
-  const vatable = n(f.vatableAmount), vat = n(f.vatAmount), rate = n(f.whtRate), wht = n(f.whtAmount);
-  if (f.vendorTin && !TIN_PATTERN.test(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
+  if (f.vendorTin && !isCompleteTin(f.vendorTin.trim())) out.push('The vendor TIN does not look right. It is usually written 000-000-000-00000.');
   if (f.birInvoice === false) return out;
-  if (f.vatType === 'vatable' && vatable !== null && vat !== null) {
-    if (!close(vatable + vat, f.amount)) out.push(`Vatable amount plus VAT (${(vatable + vat).toFixed(2)}) is not the same as the invoice gross amount (${f.amount.toFixed(2)}).`);
-    if (!close(vatable * (VAT_RATE / 100), vat)) out.push(`VAT is usually ${VAT_RATE}% of the vatable amount (${(vatable * VAT_RATE / 100).toFixed(2)}), but ${vat.toFixed(2)} was entered.`);
-  }
-  if (f.vatType === 'non_vatable' && vat !== null && vat !== 0) out.push('The invoice is marked non-vatable, but a VAT amount was entered.');
-  if (f.vatType === 'non_vatable' && vatable !== null && !close(vatable, f.amount)) out.push('For a non-vatable invoice the amount without VAT is usually the same as the gross amount.');
-  if (f.withheld && rate !== null && wht !== null) {
-    const base = vatable ?? f.amount;
-    if (!close(base * rate / 100, wht)) out.push(`${rate}% of ${base.toFixed(2)} is ${(base * rate / 100).toFixed(2)}, but a withholding amount of ${wht.toFixed(2)} was entered.`);
-  }
-  if (f.withheld === false && ((wht ?? 0) > 0 || (rate ?? 0) > 0)) out.push('Withholding tax was answered No, but a rate or amount was entered.');
+  const n = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+  for (const c of vatChecks(f, rules)) out.push(c.message);
+  if (f.withheld === false && ((n(f.whtAmount) ?? 0) > 0 || (n(f.whtRate) ?? 0) > 0)) out.push('Tax withheld was answered No, but a rate or amount was entered.');
   return out;
 }
 
@@ -272,7 +270,6 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
   const under = bir && d.invoiceUnderCompany === true;
   const wht = bir && rules.askWithholding && d.withheld === true;
   const t = (v: string | null | undefined) => (v ? v : null);
-  const reason = needsReason({ birInvoice: bir, withheld: d.withheld }, rules);
   return {
     birInvoice: bir,
     invoiceUnderCompany: bir ? d.invoiceUnderCompany ?? null : null,
@@ -280,12 +277,15 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
     noBirReason: null,
     invoiceNo: bir ? t(d.invoiceNo) : null, vendorAddress: t(d.vendorAddress), vendorTin: bir ? t(d.vendorTin) : null,
     transactionType: bir ? d.transactionType ?? null : null,
-    reasonForSpending: reason ? t(d.reasonForSpending) : null,
-    classification: reason ? d.classification ?? null : null,
-    classificationOther: reason && d.classification === 'other' ? t(d.classificationOther) : null,
+    reasonForSpending: t(d.reasonForSpending),
+    classification: d.classification ?? null,
+    classificationOther: d.classification === 'other' ? t(d.classificationOther) : null,
     vatType: bir ? d.vatType ?? null : null,
     vatableAmount: bir ? d.vatableAmount ?? null : null,
     vatAmount: bir ? d.vatAmount ?? null : null,
+    vatExemptAmount: bir ? d.vatExemptAmount ?? null : null,
+    discountAmount: bir ? d.discountAmount ?? null : null,
+    chargeLocationId: d.chargeLocationId ?? null,
     withheld: bir ? (rules.askWithholding ? d.withheld ?? null : false) : null,
     whtRate: wht ? d.whtRate ?? null : null,
     whtAmount: wht ? d.whtAmount ?? null : null,
@@ -302,3 +302,9 @@ export type Company = z.infer<typeof companySchema>;
 export const DEFAULT_COMPANY: Company = {
   name: 'SOLARA PHARMA CORP.', tin: '801-590-238-00000', address: 'U-1704 Empire Tower AIC Burgandy Bldg. ADB Ave. Ortigas Center, San Antonio, Pasig City',
 };
+
+/** A place a receipt can be charged to. An administrator keeps the list. */
+export const chargeLocationSchema = z.object({
+  name: z.string().trim().min(2, 'Enter the name.').max(120, 'Keep the name under 120 characters.'),
+  isActive: z.boolean().optional(),
+});

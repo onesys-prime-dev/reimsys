@@ -13,6 +13,8 @@ import { sendReminders } from '../lib/reminders.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
+import { byEmployee, byMonth, impactRows, seesEveryone, totalsOf } from '../lib/taxReport.js';
+import { getSettings } from '../lib/appSettings.js';
 
 const idParam = (v: unknown) => {
   const n = Number(v);
@@ -119,6 +121,30 @@ dashboardRouter.get('/', async (req, res) => {
     queue: queue.map((r) => ({ ...receiptBrief(r), status: r.status as ReceiptStatus })),
     activity: activity.map((a) => ({ id: a.id, actor: a.actorName, summary: a.summary ?? a.action, receiptId: a.entityType === 'receipt' && a.entityId ? Number(a.entityId) : null, refNo: refs.find((x) => String(x.id) === a.entityId)?.refNo ?? null, createdAt: a.createdAt })),
     today: dateOnly(new Date()),
+  });
+});
+
+/** Potential tax loss and savings. Everyone sees their own receipts; management also sees every employee. All figures are potential, not verified. */
+dashboardRouter.get('/tax-impact', async (req, res) => {
+  const auth = req.auth!;
+  const date = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+  const all = seesEveryone(auth);
+  const employeeId = all && Number.isInteger(Number(req.query.employeeId)) && Number(req.query.employeeId) > 0 ? Number(req.query.employeeId) : undefined;
+  // Everyone's rows first: the list of people to choose from must not shrink when one person is chosen.
+  const everyone = await impactRows(auth, { from: date(req.query.from), to: date(req.query.to) });
+  const people = all ? [...new Map(everyone.map((r) => [r.employeeId, r.employee])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const rows = Object.assign(employeeId ? everyone.filter((r) => r.employeeId === employeeId) : everyone, { truncated: (everyone as { truncated?: boolean }).truncated });
+  const worst = rows.filter((r) => r.potentialLoss > 0 || r.reasons.length).sort((a, b) => b.potentialLoss - a.potentialLoss).slice(0, 10);
+  res.json({
+    scope: all ? 'all' : 'own',
+    people,
+    employeeId: employeeId ?? null,
+    rate: getSettings().defaultWhtRate,
+    totals: totalsOf(rows),
+    truncated: (rows as { truncated?: boolean }).truncated === true,
+    months: byMonth(rows),
+    worst,
+    employees: all ? byEmployee(rows) : [],
   });
 });
 
