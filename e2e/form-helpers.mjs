@@ -10,7 +10,7 @@ export async function fillQuickForm(page, { payee, amount = '100', date, descrip
   await page.getByLabel('Vendor complete address').fill('Test Street, Test City');
   await page.getByLabel(/Amount paid to vendor/).fill(String(amount));
   await page.click('button:has-text("Next")');
-  await page.getByLabel('Specific reason for spending').fill('Test receipt');
+  await page.getByLabel('Specific reason for spending').fill('Test receipt'); await chooseCharge(page);
   await page.getByRole('radio', { name: /^Fuel/ }).first().click();
   await page.click('button:has-text("Next")');
   await page.waitForSelector('.drop');
@@ -18,10 +18,13 @@ export async function fillQuickForm(page, { payee, amount = '100', date, descrip
   await completeLastPage(page);
 }
 
-/** The last page also asks where to charge, and for the person's own review. */
-export async function completeLastPage(page) {
+/** The reason-for-spending page also asks where to charge. */
+export async function chooseCharge(page) {
   await page.getByLabel('Choose where to charge').selectOption({ index: 1 });
 }
+
+/** The last page needs nothing more than the evidence (where to charge is on the reason-for-spending page). */
+export async function completeLastPage(page) {}
 
 /** From an edit screen, press Next until the last step. */
 export async function toLastStep(page) {

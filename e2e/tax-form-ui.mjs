@@ -2,7 +2,7 @@
 // Usage: node e2e/tax-form-ui.mjs
 import { chromium } from 'playwright';
 import fs from 'node:fs';
-import { completeLastPage } from './form-helpers.mjs';
+import { completeLastPage, chooseCharge } from './form-helpers.mjs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -99,7 +99,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   ok('with the total matching again only the yellow warning is left, under the VAT amount: VAT is not 12%', (await p.locator('.note.bad').count()) === 0 && (await p.locator('.note.warn').count()) === 1 && (await p.locator('.note.warn').innerText()).includes('12%'));
   await next(p);
   ok('"No": a yellow ordinary mismatch lets the person carry on', (await title(p)) === 'Reason for spending');
-  await p.getByLabel('Specific reason for spending').fill('Supplies');
+  await p.getByLabel('Specific reason for spending').fill('Supplies'); await chooseCharge(p);
   await radio(p, 'Meal'); await next(p);
   ok('and reach the last step', (await title(p)) === 'Proof and review');
   ok('where the review shows the potential loss', /Potential loss/.test(await p.locator('.review').innerText()));
@@ -117,7 +117,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await p.click('.callout.bad button:has-text("Go to the VAT details")');
   ok('the link goes back to the VAT details', (await title(p)) === 'VAT details');
   await p.getByLabel(/^VAT amount/).fill('100');
-  await next(p); await p.getByLabel('Specific reason for spending').fill('Supplies'); await next(p);
+  await next(p); await p.getByLabel('Specific reason for spending').fill('Supplies'); await chooseCharge(p); await next(p);
   ok('once the total is right Submit works again', await p.locator('button:has-text("Submit for checking")').isEnabled());
   await p.click('button:has-text("Submit for checking")');
   await p.waitForURL(/\/receipts\/\d+$/);

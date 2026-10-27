@@ -41,9 +41,9 @@ const STEP_TITLE: Record<StepId, string> = {
   bir: 'Reimbursement details', underco: 'BIR-registered invoice', company: 'Company check', invoice: 'Invoice details', vat: 'VAT details', wht: 'Tax withheld', spend: 'Reason for spending', evidence: 'Proof and review',
 };
 const STEP_FIELDS: Record<StepId, string[]> = {
-  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
+  bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther', 'chargeLocationId'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
-  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description', 'chargeLocationId'],
+  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
@@ -398,6 +398,13 @@ export function ReceiptFormPage() {
                   <input type="text" value={f.classificationOther} maxLength={100} onChange={(ev) => set('classificationOther', ev.target.value, 'classificationOther')} placeholder="Write what it is" autoFocus />
                 </Field>
               )}
+              <Field required label="Choose where to charge" className="full" error={e.chargeLocationId}>
+                <select value={f.chargeLocationId} onChange={(ev) => set('chargeLocationId', ev.target.value, 'chargeLocationId')}>
+                  <option value="">Choose</option>
+                  {(charges.data?.locations ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
+                </select>
+              </Field>
             </div>
           )}
 
@@ -432,13 +439,6 @@ export function ReceiptFormPage() {
 
               {rules.showDescription && <Field label="Description" hint="Optional" className="full"><input type="text" value={f.description} onChange={(ev) => set('description', ev.target.value)} placeholder="What was this for?" maxLength={500} /></Field>}
 
-              <Field required label="Choose where to charge" className="full" error={e.chargeLocationId}>
-                <select value={f.chargeLocationId} onChange={(ev) => set('chargeLocationId', ev.target.value, 'chargeLocationId')}>
-                  <option value="">Choose</option>
-                  {(charges.data?.locations ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
-                </select>
-              </Field>
               <div className="full">
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
                 <div className="review">

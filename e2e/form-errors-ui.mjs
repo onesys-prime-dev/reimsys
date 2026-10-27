@@ -1,6 +1,7 @@
 // Every error message on the reimbursement form must sit directly under the field it is about, and be on the screen. Walks each step with empty or wrong
 // answers, at computer and phone sizes. Needs the API (4000) and web app (5173). Usage: node e2e/form-errors-ui.mjs
 import { chromium } from 'playwright';
+import { chooseCharge } from './form-helpers.mjs';
 
 const browser = await chromium.launch({ channel: 'chrome' });
 let failed = 0;
@@ -64,7 +65,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await next(p);
   // the client form asks the reason for spending after the withholding step too
   await next(p); await audit(p, 'reason for spending after tax withheld (empty)');
-  await p.getByLabel('Specific reason for spending').fill('Water'); await p.getByRole('radio', { name: /^Fuel/ }).first().click();
+  await p.getByLabel('Specific reason for spending').fill('Water'); await chooseCharge(p); await p.getByRole('radio', { name: /^Fuel/ }).first().click();
   await next(p);
   ok(`${label}: reached the last step`, (await p.locator('.steph').innerText()) === 'Proof and review');
   await p.click('button:has-text("Submit for checking")');
@@ -77,7 +78,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await p.getByLabel('Vendor complete name').fill('Errors Corner'); await p.getByLabel('Vendor complete address').fill('Cebu'); await p.getByLabel(/Amount paid to vendor/).fill('350');
   await next(p);
   await next(p); await audit(p, 'reason for spending (empty)');
-  await p.getByLabel('Specific reason for spending').fill('Water'); await p.getByRole('radio', { name: /^Other/ }).click();
+  await p.getByLabel('Specific reason for spending').fill('Water'); await chooseCharge(p); await p.getByRole('radio', { name: /^Other/ }).click();
   await next(p); await audit(p, 'reason for spending ("Other" without words)');
   await p.getByLabel('Other classification').fill('Team'); await next(p);
   await p.click('button:has-text("Submit for checking")'); await audit(p, 'last step ("Other" code left empty)');
