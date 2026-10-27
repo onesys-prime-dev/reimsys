@@ -76,7 +76,6 @@ for (const [label, size] of [['computer', { width: 1280, height: 900 }], ['phone
   await p.getByLabel('Specific reason for spending').fill('Water'); await p.getByRole('radio', { name: /^Other/ }).click();
   await next(p); await audit(p, 'reason for spending ("Other" without words)');
   await p.getByLabel('Other classification').fill('Team'); await next(p);
-  await p.getByRole('radiogroup', { name: 'New Reimbursement Code' }).getByRole('radio', { name: /^Other/ }).click();
   await p.click('button:has-text("Submit for checking")'); await audit(p, 'last step ("Other" code left empty)');
   ok(`${label}: nothing scrolls sideways`, (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);
   await ctx.close();

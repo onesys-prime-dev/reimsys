@@ -86,7 +86,7 @@ describe('validation', () => {
   const base = {
     birInvoice: 'yes', invoiceUnderCompany: 'yes', reasonForSpending: 'Clinic supplies', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-004521', payee: 'Mercury Drug',
     vendorAddress: 'Mandaue City', vendorTin: '123-456-789-00000', amount: '1120', transactionType: 'product', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', vatExemptAmount: '0', discountAmount: '0', withheld: 'no',
-    chargeLocationId: '1', newReimbursementCode: 'yes',
+    chargeLocationId: '1',
   };
   const field = (input: object) => { const r = receiptInputSchema.safeParse(input); return r.success ? [] : r.error.issues.map((i) => String(i.path[0])); };
 
@@ -112,7 +112,7 @@ describe('validation', () => {
 
   it('lets a receipt without a BIR invoice through only with a reason', () => {
     // The chart's short path: date, vendor, address, amount, then the reason for spending. No invoice number, TIN or type.
-    const none = { birInvoice: 'no', chargeLocationId: '1', newReimbursementCode: 'yes', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350' };
+    const none = { birInvoice: 'no', chargeLocationId: '1', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350' };
     expect(field(none)).toEqual(expect.arrayContaining(['vendorAddress', 'reasonForSpending', 'classification']));
     expect(field({ ...none, vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'meal_personal' })).toEqual([]);
     expect(field({ ...none, vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'nonsense' })).toContain('classification');
@@ -121,7 +121,7 @@ describe('validation', () => {
   it('drops answers that no longer apply', () => {
     const d = receiptInputSchema.parse({ ...base, withheld: 'no', whtRate: '5', whtAmount: '50' });
     expect(cleanFormData(d)).toMatchObject({ withheld: false, whtRate: null, whtAmount: null });
-    const n = receiptInputSchema.parse({ birInvoice: 'no', chargeLocationId: '1', newReimbursementCode: 'yes', vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'meal_personal', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'product', vatType: 'vatable', vatAmount: '9' });
+    const n = receiptInputSchema.parse({ birInvoice: 'no', chargeLocationId: '1', vendorAddress: 'Mandaue City', reasonForSpending: 'Water refills', classification: 'meal_personal', receiptDate: '2026-10-12', payee: 'Corner Store', amount: '350', transactionType: 'product', vatType: 'vatable', vatAmount: '9' });
     expect(cleanFormData(n)).toMatchObject({ birInvoice: false, vatType: null, vatAmount: null, seenCompany: null, transactionType: null, classification: 'meal_personal' });
     // Not under the company: the three ticks are not asked and are dropped.
     expect(cleanFormData(receiptInputSchema.parse({ ...base, invoiceUnderCompany: 'no', seenCompany: false, seenTin: false, seenAddress: false }))).toMatchObject({ invoiceUnderCompany: false, seenCompany: null });
@@ -143,7 +143,7 @@ describe('validation', () => {
   it('follows the administrator settings', () => {
     const rules = { ...DEFAULT_SETTINGS, allowNoBir: false, requireVendorTin: false, askWithholding: false, vatRate: 10 };
     const f = (input: object, r = rules) => { const x = makeReceiptSchema(r).safeParse(input); return x.success ? [] : x.error.issues.map((i) => String(i.path[0])); };
-    expect(f({ birInvoice: 'no', chargeLocationId: '1', newReimbursementCode: 'yes', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', vendorAddress: 'Mandaue', reasonForSpending: 'Water', classification: 'meal_personal' })).toEqual(['birInvoice']);
+    expect(f({ birInvoice: 'no', chargeLocationId: '1', receiptDate: '2026-10-12', payee: 'Corner', amount: '350', vendorAddress: 'Mandaue', reasonForSpending: 'Water', classification: 'meal_personal' })).toEqual(['birInvoice']);
     expect(f({ ...base, vendorTin: undefined, withheld: undefined })).toEqual([]);
     expect(f({ ...base, vendorTin: undefined }, DEFAULT_SETTINGS)).toContain('vendorTin');
     const okVat = { birInvoice: true, amount: 1100, vatType: 'vatable', vatableAmount: 1000, vatAmount: 100 };

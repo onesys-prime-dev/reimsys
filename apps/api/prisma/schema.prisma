@@ -170,11 +170,9 @@ model Receipt {
   withheld        Boolean?
   whtRate         Decimal?                 @db.Decimal(5, 2)
   whtAmount       Decimal?                 @db.Decimal(12, 2)
-  // Last page of the form: where to charge, whether this is a new reimbursement code (otherwise the old code is written), and the person's own review.
+  // Last page of the form: where to charge, and the person's own review of the details.
   chargeLocationId     Int?
   chargeLocation       ChargeLocation?          @relation(fields: [chargeLocationId], references: [id])
-  newReimbursementCode Boolean?
-  reimbursementCode    String?                  @db.VarChar(40)
   detailsReviewed      Boolean?
   ckCompany       Boolean?
   ckTin           Boolean?

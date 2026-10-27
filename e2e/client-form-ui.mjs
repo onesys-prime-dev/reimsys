@@ -100,7 +100,7 @@ ok('and shows the potential savings', /Potential savings/.test(review));
 await shot(p, '4-step-review');
 await p.click('button:has-text("Submit for checking")');
 ok('cannot submit without evidence', (await errs(p)).some((t) => /photo or PDF/.test(t)));
-ok('the last page also asks where to charge, the reimbursement code and the review', (await errs(p)).some((t) => /where to charge/i.test(t)) && (await errs(p)).some((t) => /Yes or Other/.test(t)) && (await errs(p)).some((t) => /Review the details/.test(t)));
+ok('the last page also asks where to charge and the review', (await errs(p)).some((t) => /where to charge/i.test(t)) && (await errs(p)).some((t) => /Review the details/.test(t)));
 await p.setInputFiles('input[type=file]', png);
 await completeLastPage(p);
 await p.click('button:has-text("Submit for checking")');

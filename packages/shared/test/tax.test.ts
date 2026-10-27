@@ -125,10 +125,9 @@ describe('VAT-exempt sales and discount', () => {
   it('a receipt without the new answers is fine for the API but not for the form', () => {
     const f = { birInvoice: 'yes', invoiceUnderCompany: 'no', transactionType: 'product', invoiceNo: 'A', vendorAddress: 'Cebu', vendorTin: '123-456-789-00000', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', withheld: 'no', reasonForSpending: 'Water', classification: 'fuel', receiptDate: '2026-10-12', payee: 'Corner', amount: '1120' };
     const strict = receiptProblems(f);
-    expect(Object.keys(strict).sort()).toEqual(['chargeLocationId', 'discountAmount', 'newReimbursementCode', 'vatExemptAmount']);
+    expect(Object.keys(strict).sort()).toEqual(['chargeLocationId', 'discountAmount', 'vatExemptAmount']);
     expect(receiptProblems(f, rules, false)).toEqual({});
-    expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no' }).reimbursementCode).toMatch(/reimbursement code/);
-    expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1', newReimbursementCode: 'no', reimbursementCode: 'RC-1' })).toEqual({});
+    expect(receiptProblems({ ...f, vatExemptAmount: '0', discountAmount: '0', chargeLocationId: '1' })).toEqual({});
   });
 });
 
@@ -159,7 +158,7 @@ describe('the total note goes under the amount that is wrong', () => {
 
 describe('a TIN with no digits', () => {
   it('is refused instead of being dropped without a word', () => {
-    const f = { birInvoice: 'yes', invoiceUnderCompany: 'no', transactionType: 'product', invoiceNo: 'A', vendorAddress: 'Cebu', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', vatExemptAmount: '0', discountAmount: '0', withheld: 'no', reasonForSpending: 'Water', classification: 'fuel', receiptDate: '2026-10-12', payee: 'Corner', amount: '1120', chargeLocationId: '1', newReimbursementCode: 'yes' };
+    const f = { birInvoice: 'yes', invoiceUnderCompany: 'no', transactionType: 'product', invoiceNo: 'A', vendorAddress: 'Cebu', vatType: 'vatable', vatableAmount: '1000', vatAmount: '120', vatExemptAmount: '0', discountAmount: '0', withheld: 'no', reasonForSpending: 'Water', classification: 'fuel', receiptDate: '2026-10-12', payee: 'Corner', amount: '1120', chargeLocationId: '1' };
     expect(receiptProblems({ ...f, vendorTin: 'ABC' }).vendorTin).toMatch(/made of numbers/);
     expect(receiptProblems({ ...f, vendorTin: '123-456-789-00000' }).vendorTin).toBeUndefined();
   });

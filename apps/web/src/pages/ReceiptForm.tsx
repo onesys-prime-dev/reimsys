@@ -28,12 +28,12 @@ interface FormState {
   vatType: '' | 'vatable' | 'non_vatable'; vatable: string; vat: string; vatExempt: string; discount: string;
   withheld: '' | 'yes' | 'no'; whtRate: string; whtAmount: string;
   description: string;
-  chargeLocationId: string; newCode: '' | 'yes' | 'no'; reimbursementCode: string; reviewed: '' | 'yes' | 'no';
+  chargeLocationId: string; reviewed: '' | 'yes' | 'no';
 }
 const EMPTY: FormState = {
   bir: '', underCo: '', seenCompany: false, seenTin: false, seenAddress: false, spendReason: '', classification: '', classificationOther: '', date: todayIso(), invoiceNo: '', payee: '', vendorAddress: '', vendorTin: '', amount: '',
   type: '', vatType: '', vatable: '', vat: '', vatExempt: '', discount: '', withheld: '', whtRate: '', whtAmount: '', description: '',
-  chargeLocationId: '', newCode: '', reimbursementCode: '', reviewed: '',
+  chargeLocationId: '', reviewed: '',
 };
 
 type StepId = 'bir' | 'underco' | 'company' | 'invoice' | 'vat' | 'wht' | 'spend' | 'evidence';
@@ -43,13 +43,13 @@ const STEP_TITLE: Record<StepId, string> = {
 const STEP_FIELDS: Record<StepId, string[]> = {
   bir: ['birInvoice'], underco: ['invoiceUnderCompany'], company: ['seenCompany', 'seenTin', 'seenAddress'], spend: ['reasonForSpending', 'classification', 'classificationOther'],
   invoice: ['receiptDate', 'invoiceNo', 'payee', 'vendorAddress', 'vendorTin', 'amount', 'transactionType'],
-  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description', 'chargeLocationId', 'newReimbursementCode', 'reimbursementCode', 'detailsReviewed'],
+  vat: ['vatType', 'vatableAmount', 'vatAmount', 'vatExemptAmount', 'discountAmount', 'withheld'], wht: ['whtRate', 'whtAmount'], evidence: ['description', 'chargeLocationId', 'detailsReviewed'],
 };
 
 const toCandidate = (f: FormState, rules: AppSettings) => ({
   birInvoice: f.bir, invoiceUnderCompany: f.bir === 'yes' ? f.underCo : '', seenCompany: f.underCo === 'yes' ? f.seenCompany : null, seenTin: f.underCo === 'yes' ? f.seenTin : null, seenAddress: f.underCo === 'yes' ? f.seenAddress : null,
   reasonForSpending: f.spendReason, classification: f.classification, classificationOther: f.classificationOther, receiptDate: f.date, invoiceNo: f.invoiceNo, payee: f.payee, vendorAddress: f.vendorAddress, vendorTin: f.vendorTin, amount: f.amount,
-  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, vatExemptAmount: f.vatExempt, discountAmount: f.discount, chargeLocationId: f.chargeLocationId, newReimbursementCode: f.newCode, reimbursementCode: f.reimbursementCode, detailsReviewed: f.reviewed, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
+  transactionType: f.bir === 'yes' ? f.type : '', vatType: f.vatType, vatableAmount: f.vatable, vatAmount: f.vat, vatExemptAmount: f.vatExempt, discountAmount: f.discount, chargeLocationId: f.chargeLocationId, detailsReviewed: f.reviewed, withheld: rules.askWithholding ? f.withheld : f.bir === 'yes' ? 'no' : '', whtRate: f.whtRate, whtAmount: f.whtAmount, description: f.description || null,
 });
 
 const fromReceipt = (r: ReceiptDetail): FormState => {
@@ -61,7 +61,7 @@ const fromReceipt = (r: ReceiptDetail): FormState => {
     spendReason: x.reasonForSpending ?? '', classification: (x.classification as FormState['classification']) ?? '', classificationOther: x.classificationOther ?? '',
     date: r.receiptDate, invoiceNo: x.invoiceNo ?? '', payee: r.payee, vendorAddress: x.vendorAddress ?? '', vendorTin: x.vendorTin ?? '', amount: String(r.amount),
     type: (x.transactionType as FormState['type']) ?? '', vatType: (x.vatType as FormState['vatType']) ?? '', vatable: n(x.vatableAmount), vat: n(x.vatAmount), vatExempt: n(x.vatExemptAmount), discount: n(x.discountAmount),
-    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '', newCode: yn(x.newReimbursementCode) as FormState['newCode'], reimbursementCode: x.reimbursementCode ?? '', reviewed: '' as FormState['reviewed'], // opening a receipt to edit asks for the review again
+    chargeLocationId: x.chargeLocation ? String(x.chargeLocation.id) : '', reviewed: '' as FormState['reviewed'], // opening a receipt to edit asks for the review again
    
     withheld: yn(x.withheld), whtRate: n(x.whtRate), whtAmount: n(x.whtAmount), description: r.description ?? '',
   };
@@ -440,13 +440,6 @@ export function ReceiptFormPage() {
                   {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
                 </select>
               </Field>
-              <div className="full">
-                <div className="q">New Reimbursement Code? (If not, write the reimbursement code) <i>*</i></div>
-                <Choice name="New Reimbursement Code" value={f.newCode} onChange={(v) => set('newCode', v, 'newReimbursementCode', 'reimbursementCode')} options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'Other', sub: 'Write the reimbursement code' }]} />
-                {e.newReimbursementCode && <span className="err">{e.newReimbursementCode}</span>}
-              </div>
-              {f.newCode === 'no' && <Field required label="Reimbursement code" className="full" error={e.reimbursementCode}><input type="text" value={f.reimbursementCode} maxLength={40} onChange={(ev) => set('reimbursementCode', ev.target.value, 'reimbursementCode')} autoFocus /></Field>}
-
               <div className="full">
                 <div style={{ fontWeight: 600, fontSize: '.84rem', marginBottom: 6 }}>Review</div>
                 <div className="review">

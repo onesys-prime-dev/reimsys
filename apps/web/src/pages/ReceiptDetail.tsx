@@ -170,7 +170,6 @@ export function ReceiptDetailPage() {
                   {r.payment.shortReason && <><dt>Why less was paid</dt><dd>{r.payment.shortReason}</dd></>}
                   <dt>Recorded by</dt><dd>{r.payment.recordedBy}{r.payment.recordedAt ? ` · ${fmtDateTime(r.payment.recordedAt)}` : ''}</dd>
                   {r.form.chargeLocation && <><dt>Where to charge</dt><dd>{r.form.chargeLocation.name}</dd></>}
-                  {r.form.newReimbursementCode !== null && <><dt>Reimbursement code</dt><dd>{r.form.newReimbursementCode ? 'New code' : r.form.reimbursementCode || '-'}</dd></>}
                 </dl>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                   {can('evidence.view') && <a className="btn sm" href={`/api/payments/${r.payment.id}/proof?mode=view`} target="_blank" rel="noopener"><Icon name="eye" size={16} />View proof</a>}

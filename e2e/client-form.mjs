@@ -39,7 +39,7 @@ const stamp = Date.now();
 // A complete answer for "BIR invoice: yes", vatable, no withholding.
 const full = (over = {}) => ({
   birInvoice: true, invoiceUnderCompany: true, reasonForSpending: 'Clinic supplies for the week', classification: 'fuel', seenCompany: true, seenTin: true, seenAddress: true, receiptDate: '2026-10-12', invoiceNo: 'SI-' + stamp, payee: 'Form Test Pharmacy ' + stamp,
-  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, newReimbursementCode: true, detailsReviewed: true, ...over,
+  vendorAddress: 'Mandaue City, Cebu', vendorTin: '123-456-789-00000', amount: 1120, transactionType: 'product', vatType: 'vatable', vatableAmount: 1000, vatAmount: 120, withheld: false, vatExemptAmount: 0, discountAmount: 0, chargeLocationId: 1, detailsReviewed: true, ...over,
 });
 const codes = (r) => (r.data?.error?.issues ?? []).map((i) => i.path[0]);
 

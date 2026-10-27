@@ -42,7 +42,7 @@ export function receiptForm(r: ReceiptRow) {
     birInvoice: r.birInvoice, invoiceUnderCompany: r.invoiceUnderCompany, reasonForSpending: r.reasonForSpending, classification: r.classification, classificationOther: r.classificationOther, seenCompany: r.seenCompany, seenTin: r.seenTin, seenAddress: r.seenAddress, noBirReason: r.noBirReason,
     invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, transactionType: r.transactionType,
     vatType: r.vatType, vatableAmount: dec(r.vatableAmount), vatAmount: dec(r.vatAmount), vatExemptAmount: dec(r.vatExemptAmount), discountAmount: dec(r.discountAmount),
-    chargeLocation: r.chargeLocation, newReimbursementCode: r.newReimbursementCode, reimbursementCode: r.reimbursementCode, detailsReviewed: r.detailsReviewed,
+    chargeLocation: r.chargeLocation, detailsReviewed: r.detailsReviewed,
     withheld: r.withheld, whtRate: dec(r.whtRate), whtAmount: dec(r.whtAmount),
     checked: r.ckCompany === null && r.ckTin === null && r.ckAddress === null ? null : { company: r.ckCompany, tin: r.ckTin, address: r.ckAddress },
   };

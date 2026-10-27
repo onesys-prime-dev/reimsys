@@ -17,7 +17,7 @@ importsRouter.use(requireAuth, requirePerm('receipt.import'));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
 const MAX_ROWS = 2000;
-const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'vat_exempt_amount', 'discount', 'tax_withheld', 'wht_rate', 'wht_amount', 'charge_location', 'new_reimbursement_code', 'reimbursement_code', 'description', 'encoder_email'];
+const TEMPLATE_HEAD = ['vendor', 'invoice_date', 'invoice_no', 'vendor_tin', 'vendor_address', 'gross_amount', 'type', 'bir_invoice', 'invoice_under_company', 'company_check', 'reason_for_spending', 'classification', 'vat_type', 'vatable_amount', 'vat_amount', 'vat_exempt_amount', 'discount', 'tax_withheld', 'wht_rate', 'wht_amount', 'charge_location', 'description', 'encoder_email'];
 
 const idParam = (v: unknown) => {
   const n = Number(v);
@@ -84,8 +84,8 @@ async function readRows(file: Express.Multer.File): Promise<Record<string, strin
 
 importsRouter.get('/template', (_req, res) => {
   const sample = [
-    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'Other: Clinic supplies', 'vatable', '1000.00', '120.00', '0', '0', 'no', '', '', 'Makati Medical Center', 'yes', '', 'Clinic supplies', ''],
-    ['Corner Store', '2026-10-12', '', '', 'Mandaue City, Cebu', '350.00', '', 'no', '', '', 'Water refills for the clinic', 'meal - personal', '', '', '', '', '', '', '', '', 'Makati Medical Center', 'yes', '', '', ''],
+    ['Mercury Drug - Mandaue', '2026-10-12', 'SI-004521', '123-456-789-00000', 'Mandaue City, Cebu', '1120.00', 'product', 'yes', 'yes', 'yes', 'Clinic supplies for the week', 'Other: Clinic supplies', 'vatable', '1000.00', '120.00', '0', '0', 'no', '', '', 'Makati Medical Center', 'Clinic supplies', ''],
+    ['Corner Store', '2026-10-12', '', '', 'Mandaue City, Cebu', '350.00', '', 'no', '', '', 'Water refills for the clinic', 'meal - personal', '', '', '', '', '', '', '', '', 'Makati Medical Center', '', ''],
   ];
   res.type('text/csv').attachment('reimsys-import-template.csv').send(toCsv([TEMPLATE_HEAD, ...sample]));
 });
@@ -123,7 +123,7 @@ importsRouter.post('/', upload.single('file'), async (req, res) => {
         reasonForSpending: r.reason_for_spending, ...readClassification(r.classification, r.classification_other),
         invoiceNo: r.invoice_no, vendorAddress: r.vendor_address, vendorTin: r.vendor_tin, transactionType: (r.type ?? '').toLowerCase(),
         vatType: (r.vat_type ?? '').toLowerCase().replace(/[\s-]+/g, '_'), vatableAmount: num(r.vatable_amount), vatAmount: num(r.vat_amount), vatExemptAmount: num(r.vat_exempt_amount), discountAmount: num(r.discount),
-        chargeLocationId: chargeLocations.find((c) => c.name.toLowerCase() === (r.charge_location ?? '').trim().toLowerCase())?.id, newReimbursementCode: yesNo(r.new_reimbursement_code), reimbursementCode: r.reimbursement_code,
+        chargeLocationId: chargeLocations.find((c) => c.name.toLowerCase() === (r.charge_location ?? '').trim().toLowerCase())?.id,
         withheld: yesNo(r.tax_withheld), whtRate: num(r.wht_rate), whtAmount: num(r.wht_amount),
       } : { birInvoice: false, vendorAddress: 'x', reasonForSpending: 'xxx', classification: 'fuel' }),
     };

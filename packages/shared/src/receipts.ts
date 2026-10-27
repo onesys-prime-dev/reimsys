@@ -102,8 +102,6 @@ const receiptShape = z.object({
   vatExemptAmount: optional(money('VAT-exempt amount')),
   discountAmount: optional(money('discount')),
   chargeLocationId: optional(z.coerce.number().int().positive()),
-  newReimbursementCode: optional(flag),
-  reimbursementCode: optional(z.string().trim().max(40)),
   detailsReviewed: optional(flag),
   withheld: optional(flag),
   whtRate: optional(money('withholding rate').refine((n) => n <= 100, 'The rate cannot be over 100.')),
@@ -116,7 +114,7 @@ interface Answers {
   birInvoice?: boolean | null; invoiceUnderCompany?: boolean | null; reasonForSpending?: string | null; classification?: string | null; classificationOther?: string | null; transactionType?: string | null; seenCompany?: boolean | null; seenTin?: boolean | null; seenAddress?: boolean | null; noBirReason?: string | null;
   invoiceNo?: string | null; vendorAddress?: string | null; vendorTin?: string | null; vatType?: string | null;
   vatableAmount?: number | null; vatAmount?: number | null; vatExemptAmount?: number | null; discountAmount?: number | null; withheld?: boolean | null; whtRate?: number | null; whtAmount?: number | null;
-  chargeLocationId?: number | null; newReimbursementCode?: boolean | null; reimbursementCode?: string | null; detailsReviewed?: boolean | null;
+  chargeLocationId?: number | null; detailsReviewed?: boolean | null;
 }
 const needsReason = (d: Answers, rules: AppSettings) => d.birInvoice === false || (d.birInvoice === true && !(rules.askWithholding && d.withheld === true));
 
@@ -155,8 +153,6 @@ function conditionalIssues(d: Answers, rules: AppSettings, extras = true): { pat
   }
   if (extras) {
     missing(d.chargeLocationId, 'chargeLocationId', 'Choose where to charge.');
-    missing(d.newReimbursementCode, 'newReimbursementCode', 'Choose Yes or Other.');
-    if (d.newReimbursementCode === false) need((d.reimbursementCode ?? '').length >= 1, 'reimbursementCode', 'Write the reimbursement code.');
   }
   // The reason and classification are asked on every path except when tax was withheld, which finishes right after that step.
   if (needsReason(d, rules)) {
@@ -189,7 +185,7 @@ export function receiptProblems(raw: Record<string, unknown>, rules: AppSettings
     birInvoice: b(raw.birInvoice), invoiceUnderCompany: b(raw.invoiceUnderCompany), reasonForSpending: t(raw.reasonForSpending), classification: t(raw.classification), classificationOther: t(raw.classificationOther), transactionType: t(raw.transactionType), seenCompany: raw.seenCompany === true, seenTin: raw.seenTin === true, seenAddress: raw.seenAddress === true, noBirReason: t(raw.noBirReason),
     invoiceNo: t(raw.invoiceNo), vendorAddress: t(raw.vendorAddress), vendorTin: t(raw.vendorTin), vatType: t(raw.vatType),
     vatableAmount: n(raw.vatableAmount), vatAmount: n(raw.vatAmount), vatExemptAmount: n(raw.vatExemptAmount), discountAmount: n(raw.discountAmount), withheld: b(raw.withheld), whtRate: n(raw.whtRate), whtAmount: n(raw.whtAmount),
-    chargeLocationId: n(raw.chargeLocationId), newReimbursementCode: b(raw.newReimbursementCode), reimbursementCode: t(raw.reimbursementCode),
+    chargeLocationId: n(raw.chargeLocationId),
   }, rules, extras)) out[i.path] ||= i.message;
   return out;
 }
@@ -295,8 +291,6 @@ export function cleanFormData(d: ReceiptInput, rules: AppSettings = DEFAULT_SETT
     vatExemptAmount: bir ? d.vatExemptAmount ?? null : null,
     discountAmount: bir ? d.discountAmount ?? null : null,
     chargeLocationId: d.chargeLocationId ?? null,
-    newReimbursementCode: d.newReimbursementCode ?? null,
-    reimbursementCode: d.newReimbursementCode === false ? t(d.reimbursementCode) : null,
     detailsReviewed: d.detailsReviewed ?? null,
     withheld: bir ? (rules.askWithholding ? d.withheld ?? null : false) : null,
     whtRate: wht ? d.whtRate ?? null : null,

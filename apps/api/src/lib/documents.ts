@@ -69,7 +69,6 @@ export async function buildReimbursementPdf(receiptId: number) {
     row('Tax withheld', r.withheld ? `${Number(r.whtRate ?? 0)}%  ·  ${money(r.whtAmount)}` : r.withheld === false ? 'None' : '-');
   }
   if (r.chargeLocation) row('Charged to', r.chargeLocation.name);
-  if (r.newReimbursementCode !== null) row('Reimbursement code', r.newReimbursementCode ? 'New code' : r.reimbursementCode || '-');
   row('Description', r.description || '-');
   row('Evidence files', String(r.evidence.length));
   doc.moveTo(L, y).lineTo(L + W, y).strokeColor('#d6dfe2').stroke();
