@@ -732,7 +732,7 @@ section.card[id]{scroll-margin-top:84px}
 
 /* Tax impact on the dashboard */
 .tibars{display:grid;gap:6px;margin:8px 0 18px}
-.tibar{display:grid;grid-template-columns:56px 1fr;grid-template-areas:'l t' '. v';gap:2px 10px;align-items:center;font-size:.84rem}
+.tibar{display:grid;grid-template-columns:72px 1fr;grid-template-areas:'l t' '. v';gap:2px 10px;align-items:center;font-size:.84rem}
 .tibar-l{grid-area:l;color:var(--muted)}.tibar-t{grid-area:t;display:grid;gap:3px}.tibar-v{grid-area:v;color:var(--muted);font-variant-numeric:tabular-nums}
 .tibar-t i,.tilegend i{display:block;height:8px;border-radius:4px;min-width:2px}
 .tibar-t i.loss,.tilegend i.loss{background:var(--bad)}.tibar-t i.save,.tilegend i.save{background:var(--ok)}
@@ -745,3 +745,20 @@ tr.sub td{background:var(--soft);font-size:.86rem}
 .fwrap>label.f>span:first-child{padding-right:36px}
 .fg-slot{position:absolute;top:-3px;right:0}
 .fg-slot .fg-open{margin-left:0}
+
+/* The dashboard's tax row: three tiles and a link, small enough to sit between the status tiles and the queue */
+.tisum{margin:0 0 16px}
+.tisum-h{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.tisum-h h2{margin:0;font-size:1rem}.tisum-h h2 small{font-weight:500;color:var(--muted);margin-left:6px;font-size:.82rem}
+.tisum-t{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tisum-t .tile b{font-size:1.4rem}
+@media(max-width:640px){.tisum-t{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tisum-t .tile:last-child{grid-column:1/-1}}
+/* the filters on the tax page: dates side by side, never stacked */
+.tifilter{margin:0;display:flex;gap:10px;flex-wrap:wrap}
+.tifilter label.f{flex-direction:row;align-items:center;gap:6px;white-space:nowrap}
+.taximpact .card-b>p.muted{max-width:70ch}
+/* the monthly chart: one line per month, the label, the two bars, then the amounts */
+.tibar{grid-template-columns:76px minmax(0,1fr) auto;grid-template-areas:'l t v';gap:10px}
+.tibar-t{align-self:center}
+.tibar-v{white-space:nowrap;font-size:.8rem}
+@media(max-width:640px){.tibar{grid-template-columns:76px minmax(0,1fr);grid-template-areas:'l t' '. v'}.tibar-v{white-space:normal}}

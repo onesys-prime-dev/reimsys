@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, money } from '../api';
+import { Icon } from '../ui';
 
 interface Totals {
   receipts: number; answeredYes: number; answeredNo: number; taxWithheld: number; potentialLoss: number; potentialSavings: number;
@@ -14,10 +15,42 @@ interface Employee {
 }
 interface Impact { scope: 'all' | 'own'; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
 
-const monthName = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('en-PH', { month: 'short', year: '2-digit' });
+const monthName = (m: string) => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+
+/** A small row for the dashboard: the three figures that matter and a link to the page with everything. */
+export function TaxImpactSummary() {
+  const d = useQuery({ queryKey: ['dashboard', 'tax-impact', '', ''], queryFn: () => api<Impact>('/dashboard/tax-impact'), refetchInterval: 60_000 });
+  const t = d.data?.totals;
+  return (
+    <section className="tisum" aria-labelledby="tis-h" data-testid="ti-summary">
+      <div className="tisum-h">
+        <h2 id="tis-h">Tax withheld <small>potential, not verified</small></h2>
+        <Link className="btn sm ghost" to="/tax-impact">Details and employee evaluation →</Link>
+      </div>
+      <div className="tisum-t">
+        <div className="tile alert"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b></div>
+        <div className="tile"><small>Potential savings (answered Yes)</small><b>{t ? money(t.potentialSavings) : '–'}</b></div>
+        <div className="tile"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b></div>
+      </div>
+    </section>
+  );
+}
+
+/** The whole picture, on its own page: the filters, every figure, the monthly chart, the largest losses and the employee evaluation. */
+export function TaxImpactPage() {
+  return (
+    <>
+      <div className="ph">
+        <div><h1>Tax withheld: potential loss and savings</h1><p>What answering No may cost, and what Yes may save.</p></div>
+        <Link className="btn" to="/"><Icon name="back" size={16} />Dashboard</Link>
+      </div>
+      <TaxImpactSection />
+    </>
+  );
+}
 
 /** Potential tax loss and savings, and the employee evaluation. Every figure is a potential one, not a verified one, and says so. */
-export function TaxImpactSection() {
+function TaxImpactSection() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) }).toString();
@@ -27,10 +60,10 @@ export function TaxImpactSection() {
   const maxBar = Math.max(1, ...(d.data?.months ?? []).map((m) => Math.max(m.potentialLoss, m.potentialSavings)));
 
   return (
-    <section className="card taximpact" aria-labelledby="ti-h" style={{ marginTop: 16 }}>
+    <section className="card taximpact" aria-labelledby="ti-h">
       <div className="card-h">
-        <h2 id="ti-h">Tax withheld: potential loss and savings</h2>
-        <div className="btns" style={{ margin: 0 }}>
+        <h2 id="ti-h">Figures</h2>
+        <div className="btns tifilter">
           <label className="f" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
           <label className="f" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" /></label>
         </div>
