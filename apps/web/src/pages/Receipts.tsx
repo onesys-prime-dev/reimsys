@@ -19,7 +19,7 @@ export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEnco
         {pick && <input type="checkbox" checked={pick.on} aria-label={`Select ${r.refNo}`} onClick={(e) => { e.stopPropagation(); }} onChange={pick.toggle} />}
         <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
       </span>
-      <span className="c-cat">{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? (r.invoiceNo ? null : <span className="nodata">—</span>)}{r.invoiceNo ? `${r.transactionType || r.category ? ' · ' : ''}${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
+      <span className="c-cat" title={[r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name, r.invoiceNo].filter(Boolean).join(" · ")}>{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? (r.invoiceNo ? null : <span className="nodata">—</span>)}{r.invoiceNo ? `${r.transactionType || r.category ? ' · ' : ''}${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
       <span className="c-amt">{money(r.amount)}</span>
       <span className="c-st"><StatusPill status={r.status} />{r.status === 'submitted' && r.submittedAt && <span className={`age ${late(r.submittedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.submittedAt) ? 'Waiting ' : ''}{ago(r.submittedAt)}</span>}{r.status === 'checked' && r.checkedAt && <span className={`age ${late(r.checkedAt) ? 'late' : ''}`} style={{ display: 'block', marginTop: 2 }}>{late(r.checkedAt) ? 'Waiting, checked ' : 'checked '}{ago(r.checkedAt)}</span>}</span>

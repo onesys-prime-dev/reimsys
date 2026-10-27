@@ -30,8 +30,16 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   await m.waitForSelector('.taximpact .tile b');
   ok('the details page has the five figures', (await m.locator('.taximpact .tile').count()) === 5);
   ok('the dates are side by side, not stacked', await m.evaluate(() => { const l = [...document.querySelectorAll('.tifilter label')].map((x) => x.getBoundingClientRect()); return l.length === 2 && (Math.abs(l[0].top - l[1].top) < 4 || innerWidth < 500); }));
-  ok('it shows the monthly chart, the largest losses and the employee evaluation', (await m.locator('.tibars').count()) === 1 && (await m.locator('.taximpact table').count()) >= 2);
+  ok('the detail is in tabs: by month, largest losses and employee evaluation, with only one open at a time', (await m.getByRole('tab').count()) === 3 && (await m.locator('.tibars').count()) === 1 && (await m.locator('.taximpact table').count()) === 0);
+  ok('the long explanation is folded away until asked for', !(await m.locator('.tihow p').first().isVisible()));
+  await m.getByRole('tab', { name: /Largest losses/ }).click();
+  ok('the largest losses tab has the table', (await m.locator('.taximpact table').count()) === 1 && (await m.locator('.tibars').count()) === 0);
+  await m.getByRole('tab', { name: /Employee evaluation/ }).click();
+  await m.getByRole('tab', { name: 'By month' }).click();
   ok('every month is one line: the label, the bars, then the amounts', label === 'phone' || (await m.locator('.tibar').first().evaluate((r) => { const k = [...r.children].map((x) => x.getBoundingClientRect().top); return Math.max(...k) - Math.min(...k) < 12; })));
+  await m.getByRole('tab', { name: 'By month' }).click();
+  ok('the monthly chart is back', (await m.locator('.tibars').count()) === 1);
+  await m.getByRole('tab', { name: /Employee evaluation/ }).click();
   await m.locator('[data-testid=ti-employees] button[aria-expanded]').first().click();
   ok('an employee opens to their submissions', (await m.locator('tr.sub').count()) >= 1);
   ok('no sideways scrolling on the details page', await noSideways(m));
@@ -43,7 +51,8 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   const a = await open('ana.reyes@example.com', size);
   await a.waitForSelector('.tisum .tile b');
   await a.goto('/tax-impact'); await a.waitForSelector('.taximpact .tile b');
-  ok('a Med Ref sees their own figures and no employee evaluation', (await a.locator('[data-testid=ti-employees]').count()) === 0 && /Your receipts/.test(await a.locator('.taximpact').innerText()));
+  ok('a Med Ref sees their own figures and no employee evaluation tab', (await a.getByRole('tab').count()) === 2 && (await a.getByRole('tab', { name: /Employee/ }).count()) === 0 && /Your receipts/.test(await a.locator('.taximpact').innerText()));
+  await a.getByRole('tab', { name: /Largest losses/ }).click();
   ok('and no other person is named', !(await a.locator('.taximpact table').allInnerTexts()).join(' ').includes('Liza'));
   ok('no sideways scrolling', await noSideways(a));
 }

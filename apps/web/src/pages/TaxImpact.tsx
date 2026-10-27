@@ -49,81 +49,94 @@ export function TaxImpactPage() {
   );
 }
 
+type Tab = 'months' | 'worst' | 'employees';
+
 /** Potential tax loss and savings, and the employee evaluation. Every figure is a potential one, not a verified one, and says so. */
 function TaxImpactSection() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [tab, setTab] = useState<Tab>('months');
   const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) }).toString();
   const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
   const t = d.data?.totals;
   const all = d.data?.scope === 'all';
   const maxBar = Math.max(1, ...(d.data?.months ?? []).map((m) => Math.max(m.potentialLoss, m.potentialSavings)));
+  const shown: Tab = tab === 'employees' && !all ? 'months' : tab;
 
   return (
-    <section className="card taximpact" aria-labelledby="ti-h">
-      <div className="card-h">
-        <h2 id="ti-h">Figures</h2>
-        <div className="btns tifilter">
-          <label className="f" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
-          <label className="f" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" /></label>
+    <div className="taximpact stack" aria-label="Tax withheld figures">
+      <div className="tifilterbar">
+        <span className="muted">{all ? 'All receipts with a BIR invoice' : 'Your receipts with a BIR invoice'}</span>
+        <div className="tifilter">
+          <label className="f"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
+          <label className="f"><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" /></label>
+          {(from || to) && <button type="button" className="btn sm ghost" onClick={() => { setFrom(''); setTo(''); }}>Clear</button>}
         </div>
       </div>
-      <div className="card-b">
-        <p className="muted" style={{ marginTop: 0 }}>
-          {all ? 'All receipts with a BIR invoice.' : 'Your receipts with a BIR invoice.'} These are <b>potential</b> figures, not verified: answering Yes works the tax out on the net amount and answering No on the gross amount, so the difference is the rate times the VAT.
-          {d.data && ` Where no rate was entered, the usual rate of ${d.data.rate}% is used.`}
-          {d.data?.truncated && ' Only the newest 20,000 receipts are counted here. Narrow the dates to see the rest.'}
-        </p>
-        <div className="tilegrid" data-testid="ti-tiles">
-          <div className="tile alert"><small>Potential loss (answered No)</small><b data-testid="ti-loss">{t ? money(t.potentialLoss) : '–'}</b></div>
-          <div className="tile"><small>Potential savings (answered Yes)</small><b data-testid="ti-savings">{t ? money(t.potentialSavings) : '–'}</b></div>
-          <div className="tile"><small>Tax withheld (answered Yes)</small><b data-testid="ti-withheld">{t ? money(t.taxWithheld) : '–'}</b></div>
-          <div className="tile"><small>Answered No</small><b data-testid="ti-no">{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b></div>
-          <div className="tile"><small>Incomplete receipts</small><b data-testid="ti-incomplete">{t ? t.incomplete : '–'}</b></div>
+
+      <div className="tilegrid" data-testid="ti-tiles">
+        <div className="tile alert"><small>Potential loss (answered No)</small><b data-testid="ti-loss">{t ? money(t.potentialLoss) : '–'}</b></div>
+        <div className="tile"><small>Potential savings (answered Yes)</small><b data-testid="ti-savings">{t ? money(t.potentialSavings) : '–'}</b></div>
+        <div className="tile"><small>Tax withheld (answered Yes)</small><b data-testid="ti-withheld">{t ? money(t.taxWithheld) : '–'}</b></div>
+        <div className="tile"><small>Answered No</small><b data-testid="ti-no">{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b></div>
+        <div className="tile"><small>Incomplete receipts</small><b data-testid="ti-incomplete">{t ? t.incomplete : '–'}</b></div>
+      </div>
+
+      <details className="tihow">
+        <summary>How these figures are worked out</summary>
+        <p>They are <b>potential</b> figures, not verified. Answering Yes works the tax out on the net amount (vatable plus VAT-exempt) and answering No on the gross amount, so the difference is the rate times the VAT.{d.data && ` Where no rate was entered, the usual rate of ${d.data.rate}% is used.`}{d.data?.truncated && ' Only the newest 20,000 receipts are counted. Narrow the dates to see the rest.'}</p>
+        {t && t.notEstimable > 0 && <p>{t.notEstimable} incomplete receipt{t.notEstimable === 1 ? '' : 's'} lack the figures needed to estimate a loss, so {t.notEstimable === 1 ? 'it counts' : 'they count'} as ₱0.00 until the details are completed.</p>}
+      </details>
+
+      <section className="card">
+        <div className="tabs tipanes" role="tablist" aria-label="Tax figures">
+          <button role="tab" aria-selected={shown === 'months'} className={shown === 'months' ? 'on' : ''} onClick={() => setTab('months')}>By month</button>
+          <button role="tab" aria-selected={shown === 'worst'} className={shown === 'worst' ? 'on' : ''} onClick={() => setTab('worst')}>Largest losses{d.data?.worst.length ? <span className="n"> {d.data.worst.length}</span> : null}</button>
+          {all && <button role="tab" aria-selected={shown === 'employees'} className={shown === 'employees' ? 'on' : ''} onClick={() => setTab('employees')}>Employee evaluation{d.data?.employees.length ? <span className="n"> {d.data.employees.length}</span> : null}</button>}
         </div>
-        {t && t.notEstimable > 0 && <p className="muted" style={{ fontSize: '.86rem' }}>{t.notEstimable} incomplete receipt{t.notEstimable === 1 ? '' : 's'} lack the figures needed to estimate a loss, so {t.notEstimable === 1 ? 'it counts' : 'they count'} as ₱0.00 until the details are completed.</p>}
+        <div className="card-b" role="tabpanel">
+          {!d.data && <p className="muted">Loading…</p>}
 
-        {d.data && d.data.months.length > 0 && (
-          <div className="tibars" role="img" aria-label="Potential loss and savings by month">
-            {d.data.months.map((m) => (
-              <div key={m.month} className="tibar">
-                <span className="tibar-l">{monthName(m.month)}</span>
-                <span className="tibar-t"><i className="loss" style={{ width: `${(m.potentialLoss / maxBar) * 100}%` }} /><i className="save" style={{ width: `${(m.potentialSavings / maxBar) * 100}%` }} /></span>
-                <span className="tibar-v">{money(m.potentialLoss)} lost · {money(m.potentialSavings)} saved</span>
+          {d.data && shown === 'months' && (
+            d.data.months.length ? (
+              <div className="tibars" role="img" aria-label="Potential loss and savings by month">
+                {d.data.months.map((m) => (
+                  <div key={m.month} className="tibar">
+                    <span className="tibar-l">{monthName(m.month)}</span>
+                    <span className="tibar-t"><i className="loss" style={{ width: `${(m.potentialLoss / maxBar) * 100}%` }} /><i className="save" style={{ width: `${(m.potentialSavings / maxBar) * 100}%` }} /></span>
+                    <span className="tibar-v">{money(m.potentialLoss)} lost · {money(m.potentialSavings)} saved</span>
+                  </div>
+                ))}
+                <div className="tilegend"><span><i className="loss" />Potential loss</span><span><i className="save" />Potential savings</span></div>
               </div>
-            ))}
-            <div className="tilegend"><span><i className="loss" />Potential loss</span><span><i className="save" />Potential savings</span></div>
-          </div>
-        )}
+            ) : <p className="muted">No receipts in this period.</p>
+          )}
 
-        <h3 style={{ marginBottom: 8 }}>Receipts with the largest potential loss or missing details</h3>
-        {d.data && !d.data.worst.length && <p className="muted">Nothing to show. No receipt has a potential loss or missing details.</p>}
-        {d.data && d.data.worst.length > 0 && (
-          <div className="matrix"><table style={{ minWidth: 560 }}>
-            <thead><tr><th style={{ textAlign: 'left' }}>Receipt</th>{all && <th style={{ textAlign: 'left' }}>Employee</th>}<th style={{ textAlign: 'left' }}>Why</th><th style={{ textAlign: 'right' }}>Potential loss</th></tr></thead>
-            <tbody>{d.data.worst.map((r) => (
-              <tr key={r.id}><td><Link to={`/receipts/${r.id}`} style={{ color: 'var(--accent)' }}>{r.refNo}</Link><br /><small className="muted">{r.vendor} · {r.date}</small></td>{all && <td>{r.employee}</td>}<td>{r.reasons.join(', ') || '-'}</td><td style={{ textAlign: 'right' }}>{money(r.potentialLoss)}</td></tr>
-            ))}</tbody>
-          </table></div>
-        )}
-
-        {all && d.data && (
-          <>
-            <h3 style={{ margin: '20px 0 4px' }}>Employee evaluation</h3>
-            <p className="muted" style={{ marginTop: 0 }}>Who answered No or left receipt details incomplete, and what that may have cost. A general view for now: the criteria will be defined later. A flag appears when three or more receipts from the same person have a problem.</p>
-            {!d.data.employees.length && <p className="muted">No employee has a potential loss or incomplete receipts.</p>}
-            {d.data.employees.length > 0 && (
-              <div className="matrix"><table style={{ minWidth: 640 }} data-testid="ti-employees">
-                <thead><tr><th style={{ textAlign: 'left' }}>Employee</th><th style={{ textAlign: 'right' }}>Receipts</th><th style={{ textAlign: 'right' }}>Answered No</th><th style={{ textAlign: 'right' }}>Incomplete</th><th style={{ textAlign: 'right' }}>Potential loss</th><th style={{ textAlign: 'right' }}>Potential savings</th></tr></thead>
-                <tbody>{d.data.employees.map((e) => (
-                  <EmployeeRows key={e.employeeId} e={e} />
+          {d.data && shown === 'worst' && (
+            d.data.worst.length ? (
+              <div className="matrix"><table style={{ minWidth: 520 }}>
+                <thead><tr><th style={{ textAlign: 'left' }}>Receipt</th>{all && <th style={{ textAlign: 'left' }}>Employee</th>}<th style={{ textAlign: 'left' }}>Why</th><th style={{ textAlign: 'right' }}>Potential loss</th></tr></thead>
+                <tbody>{d.data.worst.map((r) => (
+                  <tr key={r.id}><td><Link to={`/receipts/${r.id}`} style={{ color: 'var(--accent)' }}>{r.refNo}</Link><br /><small className="muted">{r.vendor} · {r.date}</small></td>{all && <td>{r.employee}</td>}<td>{r.reasons.join(', ') || '-'}</td><td style={{ textAlign: 'right' }}>{money(r.potentialLoss)}</td></tr>
                 ))}</tbody>
               </table></div>
-            )}
-          </>
-        )}
-      </div>
-    </section>
+            ) : <p className="muted">Nothing to show. No receipt has a potential loss or missing details.</p>
+          )}
+
+          {d.data && shown === 'employees' && (
+            <>
+              <p className="muted" style={{ marginTop: 0 }}>Who answered No or left receipt details incomplete, and what that may have cost. A general view for now: the criteria will be defined later. A flag appears when three or more receipts from the same person have a problem.</p>
+              {d.data.employees.length ? (
+                <div className="matrix"><table style={{ minWidth: 640 }} data-testid="ti-employees">
+                  <thead><tr><th style={{ textAlign: 'left' }}>Employee</th><th style={{ textAlign: 'right' }}>Receipts</th><th style={{ textAlign: 'right' }}>Answered No</th><th style={{ textAlign: 'right' }}>Incomplete</th><th style={{ textAlign: 'right' }}>Potential loss</th><th style={{ textAlign: 'right' }}>Potential savings</th></tr></thead>
+                  <tbody>{d.data.employees.map((e) => <EmployeeRows key={e.employeeId} e={e} />)}</tbody>
+                </table></div>
+              ) : <p className="muted">No employee has a potential loss or incomplete receipts.</p>}
+            </>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
