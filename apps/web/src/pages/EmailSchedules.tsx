@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { INTERVAL_CHOICES, REMINDER_LABEL, SCHEDULE_STEPS, WEEKDAYS, describeEmailSchedule, emailScheduleSchema } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
 import { EmailTimingCard } from '../components/EmailTiming';
@@ -100,6 +100,10 @@ export function EmailSchedulesTab() {
   );
 }
 
+function Chip({ on, children, onChange, label }: { on: boolean; children: ReactNode; onChange: () => void; label?: string }) {
+  return <label className={`sf-chip ${on ? 'on' : ''}`}><input type="checkbox" checked={on} aria-label={label} onChange={onChange} /><span>{children}</span></label>;
+}
+
 function ScheduleForm({ choices, initial, id, busy, onClose, onSave }: { choices: Choices | undefined; initial: Draft; id: number | null; busy: boolean; onClose: () => void; onSave: (d: Draft) => void }) {
   const [d, setD] = useState<Draft>(initial);
   const [find, setFind] = useState('');
@@ -107,57 +111,69 @@ function ScheduleForm({ choices, initial, id, busy, onClose, onSave }: { choices
   const parsed = emailScheduleSchema.safeParse(d);
   const errs: Record<string, string> = {};
   if (!parsed.success) for (const i of parsed.error.issues) errs[String(i.path[0])] ||= i.message;
-  const people = (choices?.people ?? []).filter((p) => !find.trim() || `${p.name} ${p.role}`.toLowerCase().includes(find.trim().toLowerCase()));
+  const everyone = choices?.people ?? [];
+  const people = everyone.filter((p) => !find.trim() || `${p.name} ${p.role}`.toLowerCase().includes(find.trim().toLowerCase()));
+  const chosen = d.userIds.map((uid) => everyone.find((p) => p.id === uid)).filter((p): p is Choices['people'][number] => !!p);
   return (
-    <Modal title={id ? 'Edit schedule' : 'New schedule'} onClose={onClose} className="wide">
-      <div style={{ display: 'grid', gap: 14 }}>
+    <Modal title={id ? 'Edit schedule' : 'New schedule'} onClose={onClose} className="wide sf">
+      <div className="sf-body">
         <label className="field"><span>Name</span><input type="text" value={d.name} maxLength={80} placeholder="For example: Hourly reminder to the boss" onChange={(e) => set('name', e.target.value)} />{errs.name && <span className="err">{errs.name}</span>}</label>
 
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend style={{ fontWeight: 600 }}>Which waiting receipts to list</legend>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {SCHEDULE_STEPS.map((s) => <label key={s} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={d.steps.includes(s)} onChange={() => set('steps', toggle(d.steps, s))} />{REMINDER_LABEL[s]}</label>)}
+        <section className="sf-sec">
+          <h3><b>1</b> What to list</h3>
+          <p className="sf-hint">The email lists the receipts that are waiting at these steps.</p>
+          <div className="sf-chips" role="group" aria-label="Steps">
+            {SCHEDULE_STEPS.map((x) => <Chip key={x} on={d.steps.includes(x)} onChange={() => set('steps', toggle(d.steps, x))}>{REMINDER_LABEL[x]}</Chip>)}
           </div>
           {errs.steps && <span className="err">{errs.steps}</span>}
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>Only those that have waited at least <input type="number" min={0} max={60} step={0.5} style={{ width: 80 }} value={d.minDays} aria-label="Minimum days waited" onChange={(e) => set('minDays', e.target.value === '' ? 0 : Number(e.target.value))} /> days <small className="muted">(0 = all)</small></label>
+          <label className="sf-inline">Only receipts that have waited at least
+            <input type="number" min={0} max={60} step={0.5} value={d.minDays} aria-label="Minimum days waited" onChange={(e) => set('minDays', e.target.value === '' ? 0 : Number(e.target.value))} />
+            days <small className="muted">(0 = all of them)</small></label>
           {errs.minDays && <span className="err">{errs.minDays}</span>}
-        </fieldset>
+        </section>
 
-        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend style={{ fontWeight: 600 }}>Who gets it</legend>
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            {(choices?.roles ?? []).map((r) => <label key={r.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={d.roleIds.includes(r.id)} onChange={() => set('roleIds', toggle(d.roleIds, r.id))} />All {r.name}</label>)}
+        <section className="sf-sec">
+          <h3><b>2</b> Who gets it</h3>
+          <p className="sf-hint">Tick whole roles, or pick people one by one. Nobody is told about a receipt they encoded themselves.</p>
+          <div className="sf-chips" role="group" aria-label="Roles">
+            {(choices?.roles ?? []).map((r) => <Chip key={r.id} on={d.roleIds.includes(r.id)} onChange={() => set('roleIds', toggle(d.roleIds, r.id))} label={`All ${r.name}`}>All {r.name}</Chip>)}
           </div>
-          <input type="search" placeholder="Find a person" aria-label="Find a person" style={{ marginTop: 8 }} value={find} onChange={(e) => setFind(e.target.value)} />
-          <div role="group" aria-label="People" style={{ maxHeight: 160, overflow: 'auto', display: 'grid', gap: 4, marginTop: 6 }}>
-            {people.map((p) => <label key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={d.userIds.includes(p.id)} onChange={() => set('userIds', toggle(d.userIds, p.id))} />{p.name} <small className="muted">{p.role}</small></label>)}
-            {choices && !people.length && <span className="muted">Nobody matches.</span>}
+          {chosen.length > 0 && (
+            <div className="sf-picked" aria-label="Chosen people">
+              {chosen.map((p) => <span key={p.id} className="sf-pick">{p.name}<button type="button" aria-label={`Remove ${p.name}`} onClick={() => set('userIds', d.userIds.filter((x) => x !== p.id))}>×</button></span>)}
+            </div>
+          )}
+          <input type="search" className="sf-find" placeholder="Search for a person to add" aria-label="Find a person" value={find} onChange={(e) => setFind(e.target.value)} />
+          <div role="group" aria-label="People" className="sf-people">
+            {people.map((p) => (
+              <label key={p.id} className={d.userIds.includes(p.id) ? 'on' : ''}><input type="checkbox" checked={d.userIds.includes(p.id)} onChange={() => set('userIds', toggle(d.userIds, p.id))} /><span>{p.name}</span><small className="muted">{p.role}</small></label>
+            ))}
+            {choices && !people.length && <span className="muted" style={{ padding: 10 }}>Nobody matches.</span>}
           </div>
           {errs.userIds && <span className="err">{errs.userIds}</span>}
-        </fieldset>
+        </section>
 
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-          <label className="field"><span>How often</span>
-            <select value={d.intervalMinutes} onChange={(e) => set('intervalMinutes', Number(e.target.value))}>{INTERVAL_CHOICES.map((c) => <option key={c.minutes} value={c.minutes}>{c.label}</option>)}</select>
-            {errs.intervalMinutes && <span className="err">{errs.intervalMinutes}</span>}</label>
-          <label className="field"><span>From</span><input type="time" value={d.startTime} onChange={(e) => set('startTime', e.target.value)} />{errs.startTime && <span className="err">{errs.startTime}</span>}</label>
-          <label className="field"><span>Until</span><input type="time" value={d.endTime} onChange={(e) => set('endTime', e.target.value)} />{errs.endTime && <span className="err">{errs.endTime}</span>}</label>
-          <label className="field"><span>Time zone</span><input type="text" value={d.timeZone} onChange={(e) => set('timeZone', e.target.value)} />{errs.timeZone && <span className="err">{errs.timeZone}</span>}</label>
-        </div>
-
-        <div>
-          <b>Days</b>
-          <div role="group" aria-label="Days" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+        <section className="sf-sec">
+          <h3><b>3</b> When to send</h3>
+          <div className="sf-grid">
+            <label className="field"><span>How often</span>
+              <select value={d.intervalMinutes} onChange={(e) => set('intervalMinutes', Number(e.target.value))}>{INTERVAL_CHOICES.map((c) => <option key={c.minutes} value={c.minutes}>{c.label}</option>)}</select>
+              {errs.intervalMinutes && <span className="err">{errs.intervalMinutes}</span>}</label>
+            <label className="field"><span>Only from</span><input type="time" value={d.startTime} onChange={(e) => set('startTime', e.target.value)} />{errs.startTime && <span className="err">{errs.startTime}</span>}</label>
+            <label className="field"><span>Until</span><input type="time" value={d.endTime} onChange={(e) => set('endTime', e.target.value)} />{errs.endTime && <span className="err">{errs.endTime}</span>}</label>
+            <label className="field"><span>Time zone</span><input type="text" value={d.timeZone} onChange={(e) => set('timeZone', e.target.value)} />{errs.timeZone && <span className="err">{errs.timeZone}</span>}</label>
+          </div>
+          <div role="group" aria-label="Days" className="sf-chips" style={{ marginTop: 12 }}>
             {[1, 2, 3, 4, 5, 6, 0].map((x) => <button key={x} type="button" className={`btn sm ${d.days.includes(x) ? 'pri' : ''}`} aria-pressed={d.days.includes(x)} onClick={() => set('days', toggle(d.days, x))}>{WEEKDAYS[x]}</button>)}
           </div>
           {errs.days && <span className="err">{errs.days}</span>}
-        </div>
+        </section>
 
         {parsed.success && <div className="callout" style={{ margin: 0 }} data-testid="schedule-sentence"><Icon name="info" /><div>{describeEmailSchedule({ ...parsed.data, minDays: parsed.data.minDays })}</div></div>}
-        <div className="formbar">
-          <button className="btn" type="button" onClick={onClose}>Cancel</button>
-          <button className="btn pri" type="button" disabled={!parsed.success || busy} onClick={() => onSave(d)}>Save schedule</button>
-        </div>
+      </div>
+      <div className="sf-foot">
+        <button className="btn" type="button" onClick={onClose}>Cancel</button>
+        <button className="btn pri" type="button" disabled={!parsed.success || busy} onClick={() => onSave(d)}>Save schedule</button>
       </div>
     </Modal>
   );
