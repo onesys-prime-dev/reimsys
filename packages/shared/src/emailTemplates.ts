@@ -128,7 +128,7 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   },
   digest: {
     subject: '{{orgName}}: your daily summary',
-    heading: 'Good morning, {{recipientName}}',
+    heading: 'Hello, {{recipientName}}',
     body: "Here is what is waiting for you today:\n\n{{summary}}",
     buttonLabel: 'Open {{orgName}}',
     showDetails: false,

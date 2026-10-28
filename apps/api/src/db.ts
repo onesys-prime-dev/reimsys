@@ -17,7 +17,7 @@ export const prisma = base.$extends({
       },
     },
   },
-});
+}); 
 
 /** The database handle inside `prisma.$transaction(async (tx) => ...)`. */
 export type Tx = Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;

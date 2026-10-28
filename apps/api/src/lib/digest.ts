@@ -48,7 +48,7 @@ export async function sendDigestNow(userId: number) {
   return queueDigest(u);
 }
 
-/** Sends one morning email per opted-in user listing what is waiting for them. Runs at most once a day. */
+/** Sends one summary email per opted-in user once a day (from the morning on; the heading does not say "morning" because a delayed send can arrive later) listing what is waiting for them. Runs at most once a day. */
 async function runDigest() {
   const now = new Date();
   if (now.getHours() < SEND_HOUR) return;
