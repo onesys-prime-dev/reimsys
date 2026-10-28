@@ -34,6 +34,8 @@ import './lib/documents.js';
 import './lib/reports.js';
 import { startDigest } from './lib/digest.js';
 import { startReminders } from './lib/reminders.js';
+import { startEmailSchedules } from './lib/emailSchedules.js';
+import { emailSchedulesRouter } from './routes/emailSchedules.js';
 import { startWorker } from './lib/jobs.js';
 import { buildInfo } from './lib/build.js';
 
@@ -86,6 +88,7 @@ app.use('/api/audit', auditRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/charge-locations', chargeLocationsRouter);
 app.use('/api/form-drafts', formDraftsRouter);
+app.use('/api/email-schedules', emailSchedulesRouter);
 app.use('/api/receipts', receiptsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/dashboard', dashboardRouter);
@@ -116,6 +119,7 @@ else app.listen(config.port, () => console.log(`REIMSYS API listening on http://
 void startWorker();
 startDigest();
 startReminders();
+startEmailSchedules();
 
 // Every half minute, close live connections that belong to sessions which have ended, so a timed-out or signed-out browser cannot keep listening.
 setInterval(async () => {

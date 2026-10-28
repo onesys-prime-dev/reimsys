@@ -174,6 +174,7 @@ export * from './privacy';
 export * from './text';
 export * from './reminders';
 export * from './emailSchedule';
+export * from './emailSchedules';
 export * from './settings';
 export * from './tax';
 

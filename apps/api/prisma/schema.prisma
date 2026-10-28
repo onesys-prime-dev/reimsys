@@ -126,6 +126,32 @@ model Category {
   @@map("category")
 }
 
+/// A reminder email an administrator set up: a list of the receipts waiting, sent to chosen roles and people, at an interval, within set hours.
+model EmailSchedule {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(80)
+  isOn            Boolean   @default(true)
+  /// Which waiting steps to list: check, decide, pay, fix (joined by commas).
+  steps           String    @db.VarChar(40)
+  /// Only receipts that have waited at least this many days.
+  minDays         Decimal   @default(0) @db.Decimal(5, 2)
+  /// Role ids and user ids, joined by commas.
+  roleIds         String    @default("") @db.VarChar(200)
+  userIds         String    @default("") @db.VarChar(1000)
+  intervalMinutes Int
+  startTime       String    @db.VarChar(5)
+  endTime         String    @db.VarChar(5)
+  days            String    @db.VarChar(20)
+  timeZone        String    @db.VarChar(60)
+  lastSentAt      DateTime?
+  lastCount       Int       @default(0)
+  createdById     Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("email_schedule")
+}
+
 /// A form that was started and not finished. Saved as the person types, so a wrong exit loses nothing. Not a receipt: it is not listed, counted or seen by anyone else.
 model FormDraft {
   id        Int      @id @default(autoincrement())
