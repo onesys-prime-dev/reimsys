@@ -7,6 +7,7 @@ import { EmailSettingsTab } from './EmailSettings';
 import { EmailTemplatesTab } from './EmailTemplates';
 import { AppSettingsTab } from './AppSettings';
 import { EmailSchedulesTab } from './EmailSchedules';
+import { BrandColourCard } from '../components/BrandColour';
 import { usePrivacyInfo } from './Privacy';
 import { Avatar, CopyBox, Empty, Field, Icon, Modal, Switch, useToast } from '../ui';
 
@@ -339,6 +340,7 @@ function CompanyTab() {
   if (!v) return <div className="empty">Loading…</div>;
   const change = (k: 'name' | 'tin' | 'address', val: string) => setF({ ...v, [k]: val });
   return (
+    <>
     <section className="card">
       <div className="card-h"><h3>Company on the invoice</h3><small>Shown to the Med Ref when they confirm the invoice</small></div>
       <form className="card-b" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
@@ -350,5 +352,7 @@ function CompanyTab() {
         <div className="formbar"><button className="btn pri" type="submit" disabled={!f || save.isPending}>Save</button></div>
       </form>
     </section>
+    <BrandColourCard />
+    </>
   );
 }

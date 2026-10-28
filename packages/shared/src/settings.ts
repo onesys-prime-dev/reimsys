@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isTimeOfDay, isTimeZone, parseDays } from './emailSchedule';
+import { ACCENT_KEYS } from './appearance';
 
 const num = (min: number, max: number, label: string) =>
   z.coerce.number({ invalid_type_error: `${label} must be a number.` }).min(min, `${label} cannot be below ${min}.`).max(max, `${label} cannot be above ${max}.`);
@@ -37,6 +38,8 @@ export const appSettingsSchema = z.object({
   emailDays: z.string().trim().refine((v) => parseDays(v) !== null, 'Choose at least one day.'),
   emailTimeZone: z.string().trim().refine(isTimeZone, 'That is not a time zone. Use a name like Asia/Manila.'),
   emailLateHours: num(0, 12, 'The late-send window').transform(Math.round),
+  /* the company's colour, for everyone who has not picked their own */
+  brandAccent: z.enum(ACCENT_KEYS).default('teal'),
   /* sessions (people already signed in keep the limits they signed in with, except the idle limit, which applies at once) */
   sessionIdleMinutes: num(5, 1440, 'The idle limit').transform(Math.round),
   sessionMaxHours: num(1, 168, 'The maximum session').transform(Math.round),
@@ -53,7 +56,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vatRate: 12, tolerance: 0.02, defaultWhtRate: 2, allowNoBir: true,
   requireInvoiceNo: true, requireVendorAddress: true, requireVendorTin: true, askWithholding: true, showDescription: true,
   evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, reminderCheckDays: 2, reminderDecideDays: 2, reminderPayDays: 3, reminderFixDays: 5, sessionIdleMinutes: 60, sessionMaxHours: 12,
-  digestOn: true, digestTime: '08:00', reminderOn: true, reminderTime: '09:00', emailDays: '1,2,3,4,5,6', emailTimeZone: 'Asia/Manila', emailLateHours: 3,
+  digestOn: true, digestTime: '08:00', reminderOn: true, reminderTime: '09:00', emailDays: '1,2,3,4,5,6', emailTimeZone: 'Asia/Manila', emailLateHours: 3, brandAccent: 'teal',
   retentionMonths: 0, privacyRetention: '', privacyContact: '', privacyVersion: 1,
 };
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { appearanceSchema, type Appearance } from './appearance';
 
 /* ---------- roles ---------- */
 export const ROLE_CODES = ['medref', 'checker', 'approver', 'accounting', 'manager', 'admin'] as const;
@@ -112,6 +113,7 @@ export const updateProfileSchema = z.object({
 
 export const preferencesSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).optional(),
+  appearance: appearanceSchema.optional(),
   dailyDigest: z.boolean().optional(),
   reservationReleased: z.boolean().optional(),
 });
@@ -148,7 +150,7 @@ export interface RoleSummary { id: number; code: string; name: string; rank: num
 export interface MeResponse {
   user: {
     id: number; name: string; email: string; phone: string | null; branch: string | null;
-    hasPhoto: boolean; photoV: number | null; theme: 'light' | 'dark' | 'system'; mustChangePassword: boolean;
+    hasPhoto: boolean; photoV: number | null; theme: 'light' | 'dark' | 'system'; appearance: Appearance; mustChangePassword: boolean;
     /** True until the person accepts the current privacy notice (shown after the password step). */
     privacyRequired: boolean;
     prefs: { dailyDigest: boolean; reservationReleased: boolean };
@@ -175,6 +177,7 @@ export * from './text';
 export * from './reminders';
 export * from './emailSchedule';
 export * from './emailSchedules';
+export * from './appearance';
 export * from './settings';
 export * from './tax';
 
