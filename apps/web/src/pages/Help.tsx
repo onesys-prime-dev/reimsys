@@ -65,11 +65,12 @@ export function HelpPage() {
       <Steps items={[
         <>Press <b>New receipt</b>. Answer the questions one step at a time. The steps follow the reimbursement form, and skip what the answers make unnecessary.</>,
         <><b>Reimbursement details:</b> say whether the invoice is BIR-registered. If it is not, only the date, vendor, address and amount are needed.</>,
-        <><b>Invoice details:</b> copy what is on the invoice. Press <b>How to read the invoice</b> to see a sample with each place to look marked.</>,
-        <><b>Reason for spending:</b> say why the money was spent and pick what it was for.</>,
+        <><b>Invoice details:</b> copy what is on the invoice. Beside the questions that have one, press the small <b>i</b> button to see a sample invoice with the place to look marked. Press outside the picture or <b>Close</b> to go back. The vendor TIN takes numbers only; the dashes are put in for you.</>,
+        <><b>VAT details:</b> say whether the invoice is vatable, then the vatable amount, VAT, VAT-exempt amount and discount (write 0 when there is none). Then answer <b>Tax withheld?</b>. With <b>Yes</b> the amounts must add up and you add the withholding rate and amount on the next step. With <b>No</b> the form shows a potential loss in yellow: it is an estimate, not a verified figure.</>,
+        <><b>Reason for spending:</b> say why the money was spent, pick what it was for, and choose where to charge it.</>,
         <><b>Proof and review:</b> add the photo or PDF. Press <b>Scan receipt</b> to take the picture with the camera: lay the receipt flat in good light, keep all four corners in view, and wait for the green outline. You can drag the four dots in the editor if the outline is off. Check the summary, then <b>Submit</b>.</>,
       ]} />
-      <p>Not ready? Save it as a <b>Draft</b> and come back. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
+      <p>You do not have to finish in one go. What you type is saved as you go, even half filled, so a wrong click or a closed page loses nothing. Come back from <b>New receipt</b> or from the note on <b>Receipts</b> and press <b>Continue</b>; it works from another device too. Photos and PDFs are not part of that and are added again. <b>Start over</b> throws the unfinished form away. You can also press <b>Save draft</b> on the last step. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
       <h3>If it comes back</h3>
       <p>A <b>Returned</b> receipt shows what to fix. Each problem has a <b>Fix</b> button that opens the form on the right step. Fix it and send it again. You get a notice and an email whenever something happens to your receipt.</p>
       <h3>Good photos</h3>
