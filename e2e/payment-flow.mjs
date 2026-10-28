@@ -117,7 +117,7 @@ const ricaNotes = (await call(U.rica, 'GET', '/notifications')).d.items;
 ok('accounting was told a receipt is ready to pay', ricaNotes.some((n) => n.text.includes('ready to pay')));
 const mails = (await call(U.admin, 'GET', '/email-log')).d.items;
 ok('one "paid" email per payment went to the Med Ref', mails.filter((e) => e.template === 'paid' && e.to === 'ana.reyes@example.com').length >= 2);
-ok('accounting got no email about approvals', !mails.some((e) => e.to === 'accounting@example.com'));
+ok('accounting gets only the "ready to pay" email, nothing else', mails.some((e) => e.to === 'accounting@example.com' && e.template === 'ready_to_pay') && mails.filter((e) => e.to === 'accounting@example.com').every((e) => ['ready_to_pay', 'reminder', 'digest'].includes(e.template)));
 const dash2 = (await call(U.rica, 'GET', '/dashboard')).d;
 ok('paid this month went up', dash2.paidThisMonth.count >= 4 && dash2.paidThisMonth.total >= 2050.5);
 
