@@ -246,6 +246,10 @@ jobs:
           # Roles, rights and categories are data, not structure, so a migration does not add them. The seed adds whatever is missing (a new role,
           # a new right) and never overwrites edits made on the Access screen. SEED_DEMO=false: no demo accounts are ever created on a server.
           SEED_DEMO=false pnpm exec tsx prisma/seed.ts
+          # A new table has no rights for the system's limited login until an administrator grants them. This does not stop the deploy; it says
+          # which tables are affected and what to run, so a missing grant is seen here and not first by a user.
+          cd "$1"
+          node scripts/grant-app-user.mjs --check || echo "::warning::The system's database login cannot reach every table (see the lines above). Ask the database administrator to run: node scripts/grant-app-user.mjs --yes --admin root"
           REMOTE_SCRIPT
 
       # The API also runs the background worker, so exactly one instance runs.

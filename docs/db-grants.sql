@@ -3,7 +3,8 @@
 -- which it can only read and append to. Changing or deleting audit rows needs a person with database access.
 --
 -- MySQL cannot take one privilege away from a database-wide grant, so the grants are per table.
--- If a later migration adds a table, grant it here too (SELECT, INSERT, UPDATE, DELETE).
+-- If a later migration adds a table, grant it here too (SELECT, INSERT, UPDATE, DELETE). Or run `node scripts/grant-app-user.mjs --yes --admin root`,
+-- which grants every table in one go (and `--check` lists the ones the system cannot reach; every deploy runs it).
 
 CREATE USER IF NOT EXISTS 'reimsys_app'@'localhost' IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
 
