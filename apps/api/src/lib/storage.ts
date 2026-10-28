@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
+import { notFound } from './errors.js';
 
 /**
  * Storage adapter. Local disk today. To move to S3, keep these function signatures and swap the bodies.
@@ -20,8 +21,14 @@ export async function saveFile(folder: string, ext: string, data: Buffer) {
   return rel;
 }
 
+/** Reads a stored file. A file that is in the database but no longer on the disk (restored database, files moved or cleared) is a plain "not found", not a server error. */
 export async function readFile(rel: string) {
-  return fs.readFile(abs(rel));
+  try {
+    return await fs.readFile(abs(rel));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw notFound('This file is no longer on the server. Please upload it again.');
+    throw err;
+  }
 }
 export async function copyFile(rel: string, folder: string) {
   const ext = path.extname(rel).slice(1);
