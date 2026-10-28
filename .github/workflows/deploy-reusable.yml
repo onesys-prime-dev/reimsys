@@ -264,10 +264,16 @@ jobs:
           set -euo pipefail
           cd "$1/apps/api"
           want="$(pwd)/dist/server.js"
+          # Another pm2 app that runs this same server.js under a different name (an older name for the same site) would keep the port, so the new
+          # copy could never start while the old code kept answering and this deploy still looked green. Stop those first; the right one is started below.
+          pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const p of JSON.parse(s.slice(s.indexOf("["))))if(p.name!==process.argv[1]&&p.pm2_env.pm_exec_path===process.argv[2])console.log(p.name)})' "$2" "$want" 2>/dev/null | while read -r other; do
+            echo "::warning::pm2 '$other' runs the same server.js as '$2'. Stopping '$other' so only one copy is running."
+            pm2 delete "$other"
+          done || true
           if pm2 describe "$2" > /dev/null 2>&1; then
             # A process that was once started from another folder would be restarted from THAT folder, so the site would keep serving old code
             # while this deploy reports success. Check where it runs from, and start it again from this folder when it differs.
-            have=$(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path:"")})' "$2")
+            have=$(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s.slice(s.indexOf("["))).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path:"")})' "$2") || true
             if [ "$have" = "$want" ]; then
               pm2 restart "$2" --update-env
             else
@@ -279,7 +285,7 @@ jobs:
             pm2 start dist/server.js --name "$2"
           fi
           pm2 save
-          echo "Running from: $(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path+" (started "+new Date(p.pm2_env.pm_uptime).toISOString()+")":"not running")})' "$2")"
+          echo "Running from: $(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s.slice(s.indexOf("["))).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path+" (started "+new Date(p.pm2_env.pm_uptime).toISOString()+")":"not running")})' "$2")"
           REMOTE_SCRIPT
 
       ########################################################
