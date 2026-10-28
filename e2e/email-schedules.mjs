@@ -81,7 +81,7 @@ try {
   ok('it records when it last sent', !!stamped.lastSentAt && stamped.lastCount === 1, JSON.stringify(stamped));
   await new Promise((r) => setTimeout(r, 70_000));
   ok('and does not send again the next minute', countW() === c1, `${c1} -> ${countW()}`);
-  ok('a switched-off schedule never sends', await (async () => { await call(U.admin, 'PATCH', `/email-schedules/${w.d.schedule.id}`, { isOn: false }); sql(`UPDATE email_schedule SET lastSentAt = NULL WHERE id = ${w.d.schedule.id}`); const k = countW(); await new Promise((r) => setTimeout(r, 65_000)); return countW() === k; })());
+  ok('a switched-off schedule never sends', await (async () => { await call(U.admin, 'PATCH', `/email-schedules/${w.d.schedule.id}`, { isOn: false }); sql(`UPDATE emailschedule SET lastSentAt = NULL WHERE id = ${w.d.schedule.id}`); const k = countW(); await new Promise((r) => setTimeout(r, 65_000)); return countW() === k; })());
 
   console.log('\nThe screen');
   const b = await chromium.launch({ channel: 'chrome' });

@@ -151,7 +151,7 @@ model EmailSchedule {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  @@map("email_schedule")
+  @@map("emailschedule")
 }
 
 /// A form that was started and not finished. Saved as the person types, so a wrong exit loses nothing. Not a receipt: it is not listed, counted or seen by anyone else.
@@ -170,7 +170,7 @@ model FormDraft {
 
   @@unique([userId, receiptId])
   @@index([userId, updatedAt])
-  @@map("form_draft")
+  @@map("formdraft")
 }
 
 /// Where a receipt is charged ("Choose where to charge"). An administrator edits the list.
@@ -182,7 +182,7 @@ model ChargeLocation {
   receipts  Receipt[]
   createdAt DateTime  @default(now())
 
-  @@map("charge_location")
+  @@map("chargelocation")
 }
 
 model Receipt {
