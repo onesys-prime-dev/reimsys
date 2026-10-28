@@ -51,5 +51,6 @@ export async function resetSettings(userId: number) {
   void userId;
 }
 
-void loadSettings();
+/** Resolves once the saved settings have been read, so a job that runs at start-up does not decide with the built-in defaults. */
+export const settingsReady: Promise<void> = loadSettings();
 setInterval(() => void loadSettings(), 15_000).unref();

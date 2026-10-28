@@ -1,12 +1,11 @@
 import { REMINDER_LABEL, REMINDER_PERMISSION, peso, reminderStage, whoToRemind, type ReminderStage } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { getSettings } from './appSettings.js';
+import { getSettings, settingsReady } from './appSettings.js';
 import { queueEmail } from './email.js';
 import { renderEmail } from './emailTemplates.js';
 import { notify } from './notify.js';
-
-const SEND_HOUR = 9;
+import { scheduleDecision } from '@reimsys/shared';
 const DAY = 86_400_000;
 
 interface Waiting {
@@ -82,12 +81,14 @@ export async function sendReminders(now = new Date()): Promise<number> {
   return users.length;
 }
 
-/** Once a day, after 9am. The unique key claims the day, so a restart or a second process cannot send twice. */
+/** Once a day, at the time set in Settings (or a little later when the server was down). The unique key claims the day, so a restart or a second process cannot send twice. */
 async function runReminders() {
   const now = new Date();
-  if (now.getHours() < SEND_HOUR) return;
+  const s = getSettings();
+  const d = scheduleDecision(now, { on: s.reminderOn, time: s.reminderTime, emailDays: s.emailDays, emailTimeZone: s.emailTimeZone, emailLateHours: s.emailLateHours });
+  if (d.action !== 'send') return;
   try {
-    await prisma.sequence.create({ data: { key: `reminders-${now.toISOString().slice(0, 10)}`, value: 1 } });
+    await prisma.sequence.create({ data: { key: `reminders-${d.dayKey}`, value: 1 } });
   } catch {
     return;
   }
@@ -96,5 +97,5 @@ async function runReminders() {
 
 export function startReminders() {
   setInterval(() => void runReminders().catch((e) => console.error('reminders', e)), 15 * 60_000);
-  void runReminders().catch((e) => console.error('reminders', e));
+  void settingsReady.then(() => runReminders()).catch((e) => console.error('reminders', e));
 }

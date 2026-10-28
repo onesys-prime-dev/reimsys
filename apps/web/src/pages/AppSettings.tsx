@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { DEFAULT_SETTINGS, SETTINGS_SECTIONS, appSettingsSchema, type AppSettings } from '@reimsys/shared';
+import { DEFAULT_SETTINGS, SETTINGS_SECTIONS, WEEKDAYS, appSettingsSchema, describeSchedule, parseDays, type AppSettings } from '@reimsys/shared';
 import { api, errMsg } from '../api';
 import { PaymentMethodsCard } from '../components/PaymentMethods';
 import { ChargeLocationsCard } from '../components/ChargeLocations';
@@ -70,11 +70,20 @@ export function AppSettingsTab() {
                   <div style={{ flex: '1 1 280px', minWidth: 0 }}>
                     <b>{it.label}</b>
                     {it.help && <div className="muted" style={{ fontSize: '.86rem' }}>{it.help}</div>}
-                    {!same && <small className="muted">Default: {it.kind === 'bool' ? (defaults[it.key] ? 'On' : 'Off') : it.kind === 'text' ? (defaults[it.key] ? String(defaults[it.key]) : 'empty') : `${defaults[it.key]} ${it.unit ?? ''}`}</small>}
+                    {!same && <small className="muted">Default: {it.kind === 'bool' ? (defaults[it.key] ? 'On' : 'Off') : it.kind === 'text' || it.kind === 'time' ? (defaults[it.key] ? String(defaults[it.key]) : 'empty') : it.kind === 'days' ? (parseDays(String(defaults[it.key])) ?? []).map((d) => WEEKDAYS[d]).join(', ') : `${defaults[it.key]} ${it.unit ?? ''}`}</small>}
                     {errs[it.key] && <span className="err" style={{ display: 'block' }}>{errs[it.key]}</span>}
                   </div>
                   {it.kind === 'bool' ? (
                     <Switch checked={!!draft[it.key]} label={it.label} onChange={(v) => set(it.key, v)} />
+                  ) : it.kind === 'time' ? (
+                    <input type="time" style={{ width: 140 }} value={String(draft[it.key] ?? '')} aria-label={it.label} onChange={(e) => set(it.key, e.target.value)} />
+                  ) : it.kind === 'days' ? (
+                    <div role="group" aria-label={it.label} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                        const on = (parseDays(String(draft[it.key] ?? '')) ?? []).includes(d);
+                        return <button key={d} type="button" className={`btn sm ${on ? 'pri' : ''}`} aria-pressed={on} onClick={() => { const cur = new Set(parseDays(String(draft[it.key] ?? '')) ?? []); if (on) cur.delete(d); else cur.add(d); set(it.key, [...cur].sort((a, b) => a - b).join(',')); }}>{WEEKDAYS[d]}</button>;
+                      })}
+                    </div>
                   ) : it.kind === 'text' ? (
                     <input type="text" style={{ flex: '1 1 320px', minWidth: 0 }} value={String(draft[it.key] ?? '')} aria-label={it.label} onChange={(e) => set(it.key, e.target.value)} />
                   ) : (
@@ -86,6 +95,12 @@ export function AppSettingsTab() {
                 </div>
               );
             })}
+            {sec.title === 'When emails go out' && !unknownKeys.has('digestTime') && (
+              <div className="callout" data-testid="email-schedule" style={{ margin: 0 }}><Icon name="info" /><div>
+                <span style={{ display: 'block' }}>{describeSchedule('The daily summary', { on: !!draft.digestOn, time: String(draft.digestTime ?? ''), emailDays: String(draft.emailDays ?? ''), emailTimeZone: String(draft.emailTimeZone ?? ''), emailLateHours: Number(draft.emailLateHours ?? 0) })}</span>
+                <span style={{ display: 'block' }}>{describeSchedule('The waiting-receipt reminder', { on: !!draft.reminderOn, time: String(draft.reminderTime ?? ''), emailDays: String(draft.emailDays ?? ''), emailTimeZone: String(draft.emailTimeZone ?? ''), emailLateHours: Number(draft.emailLateHours ?? 0) })}</span>
+              </div></div>
+            )}
           </div>
         </section>
       ))}
@@ -100,7 +115,7 @@ export function AppSettingsTab() {
       </div>
       {!unknownKeys.has('retentionMonths') && <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />}
       <section className="card" style={{ marginTop: 16 }}>
-        <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves at about 9am</small></div>
+        <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves, at the time set under When emails go out</small></div>
         <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <span className="muted">Send the reminders now, using the days you have saved above.</span>
           <button className="btn" type="button" disabled={remind.isPending} onClick={() => remind.mutate()}>Send reminders now</button>

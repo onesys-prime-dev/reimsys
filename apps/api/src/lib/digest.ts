@@ -2,8 +2,8 @@ import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { queueEmail } from './email.js';
 import { renderEmail } from './emailTemplates.js';
-
-const SEND_HOUR = 8;
+import { getSettings, settingsReady } from './appSettings.js';
+import { scheduleDecision } from '@reimsys/shared';
 
 type DigestUser = { id: number; name: string; email: string; role: { permissions: { permission: { code: string } }[] } };
 
@@ -50,9 +50,10 @@ export async function sendDigestNow(userId: number) {
 
 /** Sends one summary email per opted-in user once a day (from the morning on; the heading does not say "morning" because a delayed send can arrive later) listing what is waiting for them. Runs at most once a day. */
 async function runDigest() {
-  const now = new Date();
-  if (now.getHours() < SEND_HOUR) return;
-  const key = `digest-${now.toISOString().slice(0, 10)}`;
+  const s = getSettings();
+  const d = scheduleDecision(new Date(), { on: s.digestOn, time: s.digestTime, emailDays: s.emailDays, emailTimeZone: s.emailTimeZone, emailLateHours: s.emailLateHours });
+  if (d.action !== 'send') return;
+  const key = `digest-${d.dayKey}`;
   try {
     await prisma.sequence.create({ data: { key, value: 1 } }); // the unique key claims today's run
   } catch {
@@ -64,5 +65,5 @@ async function runDigest() {
 
 export function startDigest() {
   setInterval(() => void runDigest().catch((e) => console.error('digest', e)), 15 * 60_000);
-  void runDigest().catch((e) => console.error('digest', e));
+  void settingsReady.then(() => runDigest()).catch((e) => console.error('digest', e));
 }
