@@ -243,6 +243,13 @@ jobs:
           cd apps/api
           pnpm exec prisma generate
           pnpm exec prisma migrate deploy
+          # Roles, rights and categories are data, not structure, so a migration does not add them. The seed adds whatever is missing (a new role,
+          # a new right) and never overwrites edits made on the Access screen. SEED_DEMO=false: no demo accounts are ever created on a server.
+          SEED_DEMO=false pnpm exec tsx prisma/seed.ts
+          # A new table has no rights for the system's limited login until an administrator grants them. This does not stop the deploy; it says
+          # which tables are affected and what to run, so a missing grant is seen here and not first by a user.
+          cd "$1"
+          node scripts/grant-app-user.mjs --check || echo "::warning::The system's database login cannot reach every table (see the lines above). Ask the database administrator to run: node scripts/grant-app-user.mjs --yes --admin root"
           REMOTE_SCRIPT
 
       # The API also runs the background worker, so exactly one instance runs.
@@ -256,12 +263,23 @@ jobs:
           if [ -s "$NVM_DIR/nvm.sh" ]; then . "$NVM_DIR/nvm.sh"; fi
           set -euo pipefail
           cd "$1/apps/api"
+          want="$(pwd)/dist/server.js"
           if pm2 describe "$2" > /dev/null 2>&1; then
-            pm2 restart "$2" --update-env
+            # A process that was once started from another folder would be restarted from THAT folder, so the site would keep serving old code
+            # while this deploy reports success. Check where it runs from, and start it again from this folder when it differs.
+            have=$(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path:"")})' "$2")
+            if [ "$have" = "$want" ]; then
+              pm2 restart "$2" --update-env
+            else
+              echo "::warning::pm2 '$2' was running from '$have', not '$want'. Starting it again from this folder."
+              pm2 delete "$2"
+              pm2 start dist/server.js --name "$2"
+            fi
           else
             pm2 start dist/server.js --name "$2"
           fi
           pm2 save
+          echo "Running from: $(pm2 jlist | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).find((x)=>x.name===process.argv[1]);console.log(p?p.pm2_env.pm_exec_path+" (started "+new Date(p.pm2_env.pm_uptime).toISOString()+")":"not running")})' "$2")"
           REMOTE_SCRIPT
 
       ########################################################

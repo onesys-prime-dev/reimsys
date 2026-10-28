@@ -22,6 +22,10 @@ FLUSH PRIVILEGES;
 
 Run migrations and seed with the migrate user, then create the app user with `docs/db-grants.sql`. That script removes UPDATE and DELETE on the audit log, so even a bug in the app cannot rewrite history.
 
+## After an update that adds tables
+
+The deploy migrates the database and runs the seed, but a new table starts with no rights for the system's limited login (`reimsys_app`). The deploy log then shows a warning naming the tables. A MySQL administrator runs, once, on the database server: `node scripts/grant-app-user.mjs --yes --admin root` (it grants every table in one go; `--check` shows what is missing). No restart is needed.
+
 ## 3. Build and configure
 
 ```bash
