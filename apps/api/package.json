@@ -16,6 +16,7 @@
     "start:dev": "tsx src/server.ts",
     "demo:off": "tsx prisma/retire-demo.ts",
     "admin:create": "tsx prisma/create-admin.ts",
+    "emails:setup": "tsx prisma/setup-email-schedules.ts",
     "mail:check": "tsx prisma/mail-check.ts",
     "data:clear": "tsx prisma/clear-test-data.ts"
   },

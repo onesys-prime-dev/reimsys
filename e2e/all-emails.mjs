@@ -45,17 +45,20 @@ try {
   console.log('\nA receipt goes all the way');
   const mine = async (name, amt) => step(U.ana, await makeDraft(U, 'ana', name + stamp, amt), 'submit');
   let r = await mine('Mail A ', 410);
+  const submitted = await arrives((m) => to(m).includes('liza.santos') && /is waiting to be checked/.test(m.subject) && m.html.includes(r.refNo));
   await look(U.liza, r);
   r = await step(U.liza, r, 'return', { note: 'The photo is blurry.', issues: ['photo_unclear'] });
   const returned = await arrives((m) => to(m).includes('ana.reyes') && /needs a correction/.test(m.subject) && m.html.includes(r.refNo));
   r = await step(U.ana, await get(U.ana, r), 'submit');
   await look(U.liza, r); r = await step(U.liza, r, 'check');
+  const checked = await arrives((m) => to(m).includes('paolo.v') && /ready for your decision/.test(m.subject) && m.html.includes(r.refNo));
   await look(U.paolo, r);
   r = await step(U.paolo, r, 'reserve', { note: 'Waiting for the rate.' });
   const reserved = await arrives((m) => to(m).includes('ana.reyes') && /on hold/.test(m.subject) && m.html.includes(r.refNo));
   r = await step(U.paolo, r, 'release');
   const released = await arrives((m) => to(m).includes('ana.reyes') && /Hold released/.test(m.subject) && m.html.includes(r.refNo));
   r = await step(U.paolo, r, 'approve');
+  const readyToPay = await arrives((m) => to(m).includes('accounting@') && /approved and ready to pay/.test(m.subject) && m.html.includes(r.refNo));
   const approved = await arrives((m) => to(m).includes('ana.reyes') && /was approved/.test(m.subject) && m.html.includes(r.refNo));
   const approvedChecker = await arrives((m) => to(m).includes('liza.santos') && /was approved/.test(m.subject) && m.html.includes(r.refNo));
   r = await step(U.paolo, r, 'undo', { note: 'Approved by mistake.' });
@@ -81,7 +84,7 @@ try {
   const reminder = await arrives((m) => to(m).includes('liza.santos') && /waiting for you/.test(m.subject));
   await call(U.admin, 'DELETE', `/email-schedules/${sched.d.schedule.id}`);
 
-  const all = { test, invite, reset, returned, reserved, released, approved, reversed, paid, payment_reversed: payRev, disapproved, digest, reminder };
+  const all = { submitted, checked, ready_to_pay: readyToPay, test, invite, reset, returned, reserved, released, approved, reversed, paid, payment_reversed: payRev, disapproved, digest, reminder };
   console.log('\nEach one arrived, to the right person, and reads properly');
   for (const [key, m] of Object.entries(all)) {
     ok(`${key}: arrived`, !!m);
@@ -97,8 +100,8 @@ try {
   ok('paying worked, so the paid email was real', paidRes.s === 200 || paidRes.s === 201, JSON.stringify(paidRes.d).slice(0, 160));
   ok('the reset email has a working reset link', !!reset && /\/reset\?token=|\/reset\//.test(reset.html) && forgot.status < 300, reset?.html.match(/href="([^"]+)"/)?.[1]);
   ok('the invitation has its link', !!invite && /href="http:\/\/localhost:5173\/[^"]+"/.test(invite.html));
-  const names = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'];
-  ok('all thirteen emails of the system were sent and received', names.every((n) => !!all[n]));
+  const names = ['submitted', 'checked', 'ready_to_pay', 'returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'];
+  ok('all sixteen emails of the system were sent and received', names.every((n) => !!all[n]));
   const log = (await call(U.admin, 'GET', '/email-log?pageSize=100')).d;
   ok('and the email log says sent for them', (log.items ?? []).filter((e) => /example\.com/.test(e.to) && e.status === 'sent').length >= 12, JSON.stringify(log.counts ?? log.total));
 } finally {

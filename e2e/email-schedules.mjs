@@ -15,7 +15,7 @@ const look = (c, r) => fetch(`${B}/receipts/${r.id}/evidence/${r.evidence[0].id}
 
 const choices = (await call(U.admin, 'GET', '/email-schedules/choices')).d;
 const idOf = (name) => choices.people.find((p) => p.name === name)?.id;
-const bossId = choices.people.find((p) => p.role === 'Admin')?.id;
+const bossId = choices.people.find((p) => p.name === 'Office Admin')?.id;
 const roleId = (n) => choices.roles.find((r) => r.name === n)?.id;
 const stamp = Date.now();
 const good = { name: 'Test hourly ' + stamp, steps: ['check', 'pay'], minDays: 0, roleIds: [], userIds: [bossId], intervalMinutes: 60, startTime: '00:00', endTime: '23:59', days: [0, 1, 2, 3, 4, 5, 6], timeZone: 'Asia/Manila' };

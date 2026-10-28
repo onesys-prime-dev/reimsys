@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'] as const;
+export const TEMPLATE_KEYS = ['submitted', 'checked', 'ready_to_pay', 'returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -54,6 +54,9 @@ export interface TemplateMeta {
 }
 
 export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
+  submitted: { label: 'Receipt waiting to be checked', when: 'A Med Ref submits a receipt', to: 'Every Checker', allowed: RECEIPT_VARS, hasReceipt: true },
+  checked: { label: 'Receipt ready for a decision', when: 'A Checker marks a receipt as checked', to: 'Every Approver', allowed: RECEIPT_VARS, hasReceipt: true },
+  ready_to_pay: { label: 'Receipt ready to pay', when: 'An approver approves a receipt', to: 'Accounting', allowed: [...RECEIPT_VARS, 'docNo'], hasReceipt: true },
   returned: { label: 'Receipt returned for correction', when: 'A checker sends a receipt back', to: 'The Med Ref who encoded it', allowed: RECEIPT_VARS, hasReceipt: true },
   approved: { label: 'Receipt approved', when: 'An approver approves a receipt', to: 'The Med Ref and the checker', allowed: [...RECEIPT_VARS, 'docNo'], hasReceipt: true },
   disapproved: { label: 'Receipt disapproved', when: 'An approver disapproves a receipt', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
@@ -70,6 +73,27 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
 };
 
 export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
+  submitted: {
+    subject: '{{refNo}} is waiting to be checked',
+    heading: 'A receipt needs checking',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} submitted {{refNo}} ({{payee}}). Please open the evidence and check it.',
+    buttonLabel: 'Open the receipt',
+    showDetails: true,
+  },
+  checked: {
+    subject: '{{refNo}} is ready for your decision',
+    heading: 'A receipt is ready for your decision',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} checked {{refNo}} ({{payee}}). It is waiting for you to approve, disapprove or put on hold.\n> {{note}}',
+    buttonLabel: 'Open the receipt',
+    showDetails: true,
+  },
+  ready_to_pay: {
+    subject: '{{refNo}} is approved and ready to pay',
+    heading: 'A receipt is ready to pay',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} approved {{refNo}} ({{payee}}). Reimbursement document {{docNo}} is ready, and the receipt is waiting for your payment.',
+    buttonLabel: 'Open the receipt',
+    showDetails: true,
+  },
   returned: {
     subject: '{{refNo}} needs a correction',
     heading: 'Please correct this receipt',
@@ -87,7 +111,7 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   disapproved: {
     subject: '{{refNo}} was disapproved',
     heading: 'Receipt disapproved',
-    body: 'Hi {{recipientName}},\n\n{{actorName}} disapproved {{refNo}} ({{payee}}).\n\nReason:\n> {{note}}\n\nYou can copy it into a new draft if you need to resubmit.',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} disapproved {{refNo}} ({{payee}}).\n\nReason:\n> {{note}}\n\nThe Med Ref can copy it into a new draft to resubmit.',
     buttonLabel: 'Open the receipt',
     showDetails: true,
   },
@@ -168,6 +192,9 @@ export const SAMPLE_DATA: Record<string, string> = Object.fromEntries(PLACEHOLDE
 
 /** Each email is previewed with details that make sense for it, so a "returned" sample never shows an approval. */
 const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
+  submitted: { actorName: 'Ana Reyes', status: 'Submitted', note: '', docNo: '' },
+  checked: { actorName: 'Liza Santos', status: 'Checked', note: 'Evidence is clear.', docNo: '' },
+  ready_to_pay: { actorName: 'Paolo Villanueva', status: 'Approved', note: '', docNo: 'REIM-2026-000045' },
   returned: { actorName: 'Liza Santos', status: 'Returned', note: 'The receipt photo is blurry. Please upload a clear copy.', docNo: '' },
   approved: { actorName: 'Paolo Villanueva', status: 'Approved', note: 'Approved.', docNo: 'REIM-2026-000045' },
   disapproved: { actorName: 'Paolo Villanueva', status: 'Disapproved', note: 'Snacks are not reimbursable under the current policy.', docNo: '' },
