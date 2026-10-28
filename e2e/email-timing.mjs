@@ -49,7 +49,10 @@ try {
   const errs = [];
   p.on('pageerror', (e) => errs.push(String(e)));
   await p.goto('/'); await p.fill('input[type=email]', 'admin@example.com'); await p.fill('input[type=password]', 'Reimsys#2026'); await p.click('button[type=submit]'); await p.waitForSelector('.shell');
-  await p.goto('/access'); await p.getByRole('tab', { name: /Settings/ }).click(); await p.waitForSelector('text=When emails go out');
+  await p.goto('/access'); await p.getByRole('tab', { name: 'Email schedules' }).click(); await p.waitForSelector('text=When emails go out');
+  await p.getByRole('tab', { name: 'Settings', exact: true }).click(); await p.waitForTimeout(600);
+  ok('the box is no longer on the Settings tab', (await p.getByText('When emails go out').count()) === 0);
+  await p.getByRole('tab', { name: 'Email schedules' }).click(); await p.waitForSelector('text=When emails go out');
   ok('the group is there with its two switches, two times and the days', (await p.getByLabel('Daily summary time').count()) === 1 && (await p.getByLabel('Reminder time').count()) === 1 && (await p.getByRole('group', { name: 'Days they are sent' }).getByRole('button').count()) === 7);
   const sentence = await p.locator('[data-testid=email-schedule]').innerText();
   ok('it says in words when each goes out', /daily summary goes out at 8:00 AM \(Asia\/Manila\), Monday to Saturday/i.test(sentence) && /reminder goes out at 9:00 AM/i.test(sentence), sentence);
@@ -61,7 +64,7 @@ try {
   for (const d of ['Tue', 'Wed', 'Thu', 'Fri']) await p.getByRole('group', { name: 'Days they are sent' }).getByRole('button', { name: d }).click();
   await p.getByLabel('Time zone').fill('Mars/Base');
   ok('a time zone that does not exist is explained next to its box', (await p.locator('.err').allInnerTexts()).some((t) => /not a time zone/i.test(t)));
-  ok('and with no day chosen, saving is blocked and it says why', (await p.getByRole('button', { name: 'Save settings' }).isDisabled()) && (await p.locator('.err').allInnerTexts()).some((t) => /at least one day/i.test(t)));
+  ok('and with no day chosen, saving is blocked and it says why', (await p.getByRole('button', { name: 'Save times' }).isDisabled()) && (await p.locator('.err').allInnerTexts()).some((t) => /at least one day/i.test(t)));
   await p.getByRole('button', { name: 'Undo my edits' }).click();
   ok('Undo puts it back', /8:00 AM/.test(await p.locator('[data-testid=email-schedule]').innerText()));
   ok('nothing scrolls sideways', (await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 1);

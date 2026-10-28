@@ -100,19 +100,6 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
     ],
   },
   {
-    title: 'When emails go out',
-    help: 'The daily summary and the waiting-receipt reminders. They are sent by themselves at these times. The "send now" buttons ignore these settings.',
-    items: [
-      { key: 'digestOn', label: 'Send the daily summary', help: 'One email each day to people who have the daily summary switched on in their profile.', kind: 'bool' },
-      { key: 'digestTime', label: 'Daily summary time', help: '', kind: 'time' },
-      { key: 'reminderOn', label: 'Send the waiting-receipt reminders', help: 'Also the overview email for the Admin. The days to wait are set under Reminders above.', kind: 'bool' },
-      { key: 'reminderTime', label: 'Reminder time', help: '', kind: 'time' },
-      { key: 'emailDays', label: 'Days they are sent', help: 'On the other days nothing is sent.', kind: 'days' },
-      { key: 'emailTimeZone', label: 'Time zone', help: 'The times above are read in this time zone, whatever the server clock says. For example Asia/Manila.', kind: 'text' },
-      { key: 'emailLateHours', label: 'How late a send may be', help: 'If the server was down at the set time, the email is sent when it returns, but only within this many hours. After that the day is skipped. 0 = never late.', kind: 'number', unit: 'hours', step: 1 },
-    ],
-  },
-  {
     title: 'Sign-in sessions',
     help: 'Active people are never signed out while they work. These limits protect an unattended screen.',
     items: [
@@ -137,3 +124,18 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
     ],
   },
 ];
+
+/** The timing of the daily summary and the waiting-receipt reminders. Shown on the Email schedules tab, not on the Settings tab. */
+export const EMAIL_TIMING_SECTION: (typeof SETTINGS_SECTIONS)[number] = {
+    title: 'When emails go out',
+    help: 'The daily summary and the waiting-receipt reminders. They are sent by themselves at these times. The "send now" buttons ignore these settings.',
+    items: [
+      { key: 'digestOn', label: 'Send the daily summary', help: 'One email each day to people who have the daily summary switched on in their profile.', kind: 'bool' },
+      { key: 'digestTime', label: 'Daily summary time', help: '', kind: 'time' },
+      { key: 'reminderOn', label: 'Send the waiting-receipt reminders', help: 'Also the overview email for the Admin. The days to wait are set under Reminders above.', kind: 'bool' },
+      { key: 'reminderTime', label: 'Reminder time', help: '', kind: 'time' },
+      { key: 'emailDays', label: 'Days they are sent', help: 'On the other days nothing is sent.', kind: 'days' },
+      { key: 'emailTimeZone', label: 'Time zone', help: 'The times above are read in this time zone, whatever the server clock says. For example Asia/Manila.', kind: 'text' },
+      { key: 'emailLateHours', label: 'How late a send may be', help: 'If the server was down at the set time, the email is sent when it returns, but only within this many hours. After that the day is skipped. 0 = never late.', kind: 'number', unit: 'hours', step: 1 },
+    ],
+};

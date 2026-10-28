@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { INTERVAL_CHOICES, REMINDER_LABEL, SCHEDULE_STEPS, WEEKDAYS, describeEmailSchedule, emailScheduleSchema } from '@reimsys/shared';
 import { api, errMsg, fmtDateTime } from '../api';
+import { EmailTimingCard } from '../components/EmailTiming';
 import { Icon, Modal, Switch, useToast } from '../ui';
 
 interface Schedule {
@@ -55,6 +56,7 @@ export function EmailSchedulesTab() {
   const list = q.data?.schedules ?? [];
   return (
     <>
+      <EmailTimingCard />
       <div className="callout"><Icon name="info" /><div><b>Your own reminder emails</b><span>Each schedule emails a list of the receipts that are waiting to the roles and people you choose, as often as you set (at least every 30 minutes), only inside the hours and days you set. Nobody is told about a receipt they encoded themselves, and nothing is sent when nothing is waiting.</span></div></div>
       {list.map((s) => (
         <section className="card" key={s.id} style={{ marginBottom: 12 }} data-testid="schedule-card">
