@@ -243,6 +243,9 @@ jobs:
           cd apps/api
           pnpm exec prisma generate
           pnpm exec prisma migrate deploy
+          # Roles, rights and categories are data, not structure, so a migration does not add them. The seed adds whatever is missing (a new role,
+          # a new right) and never overwrites edits made on the Access screen. SEED_DEMO=false: no demo accounts are ever created on a server.
+          SEED_DEMO=false pnpm exec tsx prisma/seed.ts
           REMOTE_SCRIPT
 
       # The API also runs the background worker, so exactly one instance runs.
