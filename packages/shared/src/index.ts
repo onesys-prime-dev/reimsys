@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /* ---------- roles ---------- */
-export const ROLE_CODES = ['medref', 'checker', 'approver', 'accounting', 'admin'] as const;
+export const ROLE_CODES = ['medref', 'checker', 'approver', 'accounting', 'manager', 'admin'] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const DEFAULT_ROLES: { code: RoleCode; name: string; rank: number }[] = [
@@ -9,6 +9,8 @@ export const DEFAULT_ROLES: { code: RoleCode; name: string; rank: number }[] = [
   { code: 'checker', name: 'Checker', rank: 20 },
   { code: 'approver', name: 'Approver', rank: 30 },
   { code: 'accounting', name: 'Accounting', rank: 25 },
+  // The everyday administrator: looks after people and settings and sees everything, but cannot change roles, check, approve or pay.
+  { code: 'manager', name: 'Admin', rank: 90 },
   { code: 'admin', name: 'Super Admin', rank: 100 },
 ];
 
@@ -31,13 +33,14 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'audit.view', label: 'Browse the audit log', group: 'Administration' },
   { code: 'category.manage', label: 'Manage receipt categories', group: 'Administration' },
   { code: 'settings.manage', label: 'Manage email and system settings', group: 'Administration' },
+  { code: 'reminder.overview', label: 'Get a reminder email of every receipt waiting at any step', group: 'Administration' },
 ];
 export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
 
-const ALL: RoleCode[] = ['medref', 'checker', 'approver', 'accounting', 'admin'];
+const ALL: RoleCode[] = ['medref', 'checker', 'approver', 'accounting', 'manager', 'admin'];
 export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'receipt.create': ['medref'],
-  'receipt.view_all': ['checker', 'admin'],
+  'receipt.view_all': ['checker', 'manager', 'admin'],
   'receipt.import': ['medref', 'admin'],
   'evidence.view': ALL,
   'evidence.download': ALL,
@@ -46,11 +49,12 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'review.decide': ['approver'],
   'payment.mark': ['accounting'],
   'report.generate': ALL,
-  'user.manage': ['admin'],
+  'user.manage': ['manager', 'admin'],
   'role.manage': ['admin'],
-  'audit.view': ['admin'],
-  'category.manage': ['admin'],
-  'settings.manage': ['admin'],
+  'audit.view': ['manager', 'admin'],
+  'category.manage': ['manager', 'admin'],
+  'settings.manage': ['manager', 'admin'],
+  'reminder.overview': ['manager'],
 };
 
 /** Grants that can never be removed, so the system always has a review path and an administrator. */
@@ -169,6 +173,8 @@ export * from './returnIssues';
 export * from './privacy';
 export * from './text';
 export * from './reminders';
+export * from './emailSchedule';
+export * from './emailSchedules';
 export * from './settings';
 export * from './tax';
 

@@ -116,7 +116,7 @@ interface Answers {
   chargeLocationId?: number | null;
 }
 
-/** extras: also ask the answers added from the client's Google Form (VAT-exempt amount, discount, where to charge, reimbursement code). Imports and the API leave them to be completed before submitting. */
+/** extras: also ask the answers added from the client's Google Form (VAT-exempt amount, discount, where to charge). Imports and the API leave them to be completed before submitting. */
 function conditionalIssues(d: Answers, rules: AppSettings, extras = true): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [];
   const need = (ok: unknown, path: string, message: string) => { if (!ok) out.push({ path, message }); };

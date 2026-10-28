@@ -107,7 +107,7 @@ describe('receipt details table', () => {
 describe('daily summary', () => {
   it('lists what is waiting, one line each', async () => {
     const m = await render('digest', { recipientName: 'Liza', summary: '• 3 receipts waiting to be checked.\n• 1 draft not submitted yet.' }, HTTPS);
-    expect(m.html).toContain('Good morning, Liza');
+    expect(m.html).toContain('Hello, Liza');
     expect(m.html).toContain('3 receipts waiting to be checked.');
     expect(m.text).toContain('• 1 draft not submitted yet.');
   });

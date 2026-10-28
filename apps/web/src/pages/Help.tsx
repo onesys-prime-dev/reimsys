@@ -65,11 +65,12 @@ export function HelpPage() {
       <Steps items={[
         <>Press <b>New receipt</b>. Answer the questions one step at a time. The steps follow the reimbursement form, and skip what the answers make unnecessary.</>,
         <><b>Reimbursement details:</b> say whether the invoice is BIR-registered. If it is not, only the date, vendor, address and amount are needed.</>,
-        <><b>Invoice details:</b> copy what is on the invoice. Press <b>How to read the invoice</b> to see a sample with each place to look marked.</>,
-        <><b>Reason for spending:</b> say why the money was spent and pick what it was for.</>,
+        <><b>Invoice details:</b> copy what is on the invoice. Beside the questions that have one, press the small <b>i</b> button to see a sample invoice with the place to look marked. Press outside the picture or <b>Close</b> to go back. The vendor TIN takes numbers only; the dashes are put in for you.</>,
+        <><b>VAT details:</b> say whether the invoice is vatable, then the vatable amount, VAT, VAT-exempt amount and discount (write 0 when there is none). Then answer <b>Tax withheld?</b>. With <b>Yes</b> the amounts must add up and you add the withholding rate and amount on the next step. With <b>No</b> the form shows a potential loss in yellow: it is an estimate, not a verified figure.</>,
+        <><b>Reason for spending:</b> say why the money was spent, pick what it was for, and choose where to charge it.</>,
         <><b>Proof and review:</b> add the photo or PDF. Press <b>Scan receipt</b> to take the picture with the camera: lay the receipt flat in good light, keep all four corners in view, and wait for the green outline. You can drag the four dots in the editor if the outline is off. Check the summary, then <b>Submit</b>.</>,
       ]} />
-      <p>Not ready? Save it as a <b>Draft</b> and come back. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
+      <p>You do not have to finish in one go. What you type is saved as you go, even half filled, so a wrong click or a closed page loses nothing. Come back from <b>New receipt</b> or from the note on <b>Receipts</b> and press <b>Continue</b>; it works from another device too. Photos and PDFs are not part of that and are added again. <b>Start over</b> throws the unfinished form away. You can also press <b>Save draft</b> on the last step. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
       <h3>If it comes back</h3>
       <p>A <b>Returned</b> receipt shows what to fix. Each problem has a <b>Fix</b> button that opens the form on the right step. Fix it and send it again. You get a notice and an email whenever something happens to your receipt.</p>
       <h3>Good photos</h3>
@@ -126,15 +127,17 @@ export function HelpPage() {
   );
 
   if (can('user.manage') || can('role.manage') || can('settings.manage') || can('audit.view')) guides.push(
-    <Guide key="admin" id="admin" title="Super Admin: running the system" intro="You look after people, rules and settings. By default the Super Admin cannot check, approve or pay, so no one person can do the whole chain.">
+    <Guide key="admin" id="admin" title={can('role.manage') ? 'Super Admin: running the system' : 'Admin: running the system'} intro={can('role.manage') ? 'You look after people, rules and settings. By default the Super Admin cannot check, approve or pay, so no one person can do the whole chain.' : 'You look after people and settings and can see every receipt and report. You cannot change roles, and you cannot check, approve or pay.'}>
       <ul>
         {can('user.manage') && <li><b>Access → Users:</b> add people (they get a temporary password and an email invitation), change a role, switch someone off, reset a password, unlock an account. Switching off keeps their history. Each person&apos;s row shows whether they accepted the privacy notice.</li>}
         {can('role.manage') && <li><b>Access → Roles and permissions:</b> choose what each role can do. Locked boxes protect the review path so there is always someone who can check, approve and pay.</li>}
-        {can('settings.manage') && <li><b>Access → Settings:</b> the rules of the form, file limits, reminders, session times, and the privacy notice (retention period, data protection contact, and the version; raising the version makes everyone accept again).</li>}
+        {can('settings.manage') && <li><b>Access → Settings:</b> the rules of the form, file limits, reminders, when the daily emails go out (time, days and time zone; if the server was down it still sends within a few hours, then skips the day), session times, and the privacy notice (retention period, data protection contact, and the version; raising the version makes everyone accept again).</li>}
         {can('settings.manage') && <li><b>Access → Company and Email templates:</b> your name and logo on documents and emails, and the wording of each email.</li>}
+        {can('settings.manage') && <li><b>Access → Email schedules:</b> your own reminder emails. Pick the roles and people, which waiting receipts to list (to check, to decide, to pay, to fix), how often (every 30 minutes up to once a day) and the hours and days it may be sent. <b>Preview</b> shows who would get one now, and <b>Send now</b> sends it at once. The usual set (boss, Checkers, Approvers, Accounting, returned receipts) can be made with <b>pnpm emails:setup</b>.</li>}
         {can('settings.manage') && <li><b>Access → Email:</b> the mail account. <b>Send a test email</b> checks delivery. If email does not arrive, press <b>Run full check</b>: it tests each step and says what to fix.</li>}
         {can('audit.view') && <li><b>Audit log:</b> everything that happened, with who and when. Entries cannot be edited or deleted. The <b>Emails</b> tab shows every email and whether it was sent.</li>}
       </ul>
+      {can('reminder.overview') && <p>Once a day you get one email listing every receipt that has waited too long at any step (checking, deciding, payment or a correction), so you can nudge the right person. The waiting times are set under Access → Settings.</p>}
       <p>Before real use: back up, clear the test data, create real users, then switch off the demo accounts (see the deployment notes).</p>
     </Guide>,
   );

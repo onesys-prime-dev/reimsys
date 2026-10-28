@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isTimeOfDay, isTimeZone, parseDays } from './emailSchedule';
 
 const num = (min: number, max: number, label: string) =>
   z.coerce.number({ invalid_type_error: `${label} must be a number.` }).min(min, `${label} cannot be below ${min}.`).max(max, `${label} cannot be above ${max}.`);
@@ -28,6 +29,14 @@ export const appSettingsSchema = z.object({
   reminderDecideDays: num(0, 60, 'The decision reminder').transform(Math.round),
   reminderPayDays: num(0, 60, 'The payment reminder').transform(Math.round),
   reminderFixDays: num(0, 60, 'The correction reminder').transform(Math.round),
+  /* when the daily emails go out */
+  digestOn: z.boolean(),
+  digestTime: z.string().trim().refine(isTimeOfDay, 'Use a time like 08:00.'),
+  reminderOn: z.boolean(),
+  reminderTime: z.string().trim().refine(isTimeOfDay, 'Use a time like 09:00.'),
+  emailDays: z.string().trim().refine((v) => parseDays(v) !== null, 'Choose at least one day.'),
+  emailTimeZone: z.string().trim().refine(isTimeZone, 'That is not a time zone. Use a name like Asia/Manila.'),
+  emailLateHours: num(0, 12, 'The late-send window').transform(Math.round),
   /* sessions (people already signed in keep the limits they signed in with, except the idle limit, which applies at once) */
   sessionIdleMinutes: num(5, 1440, 'The idle limit').transform(Math.round),
   sessionMaxHours: num(1, 168, 'The maximum session').transform(Math.round),
@@ -44,11 +53,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vatRate: 12, tolerance: 0.02, defaultWhtRate: 2, allowNoBir: true,
   requireInvoiceNo: true, requireVendorAddress: true, requireVendorTin: true, askWithholding: true, showDescription: true,
   evidenceMaxFiles: 10, evidenceMaxMb: 10, undoMinutes: 10, reminderCheckDays: 2, reminderDecideDays: 2, reminderPayDays: 3, reminderFixDays: 5, sessionIdleMinutes: 60, sessionMaxHours: 12,
+  digestOn: true, digestTime: '08:00', reminderOn: true, reminderTime: '09:00', emailDays: '1,2,3,4,5,6', emailTimeZone: 'Asia/Manila', emailLateHours: 3,
   retentionMonths: 0, privacyRetention: '', privacyContact: '', privacyVersion: 1,
 };
 
 /** Plain-words description of each setting, in the order they are shown. Used by the Settings screen and the audit log. */
-export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: keyof AppSettings; label: string; help: string; kind: 'bool' | 'number' | 'text'; unit?: string; step?: number }[] }[] = [
+export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: keyof AppSettings; label: string; help: string; kind: 'bool' | 'number' | 'text' | 'time' | 'days'; unit?: string; step?: number }[] }[] = [
   {
     title: 'Reimbursement form: checks',
     help: 'How strict the form is about the numbers.',
@@ -114,3 +124,18 @@ export const SETTINGS_SECTIONS: { title: string; help: string; items: { key: key
     ],
   },
 ];
+
+/** The timing of the daily summary and the waiting-receipt reminders. Shown on the Email schedules tab, not on the Settings tab. */
+export const EMAIL_TIMING_SECTION: (typeof SETTINGS_SECTIONS)[number] = {
+    title: 'When emails go out',
+    help: 'The daily summary and the waiting-receipt reminders. They are sent by themselves at these times. The "send now" buttons ignore these settings.',
+    items: [
+      { key: 'digestOn', label: 'Send the daily summary', help: 'One email each day to people who have the daily summary switched on in their profile.', kind: 'bool' },
+      { key: 'digestTime', label: 'Daily summary time', help: '', kind: 'time' },
+      { key: 'reminderOn', label: 'Send the waiting-receipt reminders', help: 'Also the overview email for the Admin. The days to wait are set under Reminders above.', kind: 'bool' },
+      { key: 'reminderTime', label: 'Reminder time', help: '', kind: 'time' },
+      { key: 'emailDays', label: 'Days they are sent', help: 'On the other days nothing is sent.', kind: 'days' },
+      { key: 'emailTimeZone', label: 'Time zone', help: 'The times above are read in this time zone, whatever the server clock says. For example Asia/Manila.', kind: 'text' },
+      { key: 'emailLateHours', label: 'How late a send may be', help: 'If the server was down at the set time, the email is sent when it returns, but only within this many hours. After that the day is skipped. 0 = never late.', kind: 'number', unit: 'hours', step: 1 },
+    ],
+};

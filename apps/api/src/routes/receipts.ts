@@ -389,8 +389,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   const others = (ids: (number | null | undefined)[]) => ids.filter((x): x is number => !!x && x !== auth.user.id);
   const mail = receiptData({ refNo: r.refNo, payee: r.payee, amount: Number(r.amount), status: t.to, receiptDate: dateOnly(r.receiptDate), category: typeLabel(r) }, { actorName: who, note: reason, docNo });
   if (action === 'withdraw') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.withdrawn', receiptId: r.id, text: `${ref} was withdrawn by ${who}.` });
-  if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.` });
-  if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.` });
+  if (action === 'submit') await notify({ userIds: others(await usersWithPermission('review.check')), type: 'receipt.submitted', receiptId: r.id, text: `${ref} is waiting to be checked.`, email: { template: 'submitted', data: mail } });
+  if (action === 'check') await notify({ userIds: others(await usersWithPermission('review.decide')), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked and is ready for your decision.`, email: { template: 'checked', data: mail } });
   // The Med Ref's email button opens the form on the first problem that has a step to fix.
   const firstStep = issues.map(fixStepFor).find((s) => s);
   const fixLink = issues.length ? `${receiptUrl(r.id)}/edit${firstStep ? `?step=${firstStep}` : ''}` : undefined;
@@ -398,7 +398,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${reason}`, email: { template: 'returned', data: mail, link: fixLink } });
   if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
   if (action === 'approve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.approved', receiptId: r.id, text: `${ref} was approved. Document ${docNo} is ready.`, email: { template: 'approved', data: mail } });
-  if (action === 'approve') await notify({ userIds: others(await usersWithPermission('payment.mark')).filter((id) => id !== r.encoderId), type: 'receipt.ready_to_pay', receiptId: r.id, text: `${ref} was approved and is ready to pay.` });
+  if (action === 'approve') await notify({ userIds: others(await usersWithPermission('payment.mark')).filter((id) => id !== r.encoderId), type: 'receipt.ready_to_pay', receiptId: r.id, text: `${ref} was approved and is ready to pay.`, email: { template: 'ready_to_pay', data: mail } });
   if (action === 'reverse_payment') await notify({ userIds: [r.encoderId], type: 'payment.reversed', receiptId: r.id, text: `The payment for ${ref} was reversed. ${note}`, email: { template: 'payment_reversed', data: { ...mail, paymentNo: r.payment?.paymentNo ?? '' } } });
   if (action === 'disapprove') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.disapproved', receiptId: r.id, text: `${ref} was disapproved. ${note}`, email: { template: 'disapproved', data: mail } });
   if (action === 'reserve') await notify({ userIds: [r.encoderId, ...others([r.checkedById])], type: 'receipt.reserved', receiptId: r.id, text: `${ref} is on hold. ${note}`, email: { template: 'reserved', data: mail } });

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { enqueue, registerJob } from './jobs.js';
+import { enqueue, onJobGivesUp, registerJob } from './jobs.js';
 import { EMAIL_LOGO_PNG_BASE64 } from './emailLogo.js';
 import { resolveMail } from './mailSettings.js';
 
@@ -97,6 +97,15 @@ export async function queueEmail(input: { userId?: number; to: string; template:
   });
   await enqueue('email', { emailLogId: row.id });
 }
+
+/** An email that could not be sent for about a day: the people who look after settings are told, so it is not lost silently. */
+onJobGivesUp('email', async ({ emailLogId }: { emailLogId: number }, message) => {
+  const row = await prisma.emailLog.findUnique({ where: { id: emailLogId } });
+  if (!row || row.status === 'sent') return;
+  const admins = await prisma.user.findMany({ where: { isActive: true, role: { permissions: { some: { permission: { code: 'settings.manage' } } } } }, select: { id: true } });
+  if (!admins.length) return;
+  await prisma.notification.createMany({ data: admins.map((a) => ({ userId: a.id, type: 'email_failed', text: `An email to ${row.toEmail} ("${row.subject.slice(0, 80)}") could not be sent after a day of trying: ${message.slice(0, 120)}`.slice(0, 300), receiptId: null })) });
+});
 
 registerJob('email', async ({ emailLogId }: { emailLogId: number }) => {
   const row = await prisma.emailLog.findUnique({ where: { id: emailLogId } });

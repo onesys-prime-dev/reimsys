@@ -100,7 +100,7 @@ export function AppSettingsTab() {
       </div>
       {!unknownKeys.has('retentionMonths') && <RetentionPreview months={Number(settings.retentionMonths ?? 0)} />}
       <section className="card" style={{ marginTop: 16 }}>
-        <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves at about 9am</small></div>
+        <div className="card-h"><h2>Waiting-receipt reminders</h2><small>Also sent by themselves, at the time set on the Email schedules tab</small></div>
         <div className="card-b" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <span className="muted">Send the reminders now, using the days you have saved above.</span>
           <button className="btn" type="button" disabled={remind.isPending} onClick={() => remind.mutate()}>Send reminders now</button>
