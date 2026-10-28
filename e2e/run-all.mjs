@@ -10,7 +10,7 @@ const STEPS = [
   ['typecheck', 'pnpm', ['typecheck']],
   ['unit tests', 'pnpm', ['test']],
   // API
-  ...['api-flow', 'privacy-flow', 'profile-flow', 'payment-flow', 'return-issues-flow', 'client-form', 'form-fields', 'form-drafts', 'tax-impact', 'password-links', 'realtime-api', 'session', 'security', 'reminders', 'list-total', 'retention', 'mail-check', 'blank-text', 'friendly-error', 'bad-input', 'build-info'].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
+  ...['api-flow', 'privacy-flow', 'profile-flow', 'payment-flow', 'return-issues-flow', 'client-form', 'form-fields', 'form-drafts', 'admin-role', 'tax-impact', 'password-links', 'realtime-api', 'session', 'security', 'reminders', 'list-total', 'retention', 'mail-check', 'blank-text', 'friendly-error', 'bad-input', 'build-info'].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
   // browser
   ...['ui-flow', 'blank-ui', 'error-toast', 'evidence-loading', 'guide-loading', 'privacy-ui', 'privacy-scroll', 'privacy-settings-ui', 'profile-ui', 'password-eye', 'access-tabs', 'help-ui', 'payment-ui', 'return-ui', 'scan-ui', 'scan-live', 'zoom-ui', 'scan-scroll', 'phone-fixes', 'settings-input', 'profile-photo', 'role-sweep', ...(quick ? [] : ['dark-sweep', 'client-form-ui', 'tax-dashboard-ui', 'form-errors-ui', 'form-draft-ui', 'tax-form-ui', 'more-proof-ui', 'guide-ui'])].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
 ];

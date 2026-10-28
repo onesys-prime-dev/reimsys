@@ -5,6 +5,7 @@ export const DEMO_USERS = [
   { email: 'liza.santos@example.com', name: 'Liza Santos', role: 'checker', branch: 'Head Office' },
   { email: 'paolo.v@example.com', name: 'Paolo Villanueva', role: 'approver', branch: 'Head Office' },
   { email: 'accounting@example.com', name: 'Rica Tan', role: 'accounting', branch: 'Head Office' },
+  { email: 'manager@example.com', name: 'Office Admin', role: 'manager', branch: 'Head Office' },
   { email: 'admin@example.com', name: 'Admin User', role: 'admin', branch: 'Head Office' },
 ] as const;
 

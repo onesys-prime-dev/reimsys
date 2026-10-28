@@ -127,7 +127,7 @@ export function HelpPage() {
   );
 
   if (can('user.manage') || can('role.manage') || can('settings.manage') || can('audit.view')) guides.push(
-    <Guide key="admin" id="admin" title="Super Admin: running the system" intro="You look after people, rules and settings. By default the Super Admin cannot check, approve or pay, so no one person can do the whole chain.">
+    <Guide key="admin" id="admin" title={can('role.manage') ? 'Super Admin: running the system' : 'Admin: running the system'} intro={can('role.manage') ? 'You look after people, rules and settings. By default the Super Admin cannot check, approve or pay, so no one person can do the whole chain.' : 'You look after people and settings and can see every receipt and report. You cannot change roles, and you cannot check, approve or pay.'}>
       <ul>
         {can('user.manage') && <li><b>Access → Users:</b> add people (they get a temporary password and an email invitation), change a role, switch someone off, reset a password, unlock an account. Switching off keeps their history. Each person&apos;s row shows whether they accepted the privacy notice.</li>}
         {can('role.manage') && <li><b>Access → Roles and permissions:</b> choose what each role can do. Locked boxes protect the review path so there is always someone who can check, approve and pay.</li>}
@@ -136,6 +136,7 @@ export function HelpPage() {
         {can('settings.manage') && <li><b>Access → Email:</b> the mail account. <b>Send a test email</b> checks delivery. If email does not arrive, press <b>Run full check</b>: it tests each step and says what to fix.</li>}
         {can('audit.view') && <li><b>Audit log:</b> everything that happened, with who and when. Entries cannot be edited or deleted. The <b>Emails</b> tab shows every email and whether it was sent.</li>}
       </ul>
+      {can('reminder.overview') && <p>Once a day you get one email listing every receipt that has waited too long at any step (checking, deciding, payment or a correction), so you can nudge the right person. The waiting times are set under Access → Settings.</p>}
       <p>Before real use: back up, clear the test data, create real users, then switch off the demo accounts (see the deployment notes).</p>
     </Guide>,
   );

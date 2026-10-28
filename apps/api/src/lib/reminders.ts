@@ -58,6 +58,12 @@ export async function reminderLines(now = new Date()): Promise<Map<number, { id:
       add(id, w);
     }
   }
+  // People who oversee everything (the Admin) get every overdue receipt at every step, once each, whatever the step.
+  const overseers = await prisma.user.findMany({ where: { isActive: true, role: { permissions: { some: { permission: { code: 'reminder.overview' } } } } }, select: { id: true } });
+  for (const o of overseers) {
+    const have = new Set((byUser.get(o.id) ?? []).map((x) => x.id));
+    for (const w of list) if (!have.has(w.id)) add(o.id, w);
+  }
   return new Map([...byUser].map(([id, l]) => [id, l.sort((a, b) => b.days - a.days).map((x) => ({ id: x.id, line: x.line }))]));
 }
 
