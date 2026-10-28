@@ -130,7 +130,7 @@ for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone
   await p.click('button:has-text("Light")');
   await p.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'light', null, { timeout: 5000 }).catch(() => {});
   ok('Light turns it back', (await p.evaluate(() => document.documentElement.getAttribute('data-theme'))) === 'light');
-  await p.click('button:has-text("System")');
+  await p.click('button:has-text("Match my device")');
   await p.waitForTimeout(400);
   ok('System follows the device (no forced theme)', (await p.evaluate(() => document.documentElement.getAttribute('data-theme'))) === null);
   await p.click('button:has-text("Light")');

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type FormEvent } from 'react';
-import { PERMISSIONS, type MeResponse } from '@reimsys/shared';
+import { ACCENTS, DEFAULT_APPEARANCE, PERMISSIONS, resolveAccent, type AccentKey, type Appearance, type MeResponse } from '@reimsys/shared';
 import { api, deviceName, errMsg, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 import { PasswordForm } from '../components/PasswordForm';
@@ -181,20 +181,61 @@ function MyAccess() {
 function Look() {
   const { me, setMe } = useAuth();
   const toast = useToast();
+  const company = useQuery({ queryKey: ['app-settings'], queryFn: () => api<{ settings: { brandAccent?: string } }>('/app-settings') });
+  const brand = (company.data?.settings.brandAccent ?? 'teal') as AccentKey;
   const save = useMutation({
-    mutationFn: (theme: string) => api<MeResponse>('/me/preferences', { method: 'PATCH', body: { theme } }),
+    mutationFn: (body: { theme?: string; appearance?: Appearance }) => api<MeResponse>('/me/preferences', { method: 'PATCH', body }),
     onSuccess: (d) => setMe(d),
     onError: (e) => toast(errMsg(e), 'bad'),
   });
+  const look = me!.appearance ?? DEFAULT_APPEARANCE;
+  const setLook = (patch: Partial<Appearance>) => save.mutate({ appearance: { ...look, ...patch } });
+  const isDefault = me!.theme === 'light' && look.textSize === 'medium' && look.density === 'comfortable' && look.accent === 'default';
+  const SEG = <T extends string>(name: string, value: T, options: { v: T; label: string }[], onPick: (v: T) => void) => (
+    <div className="seg" role="radiogroup" aria-label={name}>
+      {options.map((o) => <button key={o.v} type="button" role="radio" aria-checked={value === o.v} className={value === o.v ? 'on' : ''} onClick={() => onPick(o.v)}>{o.label}</button>)}
+    </div>
+  );
   return (
-    <section className="card"><div className="card-b">
-      <div className="pref" style={{ padding: 0, border: 0 }}>
-        <div><b>Theme</b><br /><small>Light, dark, or match your device.</small></div>
-        <div className="seg">
-          {(['light', 'dark', 'system'] as const).map((k) => <button key={k} className={me!.theme === k ? 'on' : ''} onClick={() => save.mutate(k)}>{k[0]!.toUpperCase() + k.slice(1)}</button>)}
+    <section className="card" aria-labelledby="ap-h">
+      <div className="card-h"><h2 id="ap-h">Appearance</h2><button className="btn sm" type="button" disabled={isDefault || save.isPending} onClick={() => save.mutate({ theme: 'light', appearance: DEFAULT_APPEARANCE })}>Reset</button></div>
+      <div className="card-b ap-grid">
+        <div className="ap-row">
+          <b>Theme</b><small>Light, dark, or match your device.</small>
+          <div className="ap-themes" role="radiogroup" aria-label="Theme">
+            {([['light', 'Light'], ['dark', 'Dark'], ['system', 'Match my device']] as const).map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={me!.theme === k} className={`ap-theme ${me!.theme === k ? 'on' : ''}`} onClick={() => save.mutate({ theme: k })}>
+                <span className={`ap-mini ${k}`} aria-hidden="true"><i className="sb" /><i className="mn"><u className="a" /><u /><u /></i></span>
+                <b>{label}{me!.theme === k && <span className="ap-ck" aria-hidden="true">✓</span>}</b>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="ap-row">
+          <b>Colour</b><small>The colour of buttons, links and highlights.</small>
+          <div className="ap-swatches" role="radiogroup" aria-label="Colour">
+            <button type="button" role="radio" aria-checked={look.accent === 'default'} className={`ap-sw ${look.accent === 'default' ? 'on' : ''}`} onClick={() => setLook({ accent: 'default' })}><span className="co" style={{ ['--c' as string]: ACCENTS[resolveAccent('default', brand)].light.accent }} />Company</button>
+            {(Object.keys(ACCENTS) as (keyof typeof ACCENTS)[]).map((k) => (
+              <button key={k} type="button" role="radio" aria-checked={look.accent === k} aria-label={ACCENTS[k].label} className={`ap-sw ${look.accent === k ? 'on' : ''}`} onClick={() => setLook({ accent: k })}><span style={{ ['--c' as string]: ACCENTS[k].light.accent }} />{ACCENTS[k].label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="ap-row">
+          <b>Text size</b><small>Makes everything a little smaller or larger.</small>
+          {SEG('Text size', look.textSize, [{ v: 'small', label: 'Small' }, { v: 'medium', label: 'Medium' }, { v: 'large', label: 'Large' }], (v) => setLook({ textSize: v }))}
+        </div>
+        <div className="ap-row">
+          <b>Spacing</b><small>Compact fits more on the screen, for example more receipts in a list.</small>
+          {SEG('Spacing', look.density, [{ v: 'comfortable', label: 'Comfortable' }, { v: 'compact', label: 'Compact' }], (v) => setLook({ density: v }))}
+        </div>
+        <div className="ap-preview" aria-hidden="true">
+          <button type="button" className="btn pri" tabIndex={-1}>A button</button>
+          <span style={{ color: 'var(--accent)', fontWeight: 600 }}>A link</span>
+          <span className="badge">3</span>
+          <span className="muted">This is how it looks now. Your choice applies on every device you sign in on.</span>
         </div>
       </div>
-    </div></section>
+    </section>
   );
 }
 

@@ -73,6 +73,8 @@ export function HelpPage() {
       <p>You do not have to finish in one go. What you type is saved as you go, even half filled, so a wrong click or a closed page loses nothing. Come back from <b>New receipt</b> or from the note on <b>Receipts</b> and press <b>Continue</b>; it works from another device too. Photos and PDFs are not part of that and are added again. <b>Start over</b> throws the unfinished form away. You can also press <b>Save draft</b> on the last step. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
       <h3>If it comes back</h3>
       <p>A <b>Returned</b> receipt shows what to fix. Each problem has a <b>Fix</b> button that opens the form on the right step. Fix it and send it again. You get a notice and an email whenever something happens to your receipt.</p>
+      <h3>Make it look the way you like</h3>
+      <p>Open your <b>Profile</b>, then <b>Appearance</b>. Choose light, dark or match your device, a colour, the text size and the spacing. It is saved on your account, so it looks the same on every device you sign in on.</p>
       <h3>Good photos</h3>
       <ul>
         <li>One receipt per photo, flat, in good light, with no finger over the print.</li>

@@ -37,7 +37,7 @@ meRouter.patch('/preferences', async (req, res) => {
   const u = req.auth!.user;
   await prisma.user.update({
     where: { id: u.id },
-    data: { theme: p.theme, dailyDigest: p.dailyDigest, reservationReleased: p.reservationReleased },
+    data: { theme: p.theme, dailyDigest: p.dailyDigest, reservationReleased: p.reservationReleased, ...(p.appearance ? { appearance: JSON.stringify(p.appearance) } : {}) },
   });
   res.json(meResponse(await reload(u.id), req.auth!.permissions, req.auth!.session));
 });

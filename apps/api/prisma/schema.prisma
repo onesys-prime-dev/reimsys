@@ -58,6 +58,8 @@ model User {
   branch             String?   @db.VarChar(100)
   photoFile          String?   @db.VarChar(120)
   theme              String    @default("light") @db.VarChar(10)
+  /// Text size, spacing and accent colour (JSON text). Empty = the defaults.
+  appearance         String?   @db.VarChar(200)
   dailyDigest        Boolean   @default(true)
   reservationReleased Boolean  @default(false)
   privacyAcceptedVersion Int?
