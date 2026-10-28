@@ -24,6 +24,8 @@ Run migrations and seed with the migrate user, then create the app user with `do
 
 ## After an update that adds tables
 
+**Renamed tables.** `charge_location`, `email_schedule` and `form_draft` were renamed to `chargelocation`, `emailschedule` and `formdraft` (migration `20261030020000`), to match the older tables. A rename does not carry the database rights across, so after that update the administrator must run the command below once or those screens fail. The deploy warns about it.
+
 The deploy migrates the database and runs the seed, but a new table starts with no rights for the system's limited login (`reimsys_app`). The deploy log then shows a warning naming the tables. A MySQL administrator runs, once, on the database server: `node scripts/grant-app-user.mjs --yes --admin root` (it grants every table in one go; `--check` shows what is missing). No restart is needed.
 
 ## 3. Build and configure
