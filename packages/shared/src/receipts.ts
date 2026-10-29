@@ -60,9 +60,9 @@ export const canEditReceipt = (status: ReceiptStatus) => status === 'draft' || s
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the date format YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(s)), 'Enter a valid date.');
 
 const money = (label: string) =>
-  z.coerce.number({ invalid_type_error: `Enter a valid ${label}.` }).min(0, `The ${label} cannot be negative.`).max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100);
+  z.coerce.number({ error: `Enter a valid ${label}.` }).min(0, `The ${label} cannot be negative.`).max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100);
 const optional = <T extends z.ZodTypeAny>(t: T) => z.preprocess((v) => (v === '' || v === undefined ? null : v), t.nullish());
-const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'false' || v === 'no' ? false : v), z.boolean({ invalid_type_error: 'Choose Yes or No.', required_error: 'Choose Yes or No.' }));
+const flag = z.preprocess((v) => (v === 'true' || v === 'yes' ? true : v === 'false' || v === 'no' ? false : v), z.boolean({ error: 'Choose Yes or No.' }));
 
 export const TRANSACTION_TYPES = ['product', 'service'] as const;
 export const VAT_TYPES = ['vatable', 'non_vatable'] as const;
@@ -94,8 +94,8 @@ const receiptShape = z.object({
   payee: z.string().trim().min(2, 'Enter the vendor name.').max(160),
   vendorAddress: optional(z.string().trim().max(300)),
   vendorTin: optional(z.string().trim().max(30).refine((s) => s === '' || /\d/.test(s), 'The TIN is made of numbers: 14 digits, written 000-000-000-00000.').transform(formatTin).refine((s) => s === '' || isCompleteTin(s), 'Enter the complete TIN: 14 digits, written 000-000-000-00000.').transform((s) => s || null)),
-  amount: z.coerce.number({ invalid_type_error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
-  transactionType: optional(z.enum(TRANSACTION_TYPES, { errorMap: () => ({ message: 'Choose Product or Service.' }) })),
+  amount: z.coerce.number({ error: 'Enter a valid amount.' }).positive('Enter an amount greater than zero.').max(9_999_999.99, 'That amount is too large.').transform((n) => Math.round(n * 100) / 100),
+  transactionType: optional(z.enum(TRANSACTION_TYPES, { error: 'Choose Product or Service.' })),
   vatType: optional(z.enum(VAT_TYPES)),
   vatableAmount: optional(money('vatable amount')),
   vatAmount: optional(money('VAT amount')),

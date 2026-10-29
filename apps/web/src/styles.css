@@ -878,7 +878,7 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .ev-ctl .ev-only{margin-left:0}
 .ev-name{font-weight:600}
 .ev-modal{width:min(720px,100%)}
-.ev-mh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ev-mh h2{margin:0}
+.ev-mh{display:flex;gap:6px 10px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}.ev-mh h2{margin:0}
 .ev-mt{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
 .ev-mt>div{border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:10px 12px}
 .ev-mt small{display:block;color:var(--muted);font-size:.78rem}.ev-mt b{display:block;font-size:1.25rem;font-family:var(--display)}.ev-mt em{font-style:normal;font-size:.76rem;color:var(--muted)}
@@ -941,3 +941,5 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
   .dqueue .row .c-main{grid-area:main}.dqueue .row .c-amt{grid-area:amt}.dqueue .row .c-cat{grid-area:cat;color:var(--muted);font-size:.84rem}.dqueue .row .c-st{grid-area:st;justify-self:end}
   .dqueue .row .c-date{display:none}.dqueue .mdate{display:inline}
 }
+.ev-r .ev-calc{grid-column:1/-1;white-space:normal;overflow:visible;font-size:.8rem;line-height:1.4}
+.ev-r .ev-calc b{display:inline;color:var(--ink)}

@@ -20,7 +20,7 @@ export const emailScheduleSchema = z.object({
   name: z.string().trim().min(2, 'Give the schedule a name.').max(80, 'The name is too long (80 characters at most).'),
   isOn: z.boolean().default(true),
   steps: z.array(z.enum(SCHEDULE_STEPS)).min(1, 'Choose at least one step to list.').transform((a) => SCHEDULE_STEPS.filter((s) => a.includes(s)).join(',')),
-  minDays: z.coerce.number({ invalid_type_error: 'The minimum wait must be a number.' }).min(0, 'The minimum wait cannot be below 0.').max(60, 'The minimum wait cannot be above 60 days.'),
+  minDays: z.coerce.number({ error: 'The minimum wait must be a number.' }).min(0, 'The minimum wait cannot be below 0.').max(60, 'The minimum wait cannot be above 60 days.'),
   roleIds: ids.default([]),
   userIds: ids.default([]),
   intervalMinutes: z.coerce.number().int().refine((n) => INTERVAL_CHOICES.some((c) => c.minutes === n), `Choose how often: at least ${MIN_INTERVAL_MINUTES} minutes.`),

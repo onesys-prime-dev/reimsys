@@ -19,7 +19,7 @@ export const paymentLineSchema = z.object({
   /** The version of the receipt the person was looking at, so a receipt that changed meanwhile is not paid blindly. */
   version: z.number().int().min(0),
   amount: z
-    .coerce.number({ invalid_type_error: 'Enter the amount paid.' })
+    .coerce.number({ error: 'Enter the amount paid.' })
     .positive('The amount paid must be more than zero.')
     .max(9_999_999.99, 'That amount is too large.')
     .transform((n) => Math.round(n * 100) / 100)

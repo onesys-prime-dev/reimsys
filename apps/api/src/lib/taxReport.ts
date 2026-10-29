@@ -16,6 +16,8 @@ export const seesEveryone = (auth: AuthContext) => {
 export interface ImpactRow {
   id: number; refNo: string; status: string; vendor: string; date: string; employeeId: number; employee: string; gross: number;
   withheld: boolean | null; taxWithheld: number; potentialLoss: number; potentialSavings: number; computable: boolean; reasons: string[];
+  /** How the loss is worked out, when it can be: the rate on the gross amount against the rate on the net amount. */
+  calc: { rate: number; gross: number; net: number; ifNo: number; ifYes: number } | null;
 }
 
 /**
@@ -44,6 +46,7 @@ export async function impactRows(auth: AuthContext, filter: { from?: string; to?
       id: r.id, refNo: r.refNo, status: r.status, vendor: r.payee, date: r.receiptDate.toISOString().slice(0, 10), employeeId: r.encoder.id, employee: r.encoder.name,
       gross: f.amount, withheld: r.withheld, taxWithheld: r.withheld ? dec(r.whtAmount) ?? 0 : 0,
       potentialLoss: t.potentialLoss, potentialSavings: t.potentialSavings, computable: t.computable,
+      calc: t.computable ? { rate: t.rate, gross: t.gross, net: t.net, ifNo: t.ifNo, ifYes: t.ifYes } : null,
       reasons: incompleteReasons({ birInvoice: r.birInvoice, invoiceNo: r.invoiceNo, vendorAddress: r.vendorAddress, vendorTin: r.vendorTin, vatType: r.vatType, vatableAmount: f.vatableAmount, vatAmount: f.vatAmount, withheld: r.withheld }, rules),
     };
   }), { truncated: cut });
@@ -78,7 +81,7 @@ export function byEmployee(rows: ImpactRow[]) {
       potentialLoss: t.potentialLoss, potentialSavings: t.potentialSavings,
       // The same kind of problem keeps coming back: three or more flagged receipts.
       recurring: issues.length >= 3,
-      submissions: issues.slice(0, 50).map((r) => ({ id: r.id, refNo: r.refNo, vendor: r.vendor, date: r.date, potentialLoss: r.potentialLoss, reasons: r.reasons })),
+      submissions: issues.slice(0, 50).map((r) => ({ id: r.id, refNo: r.refNo, vendor: r.vendor, date: r.date, potentialLoss: r.potentialLoss, reasons: r.reasons, calc: r.calc })),
     };
   }).filter((e) => e.incomplete > 0 || e.potentialSavings > 0).sort((a, b) => b.potentialLoss - a.potentialLoss || b.incomplete - a.incomplete);
 }
