@@ -48,7 +48,7 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('Clear switches it off again', (await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).isChecked()) === false && (await m.locator('[data-testid=ti-loss]').innerText()) === lossAll);
   ok('management lands on the employee evaluation, and it is the first tab', await m.getByRole('tab').first().innerText().then((x) => /Employee evaluation/.test(x)) && await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
   await m.goBack(); await m.waitForSelector('.tisum .tile b');
-  await m.click('.tisum a.tile >> nth=0');
+  await m.click('.tisum a.tile >> nth=1');
   await m.waitForURL(/\/tax-impact\?tab=worst/); await m.waitForSelector('.taximpact .tile b');
   ok('the loss tile opens the report on the largest losses', await m.getByRole('tab', { name: /Largest losses/ }).getAttribute('aria-selected') === 'true');
   await m.goBack(); await m.waitForSelector('.tisum .tile b');
