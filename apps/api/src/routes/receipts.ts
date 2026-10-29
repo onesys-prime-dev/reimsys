@@ -394,6 +394,7 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
   // The Med Ref's email button opens the form on the first problem that has a step to fix.
   const firstStep = issues.map(fixStepFor).find((s) => s);
   const fixLink = issues.length ? `${receiptUrl(r.id)}/edit${firstStep ? `?step=${firstStep}` : ''}` : undefined;
+  if (action === 'check') await notify({ userIds: others([r.encoderId]), type: 'receipt.checked', receiptId: r.id, text: `${ref} was checked by ${who} and is now with the Approver.` });
   if (action === 'return') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref} was returned. ${reason}`, email: { template: 'returned', data: mail, link: fixLink } });
   if (action === 'request') await notify({ userIds: [r.encoderId], type: 'receipt.returned', receiptId: r.id, text: `${ref}: ${who} needs more proof. ${reason}`, email: { template: 'returned', data: mail, link: fixLink } });
   if (action === 'request' && r.checkedById && r.checkedById !== auth.user.id) await notify({ userIds: [r.checkedById], type: 'receipt.requested', receiptId: r.id, text: `${who} asked the Med Ref for more proof on ${ref}. It will come back to you to check.` });
