@@ -916,3 +916,12 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .evm-cell:hover{background:var(--soft)}.evm-cell.bad b{color:var(--bad)}
 .evm-cell b{display:block;font-variant-numeric:tabular-nums}.evm-cell small{display:block;color:var(--muted);font-size:.72rem;white-space:nowrap}
 .evm-total td{font-weight:700;border-top:2px solid var(--line);background:var(--soft)}
+/* months inside the employee window */
+.ev-scope{margin:10px 0 10px;font-size:.9rem}
+.ev-months{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ev-mo{display:grid;grid-template-columns:130px minmax(0,1fr) 150px;gap:12px;align-items:center;padding:9px 14px;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer}
+.ev-mo:last-child{border-bottom:0}.ev-mo:hover{background:var(--soft)}
+.ev-mo.on{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.ev-mo-l b,.ev-mo-v b{display:block}.ev-mo-l small,.ev-mo-v small{display:block;color:var(--muted);font-size:.74rem}
+.ev-mo-v{text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:560px){.ev-mo{grid-template-columns:1fr auto}.ev-mo .ev-track{grid-column:1/-1;order:3}}
