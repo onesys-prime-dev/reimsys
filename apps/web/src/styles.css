@@ -131,7 +131,7 @@ small,.muted{color:var(--muted)}
 .s-paid{background:var(--accent-soft);color:var(--accent)}
 
 /* list rows */
-.thead,.row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 130px;gap:12px;align-items:center;padding:12px 18px}
+.thead,.row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,1fr) minmax(96px,1fr) minmax(104px,1fr) 130px;gap:12px;align-items:center;padding:12px 18px}
 .thead{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding-block:10px}
 .row{width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left}
 .row:last-child{border-bottom:0}
@@ -139,7 +139,8 @@ small,.muted{color:var(--muted)}
 .row .c-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row small{display:block}
 .row .c-cat{min-width:0;overflow-wrap:anywhere}
-.c-amt{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.c-amt{font-weight:600;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.row>*{min-width:0}
 .thead .c-amt{text-align:right}
 .mdate{display:none}
 .empty{padding:36px 18px;text-align:center;color:var(--muted)}
