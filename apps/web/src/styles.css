@@ -933,3 +933,11 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
   .tifilter{flex-wrap:wrap}
 }
 @media(max-width:1180px){.tifilter{flex:1 1 100%;max-width:100%;min-width:0}}
+
+/* The dashboard queue sits in half the page, so its rows switch to the two-line layout by the card's own width, not the window's. */
+.dqueue{container-type:inline-size}
+@container (max-width:600px){
+  .dqueue .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main amt" "cat st";gap:6px 12px;padding:14px 16px}
+  .dqueue .row .c-main{grid-area:main}.dqueue .row .c-amt{grid-area:amt}.dqueue .row .c-cat{grid-area:cat;color:var(--muted);font-size:.84rem}.dqueue .row .c-st{grid-area:st;justify-self:end}
+  .dqueue .row .c-date{display:none}.dqueue .mdate{display:inline}
+}
