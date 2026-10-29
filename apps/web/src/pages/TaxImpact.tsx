@@ -31,8 +31,8 @@ export function TaxImpactSummary() {
       </div>
       <div className="tisum-t">
         {/* each figure opens the report, on the part that explains it */}
-        <Link className="tile tile-link" to="/tax-impact?tab=employees" aria-label="Answered No: open the employee evaluation"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
-        <Link className="tile alert tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
+        <Link className="tile alert tile-link" to="/tax-impact?tab=employees" aria-label="Answered No: open the employee evaluation"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
+        <Link className="tile tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
         {d.data?.scope === 'all' ? (
           <Link className="tile tile-link" to="/tax-impact?tab=employees&flagged=1" aria-label="People who need attention: open the employee evaluation"><small>People who need attention</small><b>{d.data ? d.data.employees.filter((e) => e.recurring).length : '–'}</b><em aria-hidden="true">See who →</em></Link>
         ) : (
