@@ -11,7 +11,7 @@ interface Totals {
 interface Worst { id: number; refNo: string; vendor: string; date: string; employee: string; potentialLoss: number; reasons: string[] }
 interface Employee {
   employeeId: number; employee: string; receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number; recurring: boolean;
-  submissions: { id: number; refNo: string; vendor: string; date: string; potentialLoss: number; reasons: string[] }[];
+  submissions: { id: number; refNo: string; vendor: string; date: string; potentialLoss: number; reasons: string[]; calc: { rate: number; gross: number; net: number; ifNo: number; ifYes: number } | null }[];
 }
 interface Cell { receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number }
 interface EmployeeMonths { months: string[]; employees: { employeeId: number; employee: string; cells: Record<string, Cell> }[] }
@@ -245,6 +245,11 @@ function EmployeeModal({ e, months, onClose }: { e: Employee; months: Record<str
               <span><b>{r.refNo}</b><small className="muted">{r.vendor} · {r.date}</small></span>
               <span className="ev-why">{r.reasons.length ? r.reasons.map((x) => <span key={x} className="chip">{x}</span>) : <span className="muted">-</span>}</span>
               <span className="ev-amt">{money(r.potentialLoss)}</span>
+              {r.potentialLoss > 0 && r.calc && (
+                <small className="ev-calc muted" data-testid="ev-calc">
+                  Not withheld: {r.calc.rate}% of {money(r.calc.net)} (without VAT) = <b>{money(r.calc.ifYes)}</b>. Loss shown = VAT part only: {money(r.calc.ifNo)} − {money(r.calc.ifYes)}.
+                </small>
+              )}
             </Link>
           ))}
         </div>

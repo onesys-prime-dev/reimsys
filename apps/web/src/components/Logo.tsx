@@ -1,15 +1,15 @@
 import { useId } from 'react';
 import { BRAND, LOGO } from '@reimsys/shared';
 
-/** The REIMSYS mark. Size is in pixels. It carries its own background, so it looks right on light and dark pages. */
+/** The REIMSYS mark. Size is in pixels. It carries its own background, so it looks right on light and dark pages. The tile takes the accent colour, so it follows the company or personal colour. */
 export function LogoMark({ size = 32 }: { size?: number }) {
   const id = useId();
   return (
     <svg width={size} height={size} viewBox={`0 0 ${LOGO.size} ${LOGO.size}`} role="img" aria-label={BRAND.name} style={{ display: 'block', flex: 'none' }}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={BRAND.tealLight} />
-          <stop offset="1" stopColor={BRAND.tealDark} />
+          <stop offset="0" style={{ stopColor: `color-mix(in srgb, var(--accent, ${BRAND.teal}) 88%, white)` }} />
+          <stop offset="1" style={{ stopColor: `color-mix(in srgb, var(--accent, ${BRAND.teal}) 78%, black)` }} />
         </linearGradient>
       </defs>
       <path d={LOGO.tile} fill={`url(#${id})`} />

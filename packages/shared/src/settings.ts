@@ -3,7 +3,7 @@ import { isTimeOfDay, isTimeZone, parseDays } from './emailSchedule';
 import { ACCENT_KEYS } from './appearance';
 
 const num = (min: number, max: number, label: string) =>
-  z.coerce.number({ invalid_type_error: `${label} must be a number.` }).min(min, `${label} cannot be below ${min}.`).max(max, `${label} cannot be above ${max}.`);
+  z.coerce.number({ error: `${label} must be a number.` }).min(min, `${label} cannot be below ${min}.`).max(max, `${label} cannot be above ${max}.`);
 
 /**
  * Things an administrator may adjust without a code change. Every value has a safe default, and a bad value is refused
