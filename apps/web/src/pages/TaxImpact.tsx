@@ -31,9 +31,13 @@ export function TaxImpactSummary() {
       </div>
       <div className="tisum-t">
         {/* each figure opens the report, on the part that explains it */}
-        <Link className="tile alert tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
-        <Link className="tile tile-link" to="/tax-impact?tab=months" aria-label="Potential savings: open the report by month"><small>Potential savings (answered Yes)</small><b>{t ? money(t.potentialSavings) : '–'}</b><em aria-hidden="true">See by month →</em></Link>
         <Link className="tile tile-link" to="/tax-impact?tab=employees" aria-label="Answered No: open the employee evaluation"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
+        <Link className="tile alert tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
+        {d.data?.scope === 'all' ? (
+          <Link className="tile tile-link" to="/tax-impact?tab=employees&flagged=1" aria-label="People who need attention: open the employee evaluation"><small>People who need attention</small><b>{d.data ? d.data.employees.filter((e) => e.recurring).length : '–'}</b><em aria-hidden="true">See who →</em></Link>
+        ) : (
+          <Link className="tile tile-link" to="/tax-impact?tab=worst" aria-label="Incomplete receipts: open the report with the receipts"><small>Incomplete receipts</small><b>{t ? t.incomplete : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
+        )}
       </div>
     </section>
   );
@@ -64,7 +68,7 @@ function TaxImpactSection() {
   // Nothing chosen yet: management lands on the employee evaluation (the part that matters most), a Med Ref on the months.
   const [tab, setTab] = useState<Tab | null>(fromTile === 'worst' || fromTile === 'months' || fromTile === 'employees' ? fromTile : null);
   const [who, setWho] = useState('');
-  const [flagged, setFlagged] = useState(false);
+  const [flagged, setFlagged] = useState(params.get('flagged') === '1');
   const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}), ...(flagged ? { flagged: '1' } : {}) }).toString();
   const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who, flagged], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
   const t = d.data?.totals;
@@ -205,11 +209,10 @@ const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMo
 
 /** Everything about one person: the whole period, then month by month (this month, last month, earlier). Pick a month to see only its figures and receipts. */
 function EmployeeModal({ e, months, onClose }: { e: Employee; months: Record<string, Cell>; onClose: () => void }) {
-  const [month, setMonth] = useState<string | null>(null);
-  const keys = Object.keys(months).sort().reverse();
   const cur = thisMonth(), prev = lastMonth();
+  const [month, setMonth] = useState<string | null>(cur);
+  const keys = [...new Set([cur, ...Object.keys(months)])].sort().reverse();
   const tag = (m: string) => (m === cur ? 'This month' : m === prev ? 'Last month' : '');
-  const maxLoss = Math.max(1, ...keys.map((k) => months[k]!.potentialLoss));
   const figs: Cell = month ? (months[month] ?? { receipts: 0, answeredNo: 0, incomplete: 0, potentialLoss: 0, potentialSavings: 0 }) : e;
   const pct = figs.receipts ? Math.round((figs.answeredNo / figs.receipts) * 100) : 0;
   const subs = [...e.submissions].filter((r) => !month || r.date.startsWith(month)).sort((x, y) => y.potentialLoss - x.potentialLoss);
@@ -219,7 +222,6 @@ function EmployeeModal({ e, months, onClose }: { e: Employee; months: Record<str
         {e.recurring ? <span className="chip warn">Needs attention</span> : <span className="chip">No pattern</span>}
         <span className="muted">Potential figures, not verified.{e.recurring ? ' Three or more receipts have a problem.' : ''}</span>
       </div>
-      <p className="ev-scope" data-testid="ev-scope">{month ? <>Showing <b>{monthLabel(month)}</b> only. <button type="button" className="btn sm ghost" onClick={() => setMonth(null)}>Show the whole period</button></> : <>Showing the <b>whole period</b>. Pick a month below to see just that month.</>}</p>
       <div className="ev-mt">
         <div><small>Receipts</small><b>{figs.receipts}</b></div>
         <div><small>Answered No</small><b>{figs.answeredNo}</b><em>{pct}% of {month ? 'that month' : 'their receipts'}</em></div>
@@ -228,21 +230,12 @@ function EmployeeModal({ e, months, onClose }: { e: Employee; months: Record<str
         <div><small>Potential savings</small><b>{money(figs.potentialSavings)}</b></div>
       </div>
       {keys.length > 0 && (
-        <>
-          <h3 style={{ margin: '16px 0 6px' }}>Month by month</h3>
-          <div className="ev-months" role="radiogroup" aria-label="Month" data-testid="ev-months">
-            {keys.map((k) => {
-              const c = months[k]!;
-              return (
-                <button key={k} type="button" role="radio" aria-checked={month === k} className={`ev-mo ${month === k ? 'on' : ''}`} onClick={() => setMonth(month === k ? null : k)}>
-                  <span className="ev-mo-l"><b>{monthLabel(k)}</b>{tag(k) && <small>{tag(k)}</small>}</span>
-                  <span className="ev-track loss"><i style={{ width: `${(c.potentialLoss / maxLoss) * 100}%` }} /></span>
-                  <span className="ev-mo-v"><b>{money(c.potentialLoss)}</b><small>{c.answeredNo} No · {c.receipts} receipts</small></span>
-                </button>
-              );
-            })}
-          </div>
-        </>
+        <label className="ev-pick">Month
+          <select value={month ?? ''} onChange={(ev) => setMonth(ev.target.value || null)} data-testid="ev-month">
+            <option value="">Whole period</option>
+            {keys.map((k) => <option key={k} value={k}>{monthLabel(k)}{tag(k) ? ` (${tag(k).toLowerCase()})` : ''}</option>)}
+          </select>
+        </label>
       )}
       <h3 style={{ margin: '16px 0 6px' }}>Receipts with a problem{month ? ` in ${monthLabel(month)}` : ''} <small className="muted">({subs.length}{!month && e.incomplete > subs.length ? ' shown' : ''})</small></h3>
       {subs.length ? (
