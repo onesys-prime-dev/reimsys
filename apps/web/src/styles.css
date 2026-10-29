@@ -891,3 +891,19 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .ev-bar,.ev-ctl{min-width:0;max-width:100%}
 .ev-ctl .seg{flex-shrink:1;min-width:0;overflow-x:auto}
 .ev-ctl .seg button{padding:8px 12px;white-space:nowrap}
+/* the tax report uses the width of a big screen */
+@media(min-width:821px){
+  .page.wide{max-width:1760px}
+  .page.wide .taximpact .tiles,.page.wide .taximpact .tilegrid{gap:16px}
+  .page.wide .ev .matrix td,.page.wide .ev .matrix th{padding:14px 18px}
+  .page.wide .ev .matrix td{font-size:1rem}
+  .page.wide .ev-track{min-width:140px;height:10px}
+  .page.wide .ev-name{font-size:1.02rem}
+  .page.wide .ev-line{font-size:1.02rem}
+}
+@media(min-width:821px){
+  /* the report card reaches the bottom of the screen instead of leaving an empty band under it */
+  .page.wide .taximpact{min-height:calc(100dvh - 190px)}
+  .page.wide .taximpact>section.card{flex:1;display:flex;flex-direction:column}
+  .page.wide .taximpact>section.card>.card-b{flex:1}
+}
