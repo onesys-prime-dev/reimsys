@@ -13,7 +13,7 @@ export function NotificationBell() {
   const qc = useQueryClient();
   const nav = useNavigate();
   const box = useRef<HTMLDivElement>(null);
-  const q = useQuery({ queryKey: ['notifications'], queryFn: () => api<Data>('/notifications'), refetchInterval: 20_000 });
+  const q = useQuery({ queryKey: ['notifications'], queryFn: () => api<Data>('/notifications'), refetchInterval: 5_000, refetchOnWindowFocus: true });
   const read = useMutation({
     mutationFn: (ids?: number[]) => api('/notifications/read', { method: 'POST', body: { ids } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
