@@ -118,5 +118,15 @@ export async function sendAvatar(userId: number, res: import('express').Response
   const u = await prisma.user.findUnique({ where: { id: userId }, select: { photoFile: true } });
   if (!u?.photoFile) throw notFound('No photo.');
   res.setHeader('Cache-Control', 'private, max-age=300');
-  res.sendFile(path.join(avatarDir(), u.photoFile));
+  // A photo that is in the database but gone from the disk is a plain "not found", not a server error.
+  let buf: Buffer;
+  try {
+    buf = await fs.readFile(path.join(avatarDir(), u.photoFile));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw notFound('No photo.');
+    throw err;
+  }
+  const ext = path.extname(u.photoFile).slice(1).toLowerCase();
+  res.type(ext === 'jpg' ? 'jpeg' : ext || 'jpeg');
+  res.send(buf);
 }

@@ -925,3 +925,17 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .ev-mo-l b,.ev-mo-v b{display:block}.ev-mo-l small,.ev-mo-v small{display:block;color:var(--muted);font-size:.74rem}
 .ev-mo-v{text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:560px){.ev-mo{grid-template-columns:1fr auto}.ev-mo .ev-track{grid-column:1/-1;order:3}}
+/* the filters of the tax report: one slim row */
+.tifilterbar{flex-wrap:nowrap;align-items:center;gap:12px;min-width:0}
+.tifilterbar>span{flex:1 1 auto;min-width:0;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tifilter{flex:0 0 auto;flex-wrap:nowrap;gap:8px;align-items:center}
+.tifilter label.f span{font-size:.8rem}
+.tifilter select,.tifilter input[type=date]{height:34px;padding:2px 8px;font-size:.86rem;min-height:0;width:auto}
+.tifilter input[type=date]{width:128px}
+.tifilter select{max-width:150px}
+.tifilter .btn.sm{min-height:34px}
+@media(max-width:1180px){
+  .tifilterbar{flex-wrap:wrap}.tifilterbar>span{flex:1 1 100%;white-space:normal}
+  .tifilter{flex-wrap:wrap}
+}
+@media(max-width:1180px){.tifilter{flex:1 1 100%;max-width:100%;min-width:0}}

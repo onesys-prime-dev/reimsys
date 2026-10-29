@@ -76,7 +76,7 @@ function TaxImpactSection() {
   return (
     <div className="taximpact stack" aria-label="Tax withheld figures">
       <div className="tifilterbar">
-        <span className="muted">{!all ? 'Your receipts with a BIR invoice' : flagged && !who ? 'Receipts with a BIR invoice from people who need attention' : who ? `Receipts with a BIR invoice: ${d.data?.people?.find((p) => String(p.id) === who)?.name ?? ''}` : 'All receipts with a BIR invoice, everyone'}</span>
+        <span className="muted">{!all ? 'Your receipts with a BIR invoice' : flagged && !who ? 'People who need attention' : who ? `Receipts with a BIR invoice: ${d.data?.people?.find((p) => String(p.id) === who)?.name ?? ''}` : 'All receipts with a BIR invoice, everyone'}</span>
         <div className="tifilter">
           {all && <label className="f"><span>Employee</span><select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Employee"><option value="">Everyone</option>{(d.data?.people ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
           <label className="f"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
