@@ -77,6 +77,15 @@ console.log('\nAdministrator: the whole, and one person at a time');
   check('a Med Ref who asks for someone else still gets only their own, and no list of people', peek.scope === 'own' && peek.people.length === 0 && peek.employeeId === null, JSON.stringify(peek.totals));
 }
 
+console.log('\nMonth by month');
+const mm = (await call(U.liza, 'GET', '/dashboard/tax-impact')).d;
+const em = mm.employeeMonths;
+check('management gets every listed employee month by month, newest month first', em.employees.length === mm.employees.length && em.months.length >= 1 && [...em.months].sort().reverse().join() === em.months.join(), JSON.stringify(em.months));
+const cellLoss = em.employees.reduce((n, e) => n + Object.values(e.cells).reduce((x, c) => x + c.potentialLoss, 0), 0);
+check('the months add up to the whole-period loss', Math.abs(cellLoss - mm.employees.reduce((n, e) => n + e.potentialLoss, 0)) < 0.01, cellLoss + '');
+check('a Med Ref gets no month-by-month table of people', (await call(U.ana, 'GET', '/dashboard/tax-impact')).d.employeeMonths.employees.length === 0);
+check('the "only people who need attention" filter narrows the months too', (await call(U.liza, 'GET', '/dashboard/tax-impact?flagged=1')).d.employeeMonths.employees.length <= em.employees.length);
+
 console.log('\nNot signed in');
 check('the figures need a sign-in', (await fetch(B + '/dashboard/tax-impact', { headers: { 'x-requested-with': 'reimsys' } })).status === 401);
 console.log(failed ? `\n${failed} FAILED` : '\nAll checks passed');
