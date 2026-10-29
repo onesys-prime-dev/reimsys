@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api, money } from '../api';
-import { Icon } from '../ui';
+import { Icon, Modal } from '../ui';
 
 interface Totals {
   receipts: number; answeredYes: number; answeredNo: number; taxWithheld: number; potentialLoss: number; potentialSavings: number;
@@ -139,10 +139,11 @@ function TaxImpactSection() {
 type SortKey = 'loss' | 'no' | 'receipts' | 'name';
 const SORTS: { key: SortKey; label: string }[] = [{ key: 'loss', label: 'Potential loss' }, { key: 'no', label: 'Answered No' }, { key: 'receipts', label: 'Receipts' }, { key: 'name', label: 'Name' }];
 
-/** Who answered No or left details incomplete, ranked, with how often and what it may have cost. A flag shows three or more receipts with a problem. */
+/** Who answered No or left details incomplete, ranked. The list is the first thing on the tab; a click on a name opens everything about that person. */
 function EmployeePane({ employees }: { employees: Employee[] }) {
   const [sort, setSort] = useState<SortKey>('loss');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
   if (!employees.length) return <p className="muted">No employee has a potential loss or incomplete receipts.</p>;
   const list = [...employees].filter((e) => !onlyFlagged || e.recurring).sort((x, y) => (
     sort === 'name' ? x.employee.localeCompare(y.employee)
@@ -151,55 +152,80 @@ function EmployeePane({ employees }: { employees: Employee[] }) {
     : y.potentialLoss - x.potentialLoss || y.answeredNo - x.answeredNo));
   const flagged = employees.filter((e) => e.recurring).length;
   const loss = employees.reduce((n, e) => n + e.potentialLoss, 0);
-  const top = [...employees].sort((x, y) => y.potentialLoss - x.potentialLoss)[0]!;
   const maxLoss = Math.max(1, ...employees.map((e) => e.potentialLoss));
+  const open = employees.find((e) => e.employeeId === openId) ?? null;
   return (
     <div className="ev" data-testid="ti-eval">
-      <div className="ev-sum">
-        <div><small>People listed</small><b>{employees.length}</b></div>
-        <div className={flagged ? 'warn' : ''}><small>Need attention</small><b>{flagged}</b></div>
-        <div><small>Potential loss</small><b>{money(loss)}</b></div>
-        <div><small>Highest</small><b>{top.potentialLoss > 0 ? top.employee : '–'}</b>{top.potentialLoss > 0 && <em>{money(top.potentialLoss)}</em>}</div>
-      </div>
-      <p className="muted ev-note">Ranked by what answering No or leaving details out may have cost. <b>Needs attention</b> appears when three or more of a person's receipts have a problem. A general view for now: the criteria will be defined later.</p>
       <div className="ev-bar">
-        <span className="muted">Sort by</span>
-        <div className="seg" role="radiogroup" aria-label="Sort the list by">
-          {SORTS.map((o) => <button key={o.key} type="button" role="radio" aria-checked={sort === o.key} className={sort === o.key ? 'on' : ''} onClick={() => setSort(o.key)}>{o.label}</button>)}
+        <p className="ev-line" data-testid="ev-line"><b>{employees.length}</b> {employees.length === 1 ? 'person' : 'people'}{flagged > 0 && <> · <span className="ev-warn"><b>{flagged}</b> need attention</span></>} · potential loss <b>{money(loss)}</b></p>
+        <div className="ev-ctl">
+          <div className="seg" role="radiogroup" aria-label="Sort the list by">
+            {SORTS.map((o) => <button key={o.key} type="button" role="radio" aria-checked={sort === o.key} className={sort === o.key ? 'on' : ''} onClick={() => setSort(o.key)}>{o.label}</button>)}
+          </div>
+          {flagged > 0 && <label className="ev-only"><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} />Only those who need attention</label>}
         </div>
-        {flagged > 0 && <label className="ev-only"><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} />Only those who need attention</label>}
       </div>
-      <div className="matrix"><table style={{ minWidth: 700 }} data-testid="ti-employees">
+      <div className="matrix"><table style={{ minWidth: 680 }} data-testid="ti-employees">
         <thead><tr>
           <th style={{ textAlign: 'left' }}>Employee</th><th style={{ textAlign: 'right' }}>Receipts</th><th style={{ textAlign: 'left', minWidth: 150 }}>Answered No</th>
           <th style={{ textAlign: 'right' }}>Incomplete</th><th style={{ textAlign: 'left', minWidth: 150 }}>Potential loss</th><th style={{ textAlign: 'right' }}>Potential savings</th>
         </tr></thead>
-        <tbody>{list.map((e) => <EmployeeRows key={e.employeeId} e={e} maxLoss={maxLoss} />)}</tbody>
+        <tbody>{list.map((e) => <EmployeeRow key={e.employeeId} e={e} maxLoss={maxLoss} onOpen={() => setOpenId(e.employeeId)} />)}</tbody>
       </table></div>
       {!list.length && <p className="muted">No one needs attention right now.</p>}
+      <p className="muted ev-note">Ranked by what answering No or leaving details out may have cost. <b>Needs attention</b> means three or more of a person's receipts have a problem. Click a name to see everything about that person. A general view for now: the criteria will be defined later.</p>
+      {open && <EmployeeModal e={open} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
 
-function EmployeeRows({ e, maxLoss }: { e: Employee; maxLoss: number }) {
-  const [open, setOpen] = useState(false);
+function EmployeeRow({ e, maxLoss, onOpen }: { e: Employee; maxLoss: number; onOpen: () => void }) {
   const pct = e.receipts ? Math.round((e.answeredNo / e.receipts) * 100) : 0;
   return (
-    <>
-      <tr className={e.recurring ? 'ev-flag' : ''}>
-        <td>
-          <button type="button" className="btn sm ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? '▾' : '▸'} {e.employee}</button>
-          {e.recurring && <span className="chip warn" style={{ marginLeft: 6 }} title="Three or more receipts with a problem">Needs attention</span>}
-        </td>
-        <td style={{ textAlign: 'right' }}>{e.receipts}</td>
-        <td><div className="ev-meter" title={`${e.answeredNo} of ${e.receipts} receipts`}><span className="ev-track"><i style={{ width: `${pct}%` }} /></span><b>{e.answeredNo}</b><small className="muted">{pct}%</small></div></td>
-        <td style={{ textAlign: 'right' }}>{e.incomplete}</td>
-        <td><div className="ev-meter"><span className="ev-track loss"><i style={{ width: `${(e.potentialLoss / maxLoss) * 100}%` }} /></span><b>{money(e.potentialLoss)}</b></div></td>
-        <td style={{ textAlign: 'right' }}>{money(e.potentialSavings)}</td>
-      </tr>
-      {open && e.submissions.map((s) => (
-        <tr key={s.id} className="sub"><td colSpan={2}><Link to={`/receipts/${s.id}`} style={{ color: 'var(--accent)' }}>{s.refNo}</Link> <small className="muted">{s.vendor} · {s.date}</small></td><td colSpan={3}>{s.reasons.length ? s.reasons.map((r) => <span key={r} className="chip" style={{ marginRight: 4 }}>{r}</span>) : '-'}</td><td style={{ textAlign: 'right' }}>{money(s.potentialLoss)}</td></tr>
-      ))}
-    </>
+    <tr className={e.recurring ? 'ev-flag' : ''}>
+      <td>
+        <button type="button" className="btn sm ghost ev-name" aria-haspopup="dialog" onClick={onOpen}>{e.employee}</button>
+        {e.recurring && <span className="chip warn" style={{ marginLeft: 6 }} title="Three or more receipts with a problem">Needs attention</span>}
+      </td>
+      <td style={{ textAlign: 'right' }}>{e.receipts}</td>
+      <td><div className="ev-meter" title={`${e.answeredNo} of ${e.receipts} receipts`}><span className="ev-track"><i style={{ width: `${pct}%` }} /></span><b>{e.answeredNo}</b><small className="muted">{pct}%</small></div></td>
+      <td style={{ textAlign: 'right' }}>{e.incomplete}</td>
+      <td><div className="ev-meter"><span className="ev-track loss"><i style={{ width: `${(e.potentialLoss / maxLoss) * 100}%` }} /></span><b>{money(e.potentialLoss)}</b></div></td>
+      <td style={{ textAlign: 'right' }}>{money(e.potentialSavings)}</td>
+    </tr>
+  );
+}
+
+/** Everything about one person: the figures, how often they answered No, and every receipt with a problem, worst first. */
+function EmployeeModal({ e, onClose }: { e: Employee; onClose: () => void }) {
+  const pct = e.receipts ? Math.round((e.answeredNo / e.receipts) * 100) : 0;
+  const subs = [...e.submissions].sort((x, y) => y.potentialLoss - x.potentialLoss);
+  return (
+    <Modal title={e.employee} onClose={onClose} className="wide ev-modal">
+      <div className="ev-mh">
+        {e.recurring ? <span className="chip warn">Needs attention</span> : <span className="chip">No pattern</span>}
+      </div>
+      <p className="muted" style={{ margin: '0 0 12px' }}>Potential figures, not verified.{e.recurring ? ' Three or more receipts have a problem.' : ''}</p>
+      <div className="ev-mt">
+        <div><small>Receipts</small><b>{e.receipts}</b></div>
+        <div><small>Answered No</small><b>{e.answeredNo}</b><em>{pct}% of their receipts</em></div>
+        <div><small>Incomplete</small><b>{e.incomplete}</b></div>
+        <div className="loss"><small>Potential loss</small><b>{money(e.potentialLoss)}</b></div>
+        <div><small>Potential savings</small><b>{money(e.potentialSavings)}</b></div>
+      </div>
+      <h3 style={{ margin: '16px 0 6px' }}>Receipts with a problem <small className="muted">({subs.length}{e.incomplete > subs.length ? ' shown' : ''})</small></h3>
+      {subs.length ? (
+        <div className="ev-list" data-testid="ev-receipts">
+          {subs.map((r) => (
+            <Link key={r.id} to={`/receipts/${r.id}`} className="ev-r">
+              <span><b>{r.refNo}</b><small className="muted">{r.vendor} · {r.date}</small></span>
+              <span className="ev-why">{r.reasons.length ? r.reasons.map((x) => <span key={x} className="chip">{x}</span>) : <span className="muted">-</span>}</span>
+              <span className="ev-amt">{money(r.potentialLoss)}</span>
+            </Link>
+          ))}
+        </div>
+      ) : <p className="muted">None. Every receipt from this person is complete.</p>}
+      <div className="btns"><button type="button" className="btn" onClick={onClose}>Close</button></div>
+    </Modal>
   );
 }

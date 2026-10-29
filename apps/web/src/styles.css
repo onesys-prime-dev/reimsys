@@ -869,3 +869,25 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 .ev,.ev>*{min-width:0}
 .ev .matrix{overflow-x:auto;max-width:100%}
 .ev-bar .seg{max-width:100%;overflow-x:auto}
+/* employee list first, details in a window */
+.ev-bar{display:flex;gap:10px 16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ev-line{margin:0;font-size:.95rem}
+.ev-warn{color:var(--warn)}
+.ev-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ev-ctl .ev-only{margin-left:0}
+.ev-name{font-weight:600}
+.ev-modal{width:min(720px,100%)}
+.ev-mh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ev-mh h2{margin:0}
+.ev-mt{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.ev-mt>div{border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:10px 12px}
+.ev-mt small{display:block;color:var(--muted);font-size:.78rem}.ev-mt b{display:block;font-size:1.25rem;font-family:var(--display)}.ev-mt em{font-style:normal;font-size:.76rem;color:var(--muted)}
+.ev-mt .loss{background:var(--bad-soft)}.ev-mt .loss b{color:var(--bad)}
+.ev-list{display:grid;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ev-r{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.4fr) auto;gap:10px;align-items:center;padding:10px 14px;text-decoration:none;color:inherit;border-bottom:1px solid var(--line)}
+.ev-r:last-child{border-bottom:0}.ev-r:hover{background:var(--soft)}
+.ev-r b{display:block;color:var(--accent)}.ev-r small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-why{display:flex;gap:4px;flex-wrap:wrap}.ev-amt{font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-width:560px){.ev-r{grid-template-columns:1fr auto}.ev-why{grid-column:1/-1;order:3}}
+.ev-bar,.ev-ctl{min-width:0;max-width:100%}
+.ev-ctl .seg{flex-shrink:1;min-width:0;overflow-x:auto}
+.ev-ctl .seg button{padding:8px 12px;white-space:nowrap}

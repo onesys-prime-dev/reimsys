@@ -49,8 +49,14 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   await m.getByRole('tab', { name: 'By month' }).click();
   ok('the monthly chart is back', (await m.locator('.tibars').count()) === 1);
   await m.getByRole('tab', { name: /Employee evaluation/ }).click();
-  await m.locator('[data-testid=ti-employees] button[aria-expanded]').first().click();
-  ok('an employee opens to their submissions', (await m.locator('tr.sub').count()) >= 1);
+  ok('the list comes first, right under the tabs', (await m.locator('[data-testid=ti-employees]').boundingBox()).y < (await m.getByRole('tab', { name: /Employee evaluation/ }).boundingBox()).y + 230, 'the table is too low');
+  await m.locator('[data-testid=ti-employees] .ev-name').first().click();
+  await m.waitForSelector('.ev-modal');
+  ok('a click on a name opens a window with that person', (await m.locator('.ev-modal .ev-mt').count()) === 1 && (await m.locator('.ev-modal h2').innerText()).length > 2);
+  ok('it lists their receipts with a problem', (await m.locator('.ev-modal .ev-r').count()) >= 1);
+  ok('and fits the screen', (await m.locator('.ev-modal').boundingBox()).y >= 0 && await noSideways(m));
+  await m.keyboard.press('Escape'); await m.waitForTimeout(300);
+  ok('Escape closes it', (await m.locator('.ev-modal').count()) === 0);
   ok('no sideways scrolling on the details page', await noSideways(m));
   await m.click('.ph a:has-text("Dashboard")');
   await m.waitForSelector('.tisum');
