@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import nodemailer from 'nodemailer';
 import {
   PLACEHOLDERS, TEMPLATE_KEYS, sampleFor, TEMPLATE_META, emailBrandingSchema, emailTemplateSchema, mailSettingsSchema, unknownPlaceholders,
@@ -53,11 +53,14 @@ settingsRouter.post('/mail/verify', async (req, res) => {
 });
 
 /** Looks at every step of sending (account, key, name, ports, login) and says which one fails. Sends nothing. */
-settingsRouter.post('/mail/diagnose', async (req, res) => {
+const runMailCheck: RequestHandler = async (req, res) => {
   const result = await diagnoseMail();
   await audit(req, { action: 'settings.mail_checked', entityType: 'settings', entityId: 'mail', summary: result.ok ? 'ran the mail check: all steps passed' : `ran the mail check: ${result.steps.filter((s) => s.state === 'fail').map((s) => s.id).join(', ')} failed` });
   res.json(result);
-});
+};
+// The button uses POST; GET also works so the link opened in a browser shows the result instead of "Not found".
+settingsRouter.post('/mail/diagnose', runMailCheck);
+settingsRouter.get('/mail/diagnose', runMailCheck);
 
 settingsRouter.delete('/mail', async (req, res) => {
   await clearMail();
