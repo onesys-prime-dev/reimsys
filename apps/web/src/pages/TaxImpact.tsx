@@ -13,7 +13,9 @@ interface Employee {
   employeeId: number; employee: string; receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number; recurring: boolean;
   submissions: { id: number; refNo: string; vendor: string; date: string; potentialLoss: number; reasons: string[] }[];
 }
-interface Impact { scope: 'all' | 'own'; people?: { id: number; name: string }[]; employeeId?: number | null; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[] }
+interface Cell { receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number }
+interface EmployeeMonths { months: string[]; employees: { employeeId: number; employee: string; cells: Record<string, Cell> }[] }
+interface Impact { scope: 'all' | 'own'; people?: { id: number; name: string }[]; employeeId?: number | null; truncated?: boolean; rate: number; totals: Totals; months: { month: string; potentialLoss: number; potentialSavings: number }[]; worst: Worst[]; employees: Employee[]; employeeMonths?: EmployeeMonths }
 
 const monthName = (m: string) => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
 
@@ -133,7 +135,7 @@ function TaxImpactSection() {
             ) : <p className="muted">Nothing to show. No receipt has a potential loss or missing details.</p>
           )}
 
-          {d.data && shown === 'employees' && <EmployeePane employees={d.data.employees} />}
+          {d.data && shown === 'employees' && <EmployeePane employees={d.data.employees} byMonth={d.data.employeeMonths} />}
         </div>
       </section>
     </div>
@@ -144,8 +146,10 @@ type SortKey = 'loss' | 'no' | 'receipts' | 'name';
 const SORTS: { key: SortKey; label: string }[] = [{ key: 'loss', label: 'Potential loss' }, { key: 'no', label: 'Answered No' }, { key: 'receipts', label: 'Receipts' }, { key: 'name', label: 'Name' }];
 
 /** Who answered No or left details incomplete, ranked. The list is the first thing on the tab; a click on a name opens everything about that person. */
-function EmployeePane({ employees }: { employees: Employee[] }) {
+function EmployeePane({ employees, byMonth }: { employees: Employee[]; byMonth?: EmployeeMonths }) {
   const [sort, setSort] = useState<SortKey>('loss');
+  const [view, setView] = useState<'whole' | 'months'>('whole');
+  const [openMonth, setOpenMonth] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
   if (!employees.length) return <p className="muted">No employee has a potential loss or incomplete receipts.</p>;
   const list = [...employees].sort((x, y) => (
@@ -162,20 +166,27 @@ function EmployeePane({ employees }: { employees: Employee[] }) {
       <div className="ev-bar">
         <p className="ev-line" data-testid="ev-line"><b>{employees.length}</b> {employees.length === 1 ? 'person' : 'people'}{flagged > 0 && <> · <span className="ev-warn"><b>{flagged}</b> need attention</span></>} · potential loss <b>{money(loss)}</b></p>
         <div className="ev-ctl">
+          {byMonth && byMonth.months.length > 0 && (
+            <div className="seg" role="radiogroup" aria-label="View">
+              <button type="button" role="radio" aria-checked={view === 'whole'} className={view === 'whole' ? 'on' : ''} onClick={() => setView('whole')}>Whole period</button>
+              <button type="button" role="radio" aria-checked={view === 'months'} className={view === 'months' ? 'on' : ''} onClick={() => setView('months')}>Month by month</button>
+            </div>
+          )}
           <div className="seg" role="radiogroup" aria-label="Sort the list by">
             {SORTS.map((o) => <button key={o.key} type="button" role="radio" aria-checked={sort === o.key} className={sort === o.key ? 'on' : ''} onClick={() => setSort(o.key)}>{o.label}</button>)}
           </div>
         </div>
       </div>
-      <div className="matrix"><table style={{ minWidth: 680 }} data-testid="ti-employees">
+      {view === 'months' && byMonth ? <MonthMatrix data={byMonth} order={list.map((e) => e.employeeId)} flagged={new Set(employees.filter((e) => e.recurring).map((e) => e.employeeId))} onOpen={(id, month) => { setOpenId(id); setOpenMonth(month); }} /> : null}
+      {view === 'whole' && <div className="matrix"><table style={{ minWidth: 680 }} data-testid="ti-employees">
         <thead><tr>
           <th style={{ textAlign: 'left' }}>Employee</th><th style={{ textAlign: 'right' }}>Receipts</th><th style={{ textAlign: 'left', minWidth: 150 }}>Answered No</th>
           <th style={{ textAlign: 'right' }}>Incomplete</th><th style={{ textAlign: 'left', minWidth: 150 }}>Potential loss</th><th style={{ textAlign: 'right' }}>Potential savings</th>
         </tr></thead>
-        <tbody>{list.map((e) => <EmployeeRow key={e.employeeId} e={e} maxLoss={maxLoss} onOpen={() => setOpenId(e.employeeId)} />)}</tbody>
-      </table></div>
+        <tbody>{list.map((e) => <EmployeeRow key={e.employeeId} e={e} maxLoss={maxLoss} onOpen={() => { setOpenId(e.employeeId); setOpenMonth(null); }} />)}</tbody>
+      </table></div>}
       <p className="muted ev-note">Ranked by what answering No or leaving details out may have cost. <b>Needs attention</b> means three or more of a person's receipts have a problem. Click a name to see everything about that person. A general view for now: the criteria will be defined later.</p>
-      {open && <EmployeeModal e={open} onClose={() => setOpenId(null)} />}
+      {open && <EmployeeModal e={open} month={openMonth} cell={openMonth ? byMonth?.employees.find((x) => x.employeeId === open.employeeId)?.cells[openMonth] : undefined} onClose={() => { setOpenId(null); setOpenMonth(null); }} />}
     </div>
   );
 }
@@ -197,24 +208,62 @@ function EmployeeRow({ e, maxLoss, onOpen }: { e: Employee; maxLoss: number; onO
   );
 }
 
-/** Everything about one person: the figures, how often they answered No, and every receipt with a problem, worst first. */
-function EmployeeModal({ e, onClose }: { e: Employee; onClose: () => void }) {
-  const pct = e.receipts ? Math.round((e.answeredNo / e.receipts) * 100) : 0;
-  const subs = [...e.submissions].sort((x, y) => y.potentialLoss - x.potentialLoss);
+const monthLabel = (m: string) => new Date(m + '-01T00:00:00').toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
+const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const lastMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+
+/** Every employee in a row and every month in a column (this month first), so the current month and the past ones can be compared. Click a figure to see that month. */
+function MonthMatrix({ data, order, flagged, onOpen }: { data: EmployeeMonths; order: number[]; flagged: Set<number>; onOpen: (id: number, month: string) => void }) {
+  const rows = order.map((id) => data.employees.find((e) => e.employeeId === id)).filter((e): e is EmployeeMonths['employees'][number] => !!e);
+  const total = (e: (typeof rows)[number]) => Object.values(e.cells).reduce((n, c) => n + c.potentialLoss, 0);
+  const colTotal = (m: string) => rows.reduce((n, e) => n + (e.cells[m]?.potentialLoss ?? 0), 0);
+  const cur = thisMonth(), prev = lastMonth();
+  const tag = (m: string) => (m === cur ? 'This month' : m === prev ? 'Last month' : '');
   return (
-    <Modal title={e.employee} onClose={onClose} className="wide ev-modal">
+    <div className="matrix evm" data-testid="ti-months"><table style={{ minWidth: 420 + data.months.length * 110 }}>
+      <thead><tr>
+        <th style={{ textAlign: 'left' }}>Employee</th><th style={{ textAlign: 'right' }}>Whole period</th>
+        {data.months.map((m) => <th key={m} style={{ textAlign: 'right' }} className={m === cur ? 'evm-cur' : ''}>{monthLabel(m)}{tag(m) && <small>{tag(m)}</small>}</th>)}
+      </tr></thead>
+      <tbody>
+        {rows.map((e) => (
+          <tr key={e.employeeId} className={flagged.has(e.employeeId) ? 'ev-flag' : ''}>
+            <td><button type="button" className="btn sm ghost ev-name" aria-haspopup="dialog" onClick={() => onOpen(e.employeeId, '')}>{e.employee}</button></td>
+            <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(total(e))}</td>
+            {data.months.map((m) => {
+              const c = e.cells[m];
+              return <td key={m} style={{ textAlign: 'right' }} className={m === cur ? 'evm-cur' : ''}>
+                {c ? <button type="button" className={`evm-cell ${c.potentialLoss > 0 ? 'bad' : ''}`} aria-label={`${e.employee}, ${monthLabel(m)}: ${money(c.potentialLoss)} potential loss, ${c.answeredNo} answered No of ${c.receipts}`} onClick={() => onOpen(e.employeeId, m)}><b>{money(c.potentialLoss)}</b><small>{c.answeredNo} No · {c.receipts} receipts</small></button> : <span className="muted">–</span>}
+              </td>;
+            })}
+          </tr>
+        ))}
+        <tr className="evm-total"><td>Everyone</td><td style={{ textAlign: 'right' }}>{money(rows.reduce((n, e) => n + total(e), 0))}</td>{data.months.map((m) => <td key={m} style={{ textAlign: 'right' }} className={m === cur ? 'evm-cur' : ''}>{money(colTotal(m))}</td>)}</tr>
+      </tbody>
+    </table></div>
+  );
+}
+
+/** Everything about one person: the figures, how often they answered No, and every receipt with a problem, worst first. */
+function EmployeeModal({ e, month, cell, onClose }: { e: Employee; month: string | null; cell?: Cell; onClose: () => void }) {
+  const one = !!month;
+  const figs = one ? { receipts: cell?.receipts ?? 0, answeredNo: cell?.answeredNo ?? 0, incomplete: cell?.incomplete ?? 0, potentialLoss: cell?.potentialLoss ?? 0, potentialSavings: cell?.potentialSavings ?? 0 } : e;
+  const pct = figs.receipts ? Math.round((figs.answeredNo / figs.receipts) * 100) : 0;
+  const subs = [...e.submissions].filter((r) => !one || r.date.startsWith(month!)).sort((x, y) => y.potentialLoss - x.potentialLoss);
+  return (
+    <Modal title={one ? `${e.employee}: ${monthLabel(month!)}` : e.employee} onClose={onClose} className="wide ev-modal">
       <div className="ev-mh">
         {e.recurring ? <span className="chip warn">Needs attention</span> : <span className="chip">No pattern</span>}
       </div>
       <p className="muted" style={{ margin: '0 0 12px' }}>Potential figures, not verified.{e.recurring ? ' Three or more receipts have a problem.' : ''}</p>
       <div className="ev-mt">
-        <div><small>Receipts</small><b>{e.receipts}</b></div>
-        <div><small>Answered No</small><b>{e.answeredNo}</b><em>{pct}% of their receipts</em></div>
-        <div><small>Incomplete</small><b>{e.incomplete}</b></div>
-        <div className="loss"><small>Potential loss</small><b>{money(e.potentialLoss)}</b></div>
-        <div><small>Potential savings</small><b>{money(e.potentialSavings)}</b></div>
+        <div><small>Receipts</small><b>{figs.receipts}</b></div>
+        <div><small>Answered No</small><b>{figs.answeredNo}</b><em>{pct}% of {one ? 'that month' : 'their receipts'}</em></div>
+        <div><small>Incomplete</small><b>{figs.incomplete}</b></div>
+        <div className="loss"><small>Potential loss</small><b>{money(figs.potentialLoss)}</b></div>
+        <div><small>Potential savings</small><b>{money(figs.potentialSavings)}</b></div>
       </div>
-      <h3 style={{ margin: '16px 0 6px' }}>Receipts with a problem <small className="muted">({subs.length}{e.incomplete > subs.length ? ' shown' : ''})</small></h3>
+      <h3 style={{ margin: '16px 0 6px' }}>Receipts with a problem{one ? ` in ${monthLabel(month!)}` : ''} <small className="muted">({subs.length}{!one && e.incomplete > subs.length ? ' shown' : ''})</small></h3>
       {subs.length ? (
         <div className="ev-list" data-testid="ev-receipts">
           {subs.map((r) => (
@@ -225,7 +274,7 @@ function EmployeeModal({ e, onClose }: { e: Employee; onClose: () => void }) {
             </Link>
           ))}
         </div>
-      ) : <p className="muted">None. Every receipt from this person is complete.</p>}
+      ) : <p className="muted">None{one ? ' in this month' : ''}. Every receipt from this person is complete.</p>}
       <div className="btns"><button type="button" className="btn" onClick={onClose}>Close</button></div>
     </Modal>
   );

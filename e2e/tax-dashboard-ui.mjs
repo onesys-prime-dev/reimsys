@@ -30,6 +30,15 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('the Answered No tile opens the employee evaluation', await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
   await m.goBack(); await m.waitForSelector('.tisum .tile b');
   await m.goto('/tax-impact'); await m.waitForSelector('.taximpact .tile b');
+  ok('the employee list can be seen for the whole period or month by month', (await m.getByRole('radio', { name: 'Month by month' }).count()) === 1);
+  await m.getByRole('radio', { name: 'Month by month' }).click(); await m.waitForSelector('[data-testid=ti-months]');
+  ok('month by month: every employee in a row, this month and the past months in columns, and a total row', (await m.locator('[data-testid=ti-months] tbody tr:not(.evm-total)').count()) >= 1 && (await m.locator('[data-testid=ti-months] thead th').count()) >= 3 && (await m.locator('.evm-total').count()) === 1);
+  ok('the whole-period table is replaced, not shown twice', (await m.locator('[data-testid=ti-employees]').count()) === 0);
+  await m.locator('[data-testid=ti-months] .evm-cell').first().click(); await m.waitForSelector('.ev-modal');
+  ok('a month figure opens that person for that month only', /: [A-Z][a-z]{2} \d{4}/.test(await m.locator('.ev-modal h2').innerText()));
+  await m.keyboard.press('Escape'); await m.waitForTimeout(300);
+  ok('no sideways scrolling in the month view', await noSideways(m));
+  await m.getByRole('radio', { name: 'Whole period' }).click(); await m.waitForSelector('[data-testid=ti-employees]');
   ok('there is one set of filters, all in the top bar: the employee, the dates and "only people who need attention"', (await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).count()) === 1 && (await m.locator('[data-testid=ti-eval] input[type=checkbox]').count()) === 0);
   const lossAll = await m.locator('[data-testid=ti-loss]').innerText();
   await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).check(); await m.waitForTimeout(800);

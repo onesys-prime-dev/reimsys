@@ -907,3 +907,12 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
   .page.wide .taximpact>section.card{flex:1;display:flex;flex-direction:column}
   .page.wide .taximpact>section.card>.card-b{flex:1}
 }
+/* month by month */
+.evm th small{display:block;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);font-size:.72rem}
+.evm .evm-cur{background:var(--accent-soft)}
+.evm th:first-child,.evm td:first-child{position:sticky;left:0;background:var(--surface);z-index:1}
+.evm .evm-cur:first-child{background:var(--surface)}
+.evm-cell{display:block;width:100%;text-align:right;background:none;border:0;padding:4px 6px;border-radius:8px;cursor:pointer}
+.evm-cell:hover{background:var(--soft)}.evm-cell.bad b{color:var(--bad)}
+.evm-cell b{display:block;font-variant-numeric:tabular-nums}.evm-cell small{display:block;color:var(--muted);font-size:.72rem;white-space:nowrap}
+.evm-total td{font-weight:700;border-top:2px solid var(--line);background:var(--soft)}

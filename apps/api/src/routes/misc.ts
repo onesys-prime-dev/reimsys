@@ -13,7 +13,7 @@ import { sendReminders } from '../lib/reminders.js';
 import { enqueue } from '../lib/jobs.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
-import { byEmployee, byMonth, impactRows, seesEveryone, totalsOf } from '../lib/taxReport.js';
+import { byEmployee, byEmployeeMonth, byMonth, impactRows, seesEveryone, totalsOf } from '../lib/taxReport.js';
 import { getSettings } from '../lib/appSettings.js';
 
 const idParam = (v: unknown) => {
@@ -150,6 +150,7 @@ dashboardRouter.get('/tax-impact', async (req, res) => {
     months: byMonth(rows),
     worst,
     employees: all ? byEmployee(rows) : [],
+    employeeMonths: all ? byEmployeeMonth(rows, byEmployee(rows)) : { months: [], employees: [] },
   });
 });
 
