@@ -31,7 +31,7 @@ export function TaxImpactSummary() {
         {/* each figure opens the report, on the part that explains it */}
         <Link className="tile alert tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
         <Link className="tile tile-link" to="/tax-impact?tab=months" aria-label="Potential savings: open the report by month"><small>Potential savings (answered Yes)</small><b>{t ? money(t.potentialSavings) : '–'}</b><em aria-hidden="true">See by month →</em></Link>
-        <Link className="tile tile-link" to="/tax-impact?tab=worst" aria-label="Answered No: open the report with the receipts behind it"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
+        <Link className="tile tile-link" to="/tax-impact?tab=employees" aria-label="Answered No: open the employee evaluation"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
       </div>
     </section>
   );
@@ -59,14 +59,16 @@ function TaxImpactSection() {
   // The dashboard tiles open this page on the part that explains the figure (?tab=worst, months or employees).
   const [params] = useSearchParams();
   const fromTile = params.get('tab');
-  const [tab, setTab] = useState<Tab>(fromTile === 'worst' || fromTile === 'months' || fromTile === 'employees' ? fromTile : 'months');
+  // Nothing chosen yet: management lands on the employee evaluation (the part that matters most), a Med Ref on the months.
+  const [tab, setTab] = useState<Tab | null>(fromTile === 'worst' || fromTile === 'months' || fromTile === 'employees' ? fromTile : null);
   const [who, setWho] = useState('');
   const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}) }).toString();
   const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
   const t = d.data?.totals;
   const all = d.data?.scope === 'all';
   const maxBar = Math.max(1, ...(d.data?.months ?? []).map((m) => Math.max(m.potentialLoss, m.potentialSavings)));
-  const shown: Tab = tab === 'employees' && !all ? 'months' : tab;
+  const picked: Tab = tab ?? (all ? 'employees' : 'months');
+  const shown: Tab = picked === 'employees' && !all ? 'months' : picked;
 
   return (
     <div className="taximpact stack" aria-label="Tax withheld figures">
@@ -96,9 +98,9 @@ function TaxImpactSection() {
 
       <section className="card">
         <div className="tabs tipanes" role="tablist" aria-label="Tax figures">
+          {all && <button role="tab" aria-selected={shown === 'employees'} className={shown === 'employees' ? 'on' : ''} onClick={() => setTab('employees')}>Employee evaluation{d.data?.employees.length ? <span className="n"> {d.data.employees.length}</span> : null}</button>}
           <button role="tab" aria-selected={shown === 'months'} className={shown === 'months' ? 'on' : ''} onClick={() => setTab('months')}>By month</button>
           <button role="tab" aria-selected={shown === 'worst'} className={shown === 'worst' ? 'on' : ''} onClick={() => setTab('worst')}>Largest losses{d.data?.worst.length ? <span className="n"> {d.data.worst.length}</span> : null}</button>
-          {all && <button role="tab" aria-selected={shown === 'employees'} className={shown === 'employees' ? 'on' : ''} onClick={() => setTab('employees')}>Employee evaluation{d.data?.employees.length ? <span className="n"> {d.data.employees.length}</span> : null}</button>}
         </div>
         <div className="card-b" role="tabpanel">
           {!d.data && <p className="muted">Loading…</p>}

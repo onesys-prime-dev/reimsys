@@ -26,6 +26,12 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('the row sits right under the status tiles and above the queue', q.y >= tiles.y + tiles.height - 1 && q.height < (label === 'phone' ? 320 : 200), JSON.stringify([q, tiles]));
   ok('no sideways scrolling on the dashboard', await noSideways(m));
   ok('each of the three figures is a link to the report', (await m.locator('.tisum a.tile').count()) === 3);
+  await m.click('.tisum a.tile >> nth=2'); await m.waitForURL(/tab=employees/); await m.waitForSelector('[data-testid=ti-eval]');
+  ok('the Answered No tile opens the employee evaluation', await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
+  await m.goBack(); await m.waitForSelector('.tisum .tile b');
+  await m.goto('/tax-impact'); await m.waitForSelector('.taximpact .tile b');
+  ok('management lands on the employee evaluation, and it is the first tab', await m.getByRole('tab').first().innerText().then((x) => /Employee evaluation/.test(x)) && await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
+  await m.goBack(); await m.waitForSelector('.tisum .tile b');
   await m.click('.tisum a.tile >> nth=0');
   await m.waitForURL(/\/tax-impact\?tab=worst/); await m.waitForSelector('.taximpact .tile b');
   ok('the loss tile opens the report on the largest losses', await m.getByRole('tab', { name: /Largest losses/ }).getAttribute('aria-selected') === 'true');
@@ -38,8 +44,9 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   await m.waitForSelector('.taximpact .tile b');
   ok('the details page has the five figures', (await m.locator('.taximpact .tile').count()) === 5);
   ok('the dates are side by side, not stacked', await m.evaluate(() => { const l = [...document.querySelectorAll('.tifilter label')].filter((x) => /^(From|To)$/.test(x.querySelector('span').textContent)).map((x) => x.getBoundingClientRect()); return l.length === 2 && (Math.abs(l[0].top - l[1].top) < 4 || innerWidth < 500); }));
-  await m.waitForSelector('.tibars');
-  ok('the detail is in tabs: by month, largest losses and employee evaluation, with only one open at a time', (await m.getByRole('tab').count()) === 3 && (await m.locator('.tibars').count()) === 1 && (await m.locator('.taximpact table').count()) === 0);
+  ok('the detail is in three tabs, the employee evaluation first and open', (await m.getByRole('tab').count()) === 3 && (await m.locator('[data-testid=ti-eval]').count()) === 1 && (await m.locator('.tibars').count()) === 0);
+  await m.getByRole('tab', { name: 'By month' }).click(); await m.waitForSelector('.tibars');
+  ok('only one tab is open at a time', (await m.locator('.tibars').count()) === 1 && (await m.locator('.taximpact table').count()) === 0 && (await m.locator('[data-testid=ti-eval]').count()) === 0);
   ok('the long explanation is folded away until asked for', !(await m.locator('.tihow p').first().isVisible()));
   await m.getByRole('tab', { name: /Largest losses/ }).click();
   ok('the largest losses tab has the table', (await m.locator('.taximpact table').count()) === 1 && (await m.locator('.tibars').count()) === 0);
