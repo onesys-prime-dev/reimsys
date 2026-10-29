@@ -62,8 +62,9 @@ function TaxImpactSection() {
   // Nothing chosen yet: management lands on the employee evaluation (the part that matters most), a Med Ref on the months.
   const [tab, setTab] = useState<Tab | null>(fromTile === 'worst' || fromTile === 'months' || fromTile === 'employees' ? fromTile : null);
   const [who, setWho] = useState('');
-  const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}) }).toString();
-  const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
+  const [flagged, setFlagged] = useState(false);
+  const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}), ...(flagged ? { flagged: '1' } : {}) }).toString();
+  const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who, flagged], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
   const t = d.data?.totals;
   const all = d.data?.scope === 'all';
   const maxBar = Math.max(1, ...(d.data?.months ?? []).map((m) => Math.max(m.potentialLoss, m.potentialSavings)));
@@ -73,12 +74,13 @@ function TaxImpactSection() {
   return (
     <div className="taximpact stack" aria-label="Tax withheld figures">
       <div className="tifilterbar">
-        <span className="muted">{!all ? 'Your receipts with a BIR invoice' : who ? `Receipts with a BIR invoice: ${d.data?.people?.find((p) => String(p.id) === who)?.name ?? ''}` : 'All receipts with a BIR invoice, everyone'}</span>
+        <span className="muted">{!all ? 'Your receipts with a BIR invoice' : flagged && !who ? 'Receipts with a BIR invoice from people who need attention' : who ? `Receipts with a BIR invoice: ${d.data?.people?.find((p) => String(p.id) === who)?.name ?? ''}` : 'All receipts with a BIR invoice, everyone'}</span>
         <div className="tifilter">
           {all && <label className="f"><span>Employee</span><select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Employee"><option value="">Everyone</option>{(d.data?.people ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
           <label className="f"><span>From</span><input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label="From date" /></label>
           <label className="f"><span>To</span><input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="To date" /></label>
-          {(from || to || who) && <button type="button" className="btn sm ghost" onClick={() => { setFrom(''); setTo(''); setWho(''); }}>Clear</button>}
+          {all && <label className="f ev-only" title="Only people with three or more receipts that have a problem. Every figure on the page follows it."><input type="checkbox" checked={flagged} onChange={(e) => setFlagged(e.target.checked)} aria-label="Only people who need attention" /><span>Only people who need attention</span></label>}
+          {(from || to || who || flagged) && <button type="button" className="btn sm ghost" onClick={() => { setFrom(''); setTo(''); setWho(''); setFlagged(false); }}>Clear</button>}
         </div>
       </div>
 
@@ -144,10 +146,9 @@ const SORTS: { key: SortKey; label: string }[] = [{ key: 'loss', label: 'Potenti
 /** Who answered No or left details incomplete, ranked. The list is the first thing on the tab; a click on a name opens everything about that person. */
 function EmployeePane({ employees }: { employees: Employee[] }) {
   const [sort, setSort] = useState<SortKey>('loss');
-  const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   if (!employees.length) return <p className="muted">No employee has a potential loss or incomplete receipts.</p>;
-  const list = [...employees].filter((e) => !onlyFlagged || e.recurring).sort((x, y) => (
+  const list = [...employees].sort((x, y) => (
     sort === 'name' ? x.employee.localeCompare(y.employee)
     : sort === 'no' ? y.answeredNo - x.answeredNo || y.potentialLoss - x.potentialLoss
     : sort === 'receipts' ? y.receipts - x.receipts || y.potentialLoss - x.potentialLoss
@@ -164,7 +165,6 @@ function EmployeePane({ employees }: { employees: Employee[] }) {
           <div className="seg" role="radiogroup" aria-label="Sort the list by">
             {SORTS.map((o) => <button key={o.key} type="button" role="radio" aria-checked={sort === o.key} className={sort === o.key ? 'on' : ''} onClick={() => setSort(o.key)}>{o.label}</button>)}
           </div>
-          {flagged > 0 && <label className="ev-only"><input type="checkbox" checked={onlyFlagged} onChange={(e) => setOnlyFlagged(e.target.checked)} />Only those who need attention</label>}
         </div>
       </div>
       <div className="matrix"><table style={{ minWidth: 680 }} data-testid="ti-employees">
@@ -174,7 +174,6 @@ function EmployeePane({ employees }: { employees: Employee[] }) {
         </tr></thead>
         <tbody>{list.map((e) => <EmployeeRow key={e.employeeId} e={e} maxLoss={maxLoss} onOpen={() => setOpenId(e.employeeId)} />)}</tbody>
       </table></div>
-      {!list.length && <p className="muted">No one needs attention right now.</p>}
       <p className="muted ev-note">Ranked by what answering No or leaving details out may have cost. <b>Needs attention</b> means three or more of a person's receipts have a problem. Click a name to see everything about that person. A general view for now: the criteria will be defined later.</p>
       {open && <EmployeeModal e={open} onClose={() => setOpenId(null)} />}
     </div>

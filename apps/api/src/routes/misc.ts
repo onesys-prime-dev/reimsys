@@ -133,12 +133,17 @@ dashboardRouter.get('/tax-impact', async (req, res) => {
   // Everyone's rows first: the list of people to choose from must not shrink when one person is chosen.
   const everyone = await impactRows(auth, { from: date(req.query.from), to: date(req.query.to) });
   const people = all ? [...new Map(everyone.map((r) => [r.employeeId, r.employee])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)) : [];
-  const rows = Object.assign(employeeId ? everyone.filter((r) => r.employeeId === employeeId) : everyone, { truncated: (everyone as { truncated?: boolean }).truncated });
+  // "Only people who need attention" (three or more receipts with a problem) narrows every figure on the page, not just the list. Management only.
+  const flaggedOnly = all && req.query.flagged === '1';
+  const flaggedIds = flaggedOnly ? new Set(byEmployee(everyone).filter((e) => e.recurring).map((e) => e.employeeId)) : null;
+  const pickedRows = everyone.filter((r) => (!employeeId || r.employeeId === employeeId) && (!flaggedIds || flaggedIds.has(r.employeeId)));
+  const rows = Object.assign(pickedRows, { truncated: (everyone as { truncated?: boolean }).truncated });
   const worst = rows.filter((r) => r.potentialLoss > 0 || r.reasons.length).sort((a, b) => b.potentialLoss - a.potentialLoss).slice(0, 10);
   res.json({
     scope: all ? 'all' : 'own',
     people,
     employeeId: employeeId ?? null,
+    flagged: flaggedOnly,
     rate: getSettings().defaultWhtRate,
     totals: totalsOf(rows),
     truncated: (rows as { truncated?: boolean }).truncated === true,

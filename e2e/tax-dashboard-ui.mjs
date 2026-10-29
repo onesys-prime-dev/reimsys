@@ -30,6 +30,12 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   ok('the Answered No tile opens the employee evaluation', await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
   await m.goBack(); await m.waitForSelector('.tisum .tile b');
   await m.goto('/tax-impact'); await m.waitForSelector('.taximpact .tile b');
+  ok('there is one set of filters, all in the top bar: the employee, the dates and "only people who need attention"', (await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).count()) === 1 && (await m.locator('[data-testid=ti-eval] input[type=checkbox]').count()) === 0);
+  const lossAll = await m.locator('[data-testid=ti-loss]').innerText();
+  await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).check(); await m.waitForTimeout(800);
+  ok('switching it on keeps the people who need attention, and every figure follows', /need attention/.test(await m.locator('.tifilterbar').innerText()) && Number((await m.locator('[data-testid=ti-loss]').innerText()).replace(/[^\d.]/g, '')) <= Number(lossAll.replace(/[^\d.]/g, '')));
+  await m.getByRole('button', { name: 'Clear' }).click(); await m.waitForTimeout(600);
+  ok('Clear switches it off again', (await m.locator('.tifilter').getByRole('checkbox', { name: 'Only people who need attention' }).isChecked()) === false && (await m.locator('[data-testid=ti-loss]').innerText()) === lossAll);
   ok('management lands on the employee evaluation, and it is the first tab', await m.getByRole('tab').first().innerText().then((x) => /Employee evaluation/.test(x)) && await m.getByRole('tab', { name: /Employee evaluation/ }).getAttribute('aria-selected') === 'true');
   await m.goBack(); await m.waitForSelector('.tisum .tile b');
   await m.click('.tisum a.tile >> nth=0');
