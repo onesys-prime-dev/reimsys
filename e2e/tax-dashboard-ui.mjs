@@ -25,6 +25,14 @@ for (const [label, size] of [['computer', { width: 1366, height: 800 }], ['phone
   const q = await m.locator('.tisum').boundingBox(), tiles = await m.locator('.tiles').first().boundingBox();
   ok('the row sits right under the status tiles and above the queue', q.y >= tiles.y + tiles.height - 1 && q.height < (label === 'phone' ? 320 : 200), JSON.stringify([q, tiles]));
   ok('no sideways scrolling on the dashboard', await noSideways(m));
+  ok('each of the three figures is a link to the report', (await m.locator('.tisum a.tile').count()) === 3);
+  await m.click('.tisum a.tile >> nth=0');
+  await m.waitForURL(/\/tax-impact\?tab=worst/); await m.waitForSelector('.taximpact .tile b');
+  ok('the loss tile opens the report on the largest losses', await m.getByRole('tab', { name: /Largest losses/ }).getAttribute('aria-selected') === 'true');
+  await m.goBack(); await m.waitForSelector('.tisum .tile b');
+  await m.click('.tisum a.tile >> nth=1'); await m.waitForURL(/tab=months/);
+  ok('the savings tile opens it by month', await m.getByRole('tab', { name: /By month/ }).getAttribute('aria-selected') === 'true');
+  await m.goBack(); await m.waitForSelector('.tisum .tile b');
   await m.click('.tisum a:has-text("Details")');
   await m.waitForURL(/\/tax-impact$/);
   await m.waitForSelector('.taximpact .tile b');

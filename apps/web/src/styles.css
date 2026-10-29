@@ -841,3 +841,9 @@ i.req{color:var(--bad);font-style:normal;font-weight:700}
 .ap-sw span.co{background:conic-gradient(var(--accent) 0 50%,var(--accent-soft) 50% 100%)}
 .ap-preview{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--soft)}
 @media(max-width:520px){.ap-themes{grid-template-columns:1fr}.ap-theme{grid-template-columns:90px 1fr;align-items:center}}
+/* the dashboard tax tiles open the report */
+.tile-link{display:block;text-decoration:none;color:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+.tile-link:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.08);transform:translateY(-1px)}
+.tile-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tile-link em{display:block;margin-top:6px;font-style:normal;font-size:.78rem;font-weight:600;color:var(--accent);opacity:.85}
+.tile-link:hover em{opacity:1;text-decoration:underline}

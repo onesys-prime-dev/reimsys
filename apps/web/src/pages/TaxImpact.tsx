@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, money } from '../api';
 import { Icon } from '../ui';
 
@@ -28,9 +28,10 @@ export function TaxImpactSummary() {
         <Link className="btn sm ghost" to="/tax-impact">Details and employee evaluation →</Link>
       </div>
       <div className="tisum-t">
-        <div className="tile alert"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b></div>
-        <div className="tile"><small>Potential savings (answered Yes)</small><b>{t ? money(t.potentialSavings) : '–'}</b></div>
-        <div className="tile"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b></div>
+        {/* each figure opens the report, on the part that explains it */}
+        <Link className="tile alert tile-link" to="/tax-impact?tab=worst" aria-label="Potential loss: open the report with the largest losses"><small>Potential loss (answered No)</small><b>{t ? money(t.potentialLoss) : '–'}</b><em aria-hidden="true">See the receipts →</em></Link>
+        <Link className="tile tile-link" to="/tax-impact?tab=months" aria-label="Potential savings: open the report by month"><small>Potential savings (answered Yes)</small><b>{t ? money(t.potentialSavings) : '–'}</b><em aria-hidden="true">See by month →</em></Link>
+        <Link className="tile tile-link" to="/tax-impact?tab=worst" aria-label="Answered No: open the report with the receipts behind it"><small>Answered No</small><b>{t ? `${t.answeredNo} of ${t.receipts}` : '–'}</b><em aria-hidden="true">See who →</em></Link>
       </div>
     </section>
   );
@@ -55,7 +56,10 @@ type Tab = 'months' | 'worst' | 'employees';
 function TaxImpactSection() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [tab, setTab] = useState<Tab>('months');
+  // The dashboard tiles open this page on the part that explains the figure (?tab=worst, months or employees).
+  const [params] = useSearchParams();
+  const fromTile = params.get('tab');
+  const [tab, setTab] = useState<Tab>(fromTile === 'worst' || fromTile === 'months' || fromTile === 'employees' ? fromTile : 'months');
   const [who, setWho] = useState('');
   const q = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(who ? { employeeId: who } : {}) }).toString();
   const d = useQuery({ queryKey: ['dashboard', 'tax-impact', from, to, who], queryFn: () => api<Impact>(`/dashboard/tax-impact${q ? `?${q}` : ''}`), refetchInterval: 60_000 });
