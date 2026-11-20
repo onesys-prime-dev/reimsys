@@ -520,3 +520,88 @@ Migration `20261120010000_batches` adds the `batch` table and `receipt.batchId`,
 ### Tests
 `packages/shared/test/batches.test.ts`, `e2e/batch-flow.mjs` (API, every role) and `e2e/batch-ui.mjs` (Chrome, computer and phone), both in `e2e/run-all.mjs`.
 
+## Batch cutoffs (plan, 2026-11-20)
+
+A **cutoff** fills a batch automatically at a set time, closes it, and (for a repeating schedule) opens the next one. After the cutoff it is an ordinary batch: its receipts are checked, approved and paid exactly as before. One mechanism serves both kinds: every batch can carry a **cutoff time** and a **fill rule**, and a repeating schedule only makes the next batch with those filled in.
+
+### Decisions
+- **Both kinds:** repeating schedules ("every Friday 5:00 PM") and a one-off cutoff on any batch made by hand.
+- **At the cutoff:** add every matching receipt that is in no batch, close the batch, open the next one, send one summary.
+- **Rules per schedule:** which status, which date counts, optional charge locations and people.
+- **Latecomers:** stay out of any batch, so the next run takes them. They can still be added by hand before that.
+- **Who:** repeating schedules need a new permission `batch.schedule` (Admin and Super Admin by default; roles can be changed in Access). A one-off cutoff on a batch needs `batch.manage` (Accounting and both admins).
+- **What each person may pull in:** "anything in progress" needs `receipt.view_all`. Without it (Accounting by default) only "approved" is offered and the API refuses the other, so nobody fills a batch with receipts they cannot see.
+
+### The fill rule (shared `cutoffRuleSchema`, stored as JSON on the batch and on the schedule)
+| Field | Choices | Notes |
+|---|---|---|
+| `statuses` | `approved` / `in_progress` | In progress = submitted, checked, approved. **Returned and reserved are never pulled in** (they wait on the Med Ref or are on hold on purpose); they can still be added by hand. |
+| `date` | `approved` / `submitted` / `receipt` | Default `approved` for approved-only, `submitted` otherwise. Approved = `decidedAt`. Submitted = `submittedAt`, which resets when a returned receipt is sent again, so one fixed after the cutoff goes to the next run. Receipt = `receiptDate`, which has no time, so "dated on or before the cutoff day". |
+| `chargeLocationIds` | empty = all | |
+| `encoderIds` | empty = everyone | |
+
+Categories are left out: receipts on the current form are Product or Service, not categories.
+
+### Database (migration `20261121010000_batch_cutoffs`, additive; rollback in `docs/rollback-batch-cutoffs.sql`)
+- **New table `batchschedule`:** `id`, `name` (60), `isOn`, `repeat` (`weekly` / `monthly`), `days` (weekly: weekdays such as `5` or `1,5`; monthly: month days such as `15,L`, `L` = last day), `time` (`17:00`), `timeZone` (default from Settings, Asia/Manila), `rule` (JSON text), `lastRunAt`, `lastBatchId`, `lastCount`, `createdById`, timestamps.
+- **New on `batch`:** `cutoffAt` (when it fills), `cutoffRule` (JSON text), `scheduleId` (FK, set null on delete), `part` (default 1; 2, 3 ... for overflow), `cutoffClaimedAt` (a run in progress), `cutoffDoneAt` (the cutoff ran or was cancelled). **A batch is due only when `cutoffAt <= now` and `cutoffDoneAt` is empty.**
+- **Unique `(scheduleId, cutoffAt, part)`:** a schedule can never get two batches for the same slot, whatever retries or a second server do. Hand-made batches have no schedule, so the key does not limit them.
+- Grants for the new table (`docs/db-grants.sql`, `scripts/grant-app-user.mjs`); the seed grants `batch.schedule` once.
+
+### Working out the next cutoff (shared `nextCutoff(schedule, after)`)
+Walks forward day by day in the schedule's time zone (up to 400 days) and returns the first chosen day and time strictly after `after`. Days 29 to 31 in a shorter month mean that month's last day, and are not counted twice when both 30 and 31 are chosen. The local time is turned into a real instant with the zone's offset on that day, checked twice so a daylight-saving change cannot shift it (Manila has none; tested with New York). The screen preview and the worker use the same function, so they always agree.
+
+### The worker (`apps/api/src/lib/cutoffs.ts`, every minute, started in `server.ts` next to the email schedules)
+1. **Keep schedules alive.** Every switched-on schedule without a current batch (one of its batches with no `cutoffDoneAt`) gets one, with the next cutoff after now. This also mends a lost batch.
+2. **Claim each due batch** with one conditional update (`cutoffDoneAt` empty, and `cutoffClaimedAt` empty or older than 10 minutes). Two servers or two ticks cannot both run it. A crash mid-run is picked up again after 10 minutes; every step below is safe to repeat.
+3. **Closed by hand before the cutoff:** the cutoff counts as cancelled (`cutoffDoneAt` set, audit `batch.cutoff_cancelled`), nothing is added, and the schedule moves on to its next batch.
+4. **Fill**, in a transaction holding the batch row lock (as adding by hand does): matching receipts, oldest first, with `batchId IS NULL` and the allowed statuses inside the update itself, so a receipt added by hand at the same moment is never in two batches. Up to 300 per batch; the rest go into **part 2, 3 ...** (same schedule and cutoff, named "... (part 2)", closed and done at once). Nothing is dropped.
+5. **Nothing in it at all** (none matched and none added by hand): a schedule's batch stays open and its cutoff moves to the next slot (renamed to the new date, audit `batch.cutoff_rolled`, a bell note to the schedule's maker, no email). A hand-made batch stays open with its cutoff removed and its maker is told. No empty closed batches pile up.
+6. **Close:** `closedAt` and `cutoffDoneAt` set, claim cleared. **Reopening later never re-runs it**, because `cutoffDoneAt` stays.
+7. **Next batch** for the schedule: the first slot after this cutoff that is still in the future. A server that was down over several slots runs the missed one once, at its own cutoff time, and does not replay every missed week. The unique key makes a second attempt a harmless no-op.
+8. **Tell people once:** a bell note and the new editable `batch_cutoff` email to everyone with `batch.manage`, plus the schedule's maker: "B-2026-000031 · Weekly run Pasig · 20 Nov closed at cutoff: 12 receipts, PHP 34,500.00. Next cutoff Fri 27 Nov, 5:00 PM." Med Refs are not told (they do not see batches).
+9. **Record:** audit as "System (cutoff schedule <name>)": `batch.cutoff_run` on the batch (counts, refs, part batches) and `batch.receipt_added` on each receipt. The schedule's `lastRunAt`, `lastBatchId` and `lastCount` are updated. Open screens refresh through the usual write announcements.
+
+### Run now, move, pause, delete
+- **Run cutoff now** (on the batch, `batch.manage`): steps 2 to 9 at once, recorded as that person. It **uses up that slot**: the next batch gets the slot after the original cutoff, not tomorrow.
+- **Change this cutoff** (one batch only, e.g. a holiday): a new time and/or rule. A time already past asks "Run it now?" and runs only when confirmed.
+- **Editing a schedule** updates its current batch's cutoff and rule (the form says so). A new time already past asks the same question. Closed batches never change.
+- **Pausing a schedule** removes the cutoff from its current batch, which becomes an ordinary batch. Switching it on again puts the next cutoff back.
+- **Deleting a schedule:** its current batch is deleted if empty, otherwise it keeps its receipts as an ordinary batch without a cutoff. Past batches keep their history (the schedule link becomes empty).
+- **Deleting a schedule's current batch** is refused: "Pause or delete the schedule instead."
+- **Hand-made batch with a cutoff:** set it when making the batch or later; change or remove it until it has run.
+
+### Overlap
+Two switched-on schedules overlap when their statuses meet and their charge-location and people filters meet (an empty filter means all). It is allowed, since a receipt can only be in one batch and the earlier cutoff takes it, but the schedule list shows "Overlaps with: ..." so it is never a surprise.
+
+### API
+- `/api/batch-schedules` (`batch.schedule`): `GET` (each with plain words, next cutoff, last run, overlaps), `GET /choices` (charge locations, people, default time zone), `POST`, `PATCH /:id` (incl. on/off and `confirmPast`), `DELETE /:id`, `GET /:id/preview` (count and total it would add now).
+- `/api/batches`: `POST /` takes optional `cutoffAt` and `cutoffRule`; `PATCH /:id` takes `cutoffAt` (or null), `cutoffRule`, `confirmPast`; new `POST /:id/cutoff/run`; `GET /:id` adds `cutoff` (time, rule, plain words, schedule, done or not) and `wouldAdd` (count and total, and how many are at steps this person cannot see); `GET /` adds each batch's cutoff time and schedule name (no per-row preview: too heavy for a list).
+- `DELETE /:id` refuses a schedule's current batch (`SCHEDULE_BATCH`). Errors in plain words, as elsewhere.
+
+### Screens
+- **Batches page:** a **Cutoff schedules** tab for `batch.schedule`: name, plain words ("Every Friday at 5:00 PM (Asia/Manila). Takes receipts approved before then, charged to Pasig."), next cutoff, last run (count and link), on/off switch, overlap warning. Form: name; Weekly (weekday chips) or Monthly (day chips 1 to 31 and Last day); time; status, date, charge locations, people; a live plain-words line and "If it ran now: 12 receipts, PHP 34,500.00".
+- **Batch rows:** "Cutoff Fri 20 Nov, 5:00 PM" or "Closed at cutoff", with the schedule name.
+- **Batch page:** a cutoff panel: when, time left, rule in words, "12 receipts (PHP 34,500.00) would be added now (3 at steps you cannot see)", **Run cutoff now** (confirm), **Change this cutoff**, and on hand-made batches **Set / Remove cutoff**.
+- **New batch dialog:** optional "Close automatically at" with the rule (only "approved" when the person lacks `receipt.view_all`).
+- Computer and phone layouts, dark mode. Help: a "Cutoffs" part in the Batches guide.
+
+### Not done, on purpose
+- **No holiday calendar.** Move one cutoff with "Change this cutoff".
+- **No filter by category or type.** Charge location and people cover how runs are split today; more can be added to the rule later without a database change.
+- **The code year** is the year the batch was opened (a batch opened 28 Dec for a 2 Jan cutoff is B-2026-...). Harmless; codes stay unique.
+
+### Tests
+- `packages/shared/test/cutoffs.test.ts`: `nextCutoff` (one and several weekdays, same day before and after the time, 15th and last day, 31st in a 30-day month and in February, leap year, year end, New York daylight-saving days), rule schema and defaults, plain words, overlap, which rules a person may choose.
+- `e2e/batch-cutoff-flow.mjs` (API): a schedule opens a batch; the preview matches; at the cutoff (set in the past by SQL, run by the worker within a minute and by Run now) it fills, closes, opens the next and tells Accounting once; a latecomer goes to the next run; returned and reserved receipts stay out; a receipt in another batch stays there; reopening does not re-run; closing before the cutoff cancels it; an empty run rolls over; 305 matching receipts make part 1 (300) and part 2 (5); two Run now calls at once give one result; a stale claim re-runs without doubles; pause, resume, edit and delete behave as above; the current batch cannot be deleted; Accounting cannot choose "in progress"; Med Ref and Checker get 403 on schedules; audit rows.
+- `e2e/batch-cutoff-ui.mjs` (Chrome, computer and phone): make a schedule, see the plain words and preview, Run now, see the closed batch and the next one.
+- `e2e/email-templates.mjs` count 17 to 18; both new tests in `e2e/run-all.mjs`.
+
+### Build order (each step ends with typecheck and its tests)
+1. Shared: rule schema, `nextCutoff`, plain words, overlap, permission, email template; unit tests.
+2. Migration, rollback SQL, grants, seed.
+3. `lib/cutoffs.ts` worker and its start-up.
+4. API routes; `e2e/batch-cutoff-flow.mjs`.
+5. Screens; `e2e/batch-cutoff-ui.mjs`.
+6. Help, a progress note here, full `run-all` and production build.
+
