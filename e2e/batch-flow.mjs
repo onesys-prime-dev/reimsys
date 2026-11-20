@@ -131,6 +131,13 @@ ok('paying again is refused', (await payBatch(U.rica, B1.id, det.payable)).s ===
 const anaPaid = (await notes(U.ana))[0];
 ok('each person gets the usual payment notice', /paid/.test(anaPaid.text));
 
+console.log('\nWithdrawing');
+const w1 = await submitted('ana', 'Batch withdraw', 70);
+await call(U.admin, 'POST', `/batches/${B1.id}/receipts`, { receiptIds: [w1.id] });
+const wd = await call(U.ana, 'POST', `/receipts/${w1.id}/withdraw`, { version: (await get(U.ana, w1)).version });
+ok('a withdrawn receipt (back to a draft) leaves its batch', wd.s === 200 && wd.d.receipt.batch === null);
+ok('the batch no longer counts it', !(await call(U.admin, 'GET', `/batches/${B1.id}`)).d.batch.receipts.some((r) => r.id === w1.id));
+
 console.log('\nRemoving, closing and deleting');
 ok('a paid receipt cannot be removed', (await call(U.admin, 'DELETE', `/batches/${B1.id}/receipts/${s1.id}`)).s === 409);
 ok('a Checker cannot remove a receipt', (await call(U.liza, 'DELETE', `/batches/${B1.id}/receipts/${s3.id}`)).s === 403);

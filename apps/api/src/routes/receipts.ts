@@ -352,7 +352,8 @@ export async function runAction(req: import('express').Request, action: ReceiptA
   }
 
   const data: Prisma.ReceiptUncheckedUpdateManyInput = { status: t.to, version: { increment: 1 } };
-  if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null });
+  // A draft is private to its Med Ref, so a withdrawn receipt leaves its batch (nobody else could take it out).
+  if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null, batchId: null });
   if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note, ckCompany: body.seen?.company ?? null, ckTin: body.seen?.tin ?? null, ckAddress: body.seen?.address ?? null });
   if (action === 'return' || action === 'reserve' || action === 'request') data.lastNote = note;
@@ -383,6 +384,8 @@ export async function runAction(req: import('express').Request, action: ReceiptA
     action: action === 'reverse_payment' ? 'payment.reversed' : `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
     before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(reason ? { note: reason } : {}), ...(issues.length ? { issues } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
+
+  if (action === 'withdraw' && r.batch) await audit(req, { action: 'batch.receipt_removed', entityType: 'receipt', entityId: r.id, summary: `removed from batch ${r.batch.code} (withdrawn)`, before: { batch: r.batch.code } });
 
   if (opts.quiet) return null;
 
