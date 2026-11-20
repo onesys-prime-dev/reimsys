@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { RECEIPT_STATUSES, STATUS_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { RECEIPT_STATUSES, STATUS_LABEL, batchWaitingText, canViewBatches, type ReceiptStatus } from '@reimsys/shared';
 import { ago, api, money } from '../api';
 import { useAuth } from '../auth';
-import type { ReceiptBrief } from '../types';
+import type { BatchSummary, ReceiptBrief } from '../types';
 import { Empty, Icon } from '../ui';
 import { ReceiptRow } from './Receipts';
 import { TaxImpactSummary } from './TaxImpact';
@@ -25,6 +25,20 @@ const BLURB: Record<string, string> = {
   pay: 'Record payments for approved reimbursements.',
   admin: 'A read-only view of the whole system.',
 };
+
+/** Open batches with receipts waiting for this person. Shown only when there are some. */
+function BatchesWaiting() {
+  const q = useQuery({ queryKey: ['batches', 'open'], queryFn: () => api<{ batches: BatchSummary[] }>('/batches?state=open') });
+  const list = (q.data?.batches ?? []).filter((b) => batchWaitingText(b.waiting));
+  if (!list.length) return null;
+  return (
+    <div className="callout ok" data-testid="batches-waiting"><Icon name="batch" /><div>
+      <b>{list.length === 1 ? 'A batch is waiting for you' : `${list.length} batches are waiting for you`}</b>
+      {list.slice(0, 4).map((b) => <span key={b.id} style={{ display: 'block' }}><Link to={`/batches/${b.id}`} style={{ color: 'inherit', textDecoration: 'underline' }}>{b.code}{b.name ? ` · ${b.name}` : ''}</Link>: {batchWaitingText(b.waiting)}</span>)}
+      {list.length > 4 && <span style={{ display: 'block' }}><Link to="/batches" style={{ color: 'inherit', textDecoration: 'underline' }}>See all {list.length}</Link></span>}
+    </div></div>
+  );
+}
 
 export function DashboardPage() {
   const { me, can } = useAuth();
@@ -75,6 +89,8 @@ export function DashboardPage() {
       <div className="tiles">
         {tiles.map((t) => <Link key={t.label} className={`tile ${t.alert ? 'alert' : ''}`} to={t.to}><small>{t.label}</small><b>{d.data ? t.value : '–'}</b></Link>)}
       </div>
+
+      {canViewBatches(can) && <BatchesWaiting />}
 
       <TaxImpactSummary />
 

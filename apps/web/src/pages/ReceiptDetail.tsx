@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { classificationText, cleanText, fixStepFor, issueLabel, issuesFor, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
+import { canViewBatches, classificationText, cleanText, fixStepFor, issueLabel, issuesFor, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Comments } from '../components/Comments';
@@ -99,7 +99,7 @@ export function ReceiptDetailPage() {
       <div className="dh">
         <div className="ttl">
           <h1>{r.payee}</h1>
-          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span><span className="amt-big">{money(r.amount)}</span></div>
+          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span>{r.batch && (canViewBatches(can) ? <Link className="pill s-chk" to={`/batches/${r.batch.id}`} title="Open the batch" style={{ textDecoration: 'none' }}>Batch {r.batch.code}</Link> : <span className="muted">Batch {r.batch.code}</span>)}<span className="amt-big">{money(r.amount)}</span></div>
         </div>
         <div className="actionbar">
           {r.canEdit && <Link className="btn" to={`/receipts/${r.id}/edit`}><Icon name="edit" size={18} />Edit</Link>}

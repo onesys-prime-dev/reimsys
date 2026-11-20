@@ -3,20 +3,21 @@ import PDFDocument from 'pdfkit';
 import type { Prisma } from '@prisma/client';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
-import { PAYMENT_FILTER_LABEL, TRANSACTION_LABEL, VAT_LABEL, type PaymentFilter } from '@reimsys/shared';
+import { PAYMENT_FILTER_LABEL, TRANSACTION_LABEL, VAT_LABEL, batchLabel, type PaymentFilter } from '@reimsys/shared';
 import { dateOnly, typeLabel } from './receipts.js';
 import { registerJob } from './jobs.js';
 import { drawLogo } from './logo.js';
 import { readFile, saveFile } from './storage.js';
 
-export interface ReportFilters { from: string; to: string; categoryId?: number | null; transactionType?: string | null; encoderId?: number | null; payment?: PaymentFilter; scope: Prisma.ReceiptWhereInput }
+export interface ReportFilters { from: string; to: string; categoryId?: number | null; transactionType?: string | null; encoderId?: number | null; batchId?: number | null; payment?: PaymentFilter; scope: Prisma.ReceiptWhereInput }
 
 /** Human description of the optional filters, e.g. "Person: Ana Reyes · Category: Medicine". Empty when nothing is filtered. */
-export async function filterLabel(f: { categoryId?: number | null; transactionType?: string | null; encoderId?: number | null; payment?: PaymentFilter }) {
+export async function filterLabel(f: { categoryId?: number | null; transactionType?: string | null; encoderId?: number | null; batchId?: number | null; payment?: PaymentFilter }) {
   const parts: string[] = [];
   if (f.encoderId) { const u = await prisma.user.findUnique({ where: { id: f.encoderId }, select: { name: true } }); if (u) parts.push(`Person: ${u.name}`); }
   if (f.transactionType) parts.push(`Type: ${TRANSACTION_LABEL[f.transactionType as keyof typeof TRANSACTION_LABEL] ?? f.transactionType}`);
   if (f.categoryId) { const c = await prisma.category.findUnique({ where: { id: f.categoryId }, select: { name: true } }); if (c) parts.push(`Category: ${c.name}`); }
+  if (f.batchId) { const b = await prisma.batch.findUnique({ where: { id: f.batchId }, select: { code: true, name: true } }); parts.push(`Batch: ${b ? batchLabel(b) : 'deleted'}`); }
   if (f.payment && f.payment !== 'all') parts.push(`Payment: ${PAYMENT_FILTER_LABEL[f.payment]}`);
   return parts.join(' · ');
 }
@@ -32,6 +33,7 @@ export async function reportRows(f: ReportFilters) {
       f.categoryId ? { categoryId: f.categoryId } : {},
       f.transactionType ? { transactionType: f.transactionType } : {},
       f.encoderId ? { encoderId: f.encoderId } : {},
+      f.batchId ? { batchId: f.batchId } : {},
     ],
   };
   const rows = await prisma.receipt.findMany({ where, include: { category: true, encoder: true, document: true, payment: true }, orderBy: [{ receiptDate: 'asc' }, { id: 'asc' }] });

@@ -59,7 +59,7 @@ notificationsRouter.get('/', async (req, res) => {
     prisma.notification.findMany({ where: { userId }, orderBy: { id: 'desc' }, take: 30 }),
     prisma.notification.count({ where: { userId, readAt: null } }),
   ]);
-  res.json({ unread, items: items.map((n) => ({ id: n.id, type: n.type, text: n.text, receiptId: n.receiptId, read: !!n.readAt, createdAt: n.createdAt })) });
+  res.json({ unread, items: items.map((n) => ({ id: n.id, type: n.type, text: n.text, receiptId: n.receiptId, batchId: n.batchId, read: !!n.readAt, createdAt: n.createdAt })) });
 });
 
 notificationsRouter.post('/read', async (req, res) => {

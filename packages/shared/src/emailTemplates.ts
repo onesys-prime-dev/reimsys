@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Every email the system can send. */
-export const TEMPLATE_KEYS = ['submitted', 'checked', 'ready_to_pay', 'returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'digest', 'reminder', 'reset', 'invite', 'test'] as const;
+export const TEMPLATE_KEYS = ['submitted', 'checked', 'ready_to_pay', 'returned', 'approved', 'disapproved', 'reserved', 'released', 'reversed', 'paid', 'payment_reversed', 'batch_update', 'digest', 'reminder', 'reset', 'invite', 'test'] as const;
 export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
 
 export interface EmailTemplate {
@@ -32,7 +32,8 @@ export const PLACEHOLDERS: PlaceholderDef[] = [
   { key: 'paymentNo', label: 'Payment number', example: 'PAY-2026-000012' },
   { key: 'method', label: 'How it was paid', example: 'Bank transfer' },
   { key: 'paidOn', label: 'Payment date', example: 'Oct 15, 2026' },
-  { key: 'receiptList', label: 'Receipts in the payment, one per line (payment email only)', example: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50' },
+  { key: 'batchCode', label: 'Batch code and name (batch email only)', example: 'B-2026-000004 · Pasig week 3' },
+  { key: 'receiptList', label: 'Receipts in the payment or batch, one per line', example: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50' },
   { key: 'summary', label: 'List of what is waiting (daily summary only)', example: '2 receipts waiting to be checked.' },
   { key: 'orgName', label: 'Your organisation name', example: 'Your Organisation' },
   { key: 'minutes', label: 'How long a reset link works, in minutes', example: '60' },
@@ -64,6 +65,7 @@ export const TEMPLATE_META: Record<TemplateKey, TemplateMeta> = {
   released: { label: 'Hold released', when: 'An approver releases a hold', to: 'The Med Ref, if they turned this on in their profile', allowed: RECEIPT_VARS, hasReceipt: true },
   paid: { label: 'Reimbursement paid', when: 'Accounting marks one or more receipts as paid', to: 'The Med Ref who was paid', allowed: ['recipientName', 'actorName', 'paymentNo', 'method', 'paidOn', 'amount', 'receiptList', 'orgName'], hasReceipt: false },
   payment_reversed: { label: 'Payment reversed', when: 'Accounting reverses a payment', to: 'The Med Ref who was paid', allowed: [...RECEIPT_VARS, 'paymentNo'], hasReceipt: true },
+  batch_update: { label: 'Batch update', when: 'Someone checks or approves the receipts of a batch together', to: 'The Med Refs whose receipts moved, and the people who act next', allowed: ['recipientName', 'actorName', 'batchCode', 'summary', 'receiptList', 'orgName'], hasReceipt: false },
   reversed: { label: 'Decision reversed', when: 'An approver undoes an approval or disapproval within ten minutes', to: 'The Med Ref and the checker', allowed: RECEIPT_VARS, hasReceipt: true },
   digest: { label: 'Daily summary', when: 'Once a day at the time set on the Email schedules tab, only if something is waiting', to: 'Anyone who has the summary turned on in their profile', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
   reminder: { label: 'Waiting receipts reminder', when: 'Once a day at the time set on the Email schedules tab (when receipts have waited longer than the reminder days on the Settings page), and whenever one of your own email schedules is due', to: 'Whoever has to act: Checkers, Approvers, Accounting, or the Med Ref of a returned receipt; the Admin gets every stuck receipt; and the people and roles chosen in a schedule', allowed: ['recipientName', 'summary', 'orgName'], hasReceipt: false },
@@ -143,6 +145,13 @@ export const DEFAULT_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     buttonLabel: 'View the payment',
     showDetails: false,
   },
+  batch_update: {
+    subject: '{{batchCode}}: {{summary}}',
+    heading: 'A batch moved forward',
+    body: 'Hi {{recipientName}},\n\n{{actorName}} worked on batch {{batchCode}}. {{summary}}\n\n{{receiptList}}',
+    buttonLabel: 'Open the batch',
+    showDetails: false,
+  },
   payment_reversed: {
     subject: 'Correction: the payment for {{refNo}} was reversed',
     heading: 'Please disregard the earlier payment notice',
@@ -201,6 +210,7 @@ const SAMPLE_OVERRIDES: Partial<Record<TemplateKey, Record<string, string>>> = {
   reserved: { actorName: 'Paolo Villanueva', status: 'Reserved', note: 'Waiting for the regional office to confirm the room rate.', docNo: '' },
   released: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Rate confirmed.', docNo: '' },
   reversed: { actorName: 'Paolo Villanueva', status: 'Checked', note: 'Approved by mistake. Re-checking the amount.', docNo: '' },
+  batch_update: { actorName: 'Paolo Villanueva', summary: '2 of your receipts were approved.', receiptList: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50\n• RC-2026-000131 · Shell Mandaue · PHP 600.00' },
   paid: { actorName: 'Rica Tan', amount: 'PHP 1,884.50', receiptList: '• RC-2026-000123 · Mercury Drug - Mandaue · PHP 1,284.50\n• RC-2026-000131 · Shell Mandaue · PHP 600.00' },
   payment_reversed: { actorName: 'Rica Tan', status: 'Approved', note: 'Recorded against the wrong person. It will be paid again today.', docNo: '' },
   reset: { recipientName: 'Ana', minutes: '60' },

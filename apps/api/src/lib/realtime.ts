@@ -11,7 +11,7 @@ export type Scope = 'receipts' | 'notifications' | 'reports' | 'access' | 'me' |
 
 /** Which database tables, when written, change which area of the screen. Anything not listed is not announced. */
 export const MODEL_SCOPE: Record<string, Scope> = {
-  Receipt: 'receipts', ReceiptEvidence: 'receipts', ReimbursementDocument: 'receipts', Comment: 'receipts',
+  Receipt: 'receipts', ReceiptEvidence: 'receipts', ReimbursementDocument: 'receipts', Comment: 'receipts', Batch: 'receipts',
   Notification: 'notifications',
   LiquidationReport: 'reports',
   Category: 'categories',

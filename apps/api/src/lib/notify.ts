@@ -9,17 +9,20 @@ interface NotifyInput {
   type: string;
   text: string;
   receiptId?: number;
+  /** A summary about a batch: the bell opens the batch, the email button too unless `link` says otherwise. */
+  batchId?: number;
   /** When set, the recipients also get this email, written from the template an administrator can edit. */
   email?: { template: TemplateKey; data: Record<string, string>; respectPref?: 'reservationReleased'; link?: string };
 }
 
 export const receiptUrl = (id: number) => `${config.webOrigin}/receipts/${id}`;
+export const batchUrl = (id: number) => `${config.webOrigin}/batches/${id}`;
 
 /** In-app notification for each recipient, plus an optional queued email. */
 export async function notify(input: NotifyInput) {
   const ids = [...new Set(input.userIds)];
   if (!ids.length) return;
-  await prisma.notification.createMany({ data: ids.map((userId) => ({ userId, type: input.type, text: input.text.slice(0, 300), receiptId: input.receiptId ?? null })) });
+  await prisma.notification.createMany({ data: ids.map((userId) => ({ userId, type: input.type, text: input.text.slice(0, 300), receiptId: input.receiptId ?? null, batchId: input.batchId ?? null })) });
   if (!input.email) return;
   const users = await prisma.user.findMany({ where: { id: { in: ids }, isActive: true } });
   for (const u of users) {
@@ -27,7 +30,7 @@ export async function notify(input: NotifyInput) {
     const mail = await renderEmail({
       key: input.email.template,
       data: { ...input.email.data, recipientName: u.name.split(' ')[0] },
-      link: input.email.link ?? (input.receiptId ? receiptUrl(input.receiptId) : undefined),
+      link: input.email.link ?? (input.receiptId ? receiptUrl(input.receiptId) : input.batchId ? batchUrl(input.batchId) : undefined),
     });
     await queueEmail({ userId: u.id, to: u.email, template: input.email.template, subject: mail.subject, html: mail.html });
   }

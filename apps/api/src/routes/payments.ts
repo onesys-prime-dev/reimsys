@@ -2,17 +2,15 @@ import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import ExcelJS from 'exceljs';
-import { EVIDENCE_MAX_BYTES, cleanDeep, paymentIssues, paymentMethodsSchema, paymentRequestSchema, totalOf } from '@reimsys/shared';
+import { EVIDENCE_MAX_BYTES, cleanDeep, paymentMethodsSchema, paymentRequestSchema, totalOf } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
-import { getSettings } from '../lib/appSettings.js';
-import { badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import { getPaymentMethods, savePaymentMethods } from '../lib/paymentMethods.js';
-import { announcePaid } from '../lib/paymentNotices.js';
 import { dateOnly, receiptBrief, receiptInclude, visibleWhere } from '../lib/receipts.js';
 import { toCsv } from '../lib/reports.js';
-import { nextPaymentNo } from '../lib/sequence.js';
-import { readFile, removeFile, saveFile, sha256Of, sniff } from '../lib/storage.js';
+import { readFile } from '../lib/storage.js';
+import { recordPayments } from '../lib/payments.js';
 import { requireAuth, requirePerm } from '../middleware/auth.js';
 
 export const paymentsRouter = Router();
@@ -53,79 +51,23 @@ paymentsRouter.get('/queue', requirePerm('payment.mark'), async (req, res) => {
     const mine = rows.filter((r) => r.encoderId === payee.id);
     return { payee, count: mine.length, total: totalOf(mine.map((r) => ({ amount: Number(r.amount) }))), receipts: mine.map(receiptBrief) };
   }).sort((a, b) => a.payee.name.localeCompare(b.payee.name));
-  res.json({ groups, totals: { count: rows.length, total: totalOf(rows.map((r) => ({ amount: Number(r.amount) }))) } });
+  // The same receipts seen by batch, so a whole batch can be paid from its own page.
+  const batches = [...new Map(rows.filter((r) => r.batch).map((r) => [r.batch!.id, r.batch!])).values()].map((b) => {
+    const mine = rows.filter((r) => r.batchId === b.id);
+    return { ...b, count: mine.length, people: new Set(mine.map((r) => r.encoderId)).size, total: totalOf(mine.map((r) => ({ amount: Number(r.amount) }))) };
+  }).sort((a, b) => a.code.localeCompare(b.code));
+  res.json({ groups, batches, totals: { count: rows.length, total: totalOf(rows.map((r) => ({ amount: Number(r.amount) }))) } });
 });
 
 /* ---------- mark as paid ---------- */
 
 paymentsRouter.post('/', requirePerm('payment.mark'), payLimiter, upload.single('proof'), async (req, res) => {
-  const auth = req.auth!;
   let lines: unknown;
   try { lines = cleanDeep(JSON.parse(String(req.body?.lines ?? ''))); } catch { throw badRequest('The list of receipts could not be read. Reload and try again.', 'BAD_LINES'); }
   const body = paymentRequestSchema.parse({ method: req.body?.method, paidOn: req.body?.paidOn, lines });
-
-  const method = (await getPaymentMethods()).find((m) => m.toLowerCase() === body.method.toLowerCase());
-  if (!method) throw badRequest('Choose one of the listed payment methods.', 'BAD_METHOD');
-  const file = req.file;
-  if (!file) throw badRequest('Attach the proof of payment (a photo or PDF).', 'PROOF_REQUIRED');
-  const kind = sniff(file.buffer);
-  if (!kind) throw badRequest('The proof must be a JPG, PNG, WEBP, HEIC or PDF file.', 'BAD_FILE');
-  const maxMb = getSettings().evidenceMaxMb;
-  if (file.size > maxMb * 1_048_576) throw badRequest(`The proof is over ${maxMb} MB.`, 'FILE_TOO_LARGE');
-
-  const ids = body.lines.map((l) => l.receiptId);
-  if (new Set(ids).size !== ids.length) throw badRequest('The same receipt is listed twice.', 'DUPLICATE_RECEIPT');
-  const receipts = await prisma.receipt.findMany({ where: { AND: [{ id: { in: ids } }, visibleWhere(auth)] } });
-  if (receipts.length !== ids.length) throw notFound('One of the receipts was not found.');
-  for (const r of receipts) {
-    if (r.encoderId === auth.user.id) throw forbidden('You cannot pay a receipt you encoded.', 'OWN_RECEIPT');
-    if (r.checkedById === auth.user.id || r.decidedById === auth.user.id) throw forbidden('You checked or approved this receipt, so someone else has to pay it.', 'SAME_PERSON');
-    if (r.status !== 'approved') throw conflict(`${r.refNo} is ${r.status}, so it cannot be paid.`, 'INVALID_STATE');
-    if (body.lines.find((l) => l.receiptId === r.id)!.version !== r.version) throw conflict(`${r.refNo} changed since you opened it. Reload and try again.`, 'RECORD_CHANGED');
-  }
-  if (new Set(receipts.map((r) => r.encoderId)).size !== 1) throw badRequest('One payment can only cover the receipts of one person.', 'MIXED_PAYEES');
-  const issue = paymentIssues(body, new Map(receipts.map((r) => [r.id, Number(r.amount)])))[0];
-  if (issue) {
-    const ref = receipts.find((r) => r.id === issue.receiptId)?.refNo;
-    throw badRequest(ref ? `${ref}: ${issue.message}` : issue.message, issue.code);
-  }
-
-  const payeeId = receipts[0]!.encoderId;
-  const proofFile = await saveFile('proofs', kind.ext, file.buffer);
-  const now = new Date();
-  let payment: { id: number; paymentNo: string };
-  try {
-    // Every receipt changes in the same transaction, and only if it is still approved at the version that was shown, so nobody pays twice.
-    payment = await prisma.$transaction(async (tx) => {
-      const p = await tx.payment.create({
-        data: { paymentNo: await nextPaymentNo(tx), payeeId, method, paidOn: new Date(body.paidOn + 'T00:00:00Z'), proofFile, proofMime: kind.mime, proofSize: file.size, proofSha256: sha256Of(file.buffer), recordedById: auth.user.id },
-      });
-      for (const l of body.lines) {
-        const done = await tx.receipt.updateMany({
-          where: { id: l.receiptId, version: l.version, status: 'approved' },
-          data: { status: 'paid', version: { increment: 1 }, paymentId: p.id, paidAmount: l.amount, paidShortReason: l.shortReason, paidAt: now },
-        });
-        if (!done.count) throw conflict('Someone else changed one of these receipts. Reload and try again.', 'RECORD_CHANGED');
-      }
-      return p;
-    });
-  } catch (err) {
-    await removeFile(proofFile).catch(() => undefined);
-    throw err;
-  }
-
-  for (const r of receipts) {
-    const l = body.lines.find((x) => x.receiptId === r.id)!;
-    await audit(req, {
-      action: 'payment.marked', entityType: 'receipt', entityId: r.id, summary: `marked as paid (${payment.paymentNo})`,
-      before: { status: 'approved' }, after: { status: 'paid', paymentNo: payment.paymentNo, amount: l.amount, method, paidOn: body.paidOn, ...(l.shortReason ? { note: l.shortReason } : {}) },
-    });
-  }
-  await announcePaid({
-    payeeId, paymentNo: payment.paymentNo, method, paidOn: body.paidOn, actorName: auth.user.name,
-    lines: body.lines.map((l) => { const r = receipts.find((x) => x.id === l.receiptId)!; return { id: r.id, refNo: r.refNo, payee: r.payee, amount: Number(r.amount), paid: l.amount }; }),
-  });
-  res.status(201).json({ payment: { id: payment.id, paymentNo: payment.paymentNo, method, paidOn: body.paidOn, count: body.lines.length, total: totalOf(body.lines) } });
+  const [p] = await recordPayments(req, body, req.file, { onePerson: true });
+  const method = (await getPaymentMethods()).find((m) => m.toLowerCase() === body.method.toLowerCase())!;
+  res.status(201).json({ payment: { id: p!.id, paymentNo: p!.paymentNo, method, paidOn: body.paidOn, count: p!.count, total: p!.total } });
 });
 
 /* ---------- proof of payment ---------- */
@@ -150,12 +92,12 @@ paymentsRouter.get('/export', requirePerm('payment.mark'), async (req, res) => {
   if (from > to) throw badRequest('The start date is after the end date.', 'BAD_PERIOD');
   const rows = await prisma.receipt.findMany({
     where: { AND: [visibleWhere(req.auth!), { paymentId: { not: null }, payment: { paidOn: { gte: from, lte: to } } }] },
-    include: { payment: { include: { payee: { select: { name: true } }, recordedBy: { select: { name: true } } } } },
+    include: { payment: { include: { payee: { select: { name: true } }, recordedBy: { select: { name: true } } } }, batch: { select: { code: true } } },
     take: 20000,
   });
   rows.sort((a, b) => a.payment!.paidOn.getTime() - b.payment!.paidOn.getTime() || a.payment!.paymentNo.localeCompare(b.payment!.paymentNo) || a.id - b.id);
-  const head = ['Payment no.', 'Paid on', 'Method', 'Paid to', 'Receipt ref.', 'Vendor', 'Invoice no.', 'Invoice date', 'Receipt amount (PHP)', 'Amount paid (PHP)', 'Short-payment reason', 'Recorded by'];
-  const data = rows.map((r) => [r.payment!.paymentNo, dateOnly(r.payment!.paidOn), r.payment!.method, r.payment!.payee.name, r.refNo, r.payee, r.invoiceNo ?? '', dateOnly(r.receiptDate), Number(r.amount), Number(r.paidAmount ?? 0), r.paidShortReason ?? '', r.payment!.recordedBy.name]);
+  const head = ['Payment no.', 'Paid on', 'Method', 'Paid to', 'Receipt ref.', 'Vendor', 'Invoice no.', 'Invoice date', 'Receipt amount (PHP)', 'Amount paid (PHP)', 'Short-payment reason', 'Recorded by', 'Batch'];
+  const data = rows.map((r) => [r.payment!.paymentNo, dateOnly(r.payment!.paidOn), r.payment!.method, r.payment!.payee.name, r.refNo, r.payee, r.invoiceNo ?? '', dateOnly(r.receiptDate), Number(r.amount), Number(r.paidAmount ?? 0), r.paidShortReason ?? '', r.payment!.recordedBy.name, r.batch?.code ?? '']);
   await audit(req, { action: 'payment.exported', entityType: 'export', summary: `exported ${rows.length} paid receipt${rows.length === 1 ? '' : 's'} (${from.toISOString().slice(0, 10)} to ${to.toISOString().slice(0, 10)})` });
   const name = `payments-${from.toISOString().slice(0, 10)}-to-${to.toISOString().slice(0, 10)}`;
   if (req.query.format !== 'xlsx') {

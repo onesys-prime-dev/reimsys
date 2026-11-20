@@ -23,6 +23,7 @@ export const receiptInclude = {
   encoder: { select: { id: true, name: true } },
   document: true,
   chargeLocation: { select: { id: true, name: true } },
+  batch: { select: { id: true, code: true, name: true } },
   payment: { include: { recordedBy: { select: { id: true, name: true } } } },
 } satisfies Prisma.ReceiptInclude;
 
@@ -66,6 +67,7 @@ export function receiptBrief(r: ReceiptRow) {
     checkedAt: r.checkedAt,
     updatedAt: r.updatedAt,
     docNo: r.document?.docNo ?? null,
+    batch: r.batch,
   };
 }
 
@@ -123,18 +125,19 @@ export const assertOwner = (auth: AuthContext, r: { encoderId: number }) => {
 };
 
 /** Shared list filters used by the list, export and report endpoints. */
-export function filterWhere(q: { status?: string; q?: string; categoryId?: number; transactionType?: string; vatType?: string; encoderId?: number; from?: string; to?: string }): Prisma.ReceiptWhereInput {
+export function filterWhere(q: { status?: string; q?: string; categoryId?: number; transactionType?: string; vatType?: string; encoderId?: number; batchId?: number; from?: string; to?: string }): Prisma.ReceiptWhereInput {
   const w: Prisma.ReceiptWhereInput = {};
   if (q.status) w.status = q.status;
   if (q.categoryId) w.categoryId = q.categoryId;
   if (q.transactionType) w.transactionType = q.transactionType;
   if (q.vatType) w.vatType = q.vatType;
   if (q.encoderId) w.encoderId = q.encoderId;
+  if (q.batchId) w.batchId = q.batchId;
   if (q.from || q.to) {
     w.receiptDate = {};
     if (q.from) w.receiptDate.gte = new Date(q.from + 'T00:00:00Z');
     if (q.to) w.receiptDate.lte = new Date(q.to + 'T00:00:00Z');
   }
-  if (q.q) w.OR = [{ payee: { contains: q.q } }, { refNo: { contains: q.q } }, { description: { contains: q.q } }, { invoiceNo: { contains: q.q } }, { vendorTin: { contains: q.q } }, { encoder: { name: { contains: q.q } } }];
+  if (q.q) w.OR = [{ payee: { contains: q.q } }, { refNo: { contains: q.q } }, { description: { contains: q.q } }, { invoiceNo: { contains: q.q } }, { vendorTin: { contains: q.q } }, { encoder: { name: { contains: q.q } } }, { batch: { code: { contains: q.q } } }];
   return w;
 }

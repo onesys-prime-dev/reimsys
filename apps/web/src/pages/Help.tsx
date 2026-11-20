@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { canViewBatches } from '@reimsys/shared';
 import { api, fmtDateTime } from '../api';
 import { useAuth } from '../auth';
 
@@ -128,6 +129,20 @@ export function HelpPage() {
     </Guide>,
   );
 
+  if (canViewBatches(can)) guides.push(
+    <Guide key="batches" id="batches" title="Batches: working on a group" intro="A batch puts receipts under one code, such as B-2026-000004, so everyone can find them and work on them together. Each receipt keeps its own status and its own rules.">
+      <Steps items={[
+        <>{can('batch.manage') ? <>Open <Link to="/batches">Batches</Link> and press <b>New batch</b>. The code is given automatically; a name (the branch or the week) is optional.</> : <>Accounting or an administrator makes the batch and tells you its code.</>}</>,
+        <>{can('batch.manage') ? <>Press <b>Add receipts</b> and tick them. Only submitted receipts that are not yet paid or disapproved, and in no other batch, can be added. One batch holds up to 300.</> : <>Open <Link to="/batches">Batches</Link> and type the code, or pick it from the list.</>}</>,
+        <>The batch page shows what is waiting for you. <b>Check</b>, <b>Approve</b> or <b>Pay</b> works on every receipt of the batch at your step at once.</>,
+        <>Checking and approving still need the evidence of each receipt opened first (and the company details confirmed when asked). Any that are not ready are skipped and you see why; nothing is skipped silently.</>,
+        <>Paying a batch records one payment per person, all with the same date, method and proof. Each person gets their usual payment email.</>,
+      ]} />
+      <p>People hear about a batch once, in a summary, instead of once per receipt. A returned or disapproved receipt does not hold up the rest.</p>
+      {can('batch.manage') && <p><b>Close</b> a batch when it is complete so nothing more is added; its receipts carry on as usual. A receipt can be taken out until it is paid. Only an empty batch can be deleted. <b>Export</b> on the batch page downloads its receipts, and Reports can be limited to one batch.</p>}
+    </Guide>,
+  );
+
   if (can('user.manage') || can('role.manage') || can('settings.manage') || can('audit.view')) guides.push(
     <Guide key="admin" id="admin" title={can('role.manage') ? 'Super Admin: running the system' : 'Admin: running the system'} intro={can('role.manage') ? 'You look after people, rules and settings. By default the Super Admin cannot check, approve or pay, so no one person can do the whole chain.' : 'You look after people and settings and can see every receipt and report. You cannot change roles, and you cannot check, approve or pay.'}>
       <ul>
@@ -154,6 +169,7 @@ export function HelpPage() {
         {can('review.check') && <a href="#checker">Checker</a>}
         {can('review.decide') && <a href="#approver">Approver</a>}
         {can('payment.mark') && <a href="#accounting">Accounting</a>}
+        {canViewBatches(can) && <a href="#batches">Batches</a>}
         {(can('user.manage') || can('role.manage') || can('settings.manage') || can('audit.view')) && <a href="#admin">Super Admin</a>}
         <a href="#you">Your account</a>
       </nav>

@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { cleanText, paymentIssues, totalOf } from '@reimsys/shared';
 import { api, errMsg, localToday, money } from '../api';
 import { Field, Modal, useToast } from '../ui';
 
-export interface PayLine { id: number; refNo: string; vendor: string; amount: number; version: number }
+export interface PayLine { id: number; refNo: string; vendor: string; amount: number; version: number; /** Who is paid. Set when the lines cover several people (a batch). */ person?: string }
 
-/** Records one payment for one person's receipts: the date, how it was paid, the proof, and what was paid on each receipt. */
-export function PayDialog({ payee, lines, onClose, onDone }: { payee: string; lines: PayLine[]; onClose: () => void; onDone: () => void }) {
+/**
+ * Records the payment: the date, how it was paid, the proof, and what was paid on each receipt. For one person's receipts it is one
+ * payment; for a batch (`endpoint` is the batch's pay route) it is one payment per person, all with the same date, method and proof.
+ */
+export function PayDialog({ payee, lines, onClose, onDone, endpoint = '/payments' }: { payee: string; lines: PayLine[]; onClose: () => void; onDone: () => void; endpoint?: string }) {
   const toast = useToast();
   const qc = useQueryClient();
   const methods = useQuery({ queryKey: ['payment-methods'], queryFn: () => api<{ methods: string[] }>('/payments/methods') });
@@ -17,6 +20,7 @@ export function PayDialog({ payee, lines, onClose, onDone }: { payee: string; li
   const [amounts, setAmounts] = useState<Record<number, string>>(() => Object.fromEntries(lines.map((l) => [l.id, String(l.amount)])));
   const [reasons, setReasons] = useState<Record<number, string>>({});
 
+  const people = [...new Set(lines.map((l) => l.person ?? payee))];
   const chosen = method || methods.data?.methods[0] || '';
   const parsed = lines.map((l) => ({ receiptId: l.id, version: l.version, amount: Math.round(Number(amounts[l.id]) * 100) / 100, shortReason: cleanText(reasons[l.id] ?? '') || null }));
   const badAmount = (id: number) => { const n = parsed.find((p) => p.receiptId === id)!.amount; return !Number.isFinite(n) || n <= 0; };
@@ -32,14 +36,15 @@ export function PayDialog({ payee, lines, onClose, onDone }: { payee: string; li
       f.append('paidOn', paidOn);
       f.append('lines', JSON.stringify(parsed));
       f.append('proof', file!);
-      return api<{ payment: { paymentNo: string } }>('/payments', { method: 'POST', form: f });
+      return api<{ payment?: { paymentNo: string }; payments?: { paymentNo: string }[] }>(endpoint, { method: 'POST', form: f });
     },
     onSuccess: (d) => {
-      toast(`Marked as paid. Payment ${d.payment.paymentNo}.`);
-      for (const k of ['payments-queue', 'receipts', 'receipt', 'dashboard', 'history']) qc.invalidateQueries({ queryKey: [k] });
+      const nos = d.payment ? [d.payment.paymentNo] : (d.payments ?? []).map((p) => p.paymentNo);
+      toast(`Marked as paid. ${nos.length === 1 ? 'Payment' : 'Payments'} ${nos.join(', ')}.`);
+      for (const k of ['payments-queue', 'receipts', 'receipt', 'dashboard', 'history', 'batch', 'batches']) qc.invalidateQueries({ queryKey: [k] });
       onDone();
     },
-    onError: (e) => { toast(errMsg(e), 'bad'); qc.invalidateQueries({ queryKey: ['payments-queue'] }); },
+    onError: (e) => { toast(errMsg(e), 'bad'); qc.invalidateQueries({ queryKey: ['payments-queue'] }); qc.invalidateQueries({ queryKey: ['batch'] }); },
   });
 
   return (
@@ -54,24 +59,25 @@ export function PayDialog({ payee, lines, onClose, onDone }: { payee: string; li
         </Field>
       </div>
       <div style={{ display: 'grid', gap: 10, margin: '14px 0' }}>
-        {lines.map((l) => {
+        {lines.map((l, i) => {
+          const heading = people.length > 1 && l.person !== lines[i - 1]?.person ? <h3 key={`h${l.id}`} style={{ margin: i ? '8px 0 0' : 0, fontSize: '1rem' }}>{l.person} · {money(totalOf(parsed.filter((p, j) => lines[j]!.person === l.person && !badAmount(p.receiptId))))}</h3> : null;
           const p = parsed.find((x) => x.receiptId === l.id)!;
           const short = !badAmount(l.id) && Math.round(p.amount * 100) < Math.round(l.amount * 100);
           const problem = badAmount(l.id) ? 'Enter an amount greater than zero.' : issueFor(l.id)?.message;
           return (
-            <div key={l.id} className="callout" style={{ margin: 0, display: 'block' }}>
+            <Fragment key={l.id}>{heading}<div className="callout" style={{ margin: 0, display: 'block' }}>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span><b>{l.vendor}</b><small className="muted" style={{ display: 'block' }}>{l.refNo} · receipt {money(l.amount)}</small></span>
                 <input style={{ width: 130, textAlign: 'right' }} inputMode="decimal" aria-label={`Amount paid for ${l.refNo}`} value={amounts[l.id]} onChange={(e) => setAmounts((s) => ({ ...s, [l.id]: e.target.value }))} />
               </div>
               {problem && <span className="err" style={{ display: 'block' }}>{problem}</span>}
               {short && <input style={{ marginTop: 8, width: '100%' }} aria-label={`Why less was paid for ${l.refNo}`} placeholder="Why less than the full amount was paid (required)" maxLength={300} value={reasons[l.id] ?? ''} onChange={(e) => setReasons((s) => ({ ...s, [l.id]: e.target.value }))} />}
-            </div>
+            </div></Fragment>
           );
         })}
       </div>
       {issues.some((i) => i.code === 'DATE_FUTURE') && <p className="err">The payment date cannot be in the future.</p>}
-      <p><b>Total {money(total)}</b> · {lines.length} receipt{lines.length === 1 ? '' : 's'}. {payee.split(' ')[0]} will get one email.</p>
+      <p><b>Total {money(total)}</b> · {lines.length} receipt{lines.length === 1 ? '' : 's'}. {people.length > 1 ? `One payment for each of the ${people.length} people, and each gets one email.` : `${(lines[0]?.person ?? payee).split(' ')[0]} will get one email.`}</p>
       <div className="btns">
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn ok" disabled={!ready || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving…' : 'Mark as paid'}</button>

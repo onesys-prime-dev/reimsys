@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { PAYMENT_FILTERS, PAYMENT_FILTER_LABEL } from '@reimsys/shared';
+import { PAYMENT_FILTERS, PAYMENT_FILTER_LABEL, batchLabel, canViewBatches } from '@reimsys/shared';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
 import { Empty, Field, Icon, useToast } from '../ui';
 
-interface Report { id: number; person: string | null; category: string | null; format: string; status: string; from: string; to: string; rowCount: number | null; total: number | null; error: string | null; createdAt: string; requestedBy: string }
+interface Report { id: number; person: string | null; category: string | null; batch: string | null; format: string; status: string; from: string; to: string; rowCount: number | null; total: number | null; error: string | null; createdAt: string; requestedBy: string }
 const firstOfMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString().slice(0, 10); };
 const endOfMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth() + 1, 0)).toISOString().slice(0, 10); };
 
@@ -21,16 +21,18 @@ export function ReportsPage() {
   const [personId, setPersonId] = useState('');
   const [format, setFormat] = useState<'pdf' | 'xlsx' | 'csv'>('pdf');
 
+  const [batchId, setBatchId] = useState('');
+  const batches = useQuery({ queryKey: ['batches', 'all'], enabled: canViewBatches(can), queryFn: () => api<{ batches: { id: number; code: string; name: string | null }[] }>('/batches?state=all') });
   const people = useQuery({ queryKey: ['encoders'], queryFn: () => api<{ people: { id: number; name: string }[] }>('/receipts/encoders') });
   const [payment, setPayment] = useState<'all' | 'paid' | 'unpaid'>('all');
-  const qs = new URLSearchParams({ from, to, ...(type ? { transactionType: type } : {}), ...(personId ? { encoderId: personId } : {}), ...(payment !== 'all' ? { payment } : {}) }).toString();
+  const qs = new URLSearchParams({ from, to, ...(type ? { transactionType: type } : {}), ...(personId ? { encoderId: personId } : {}), ...(batchId ? { batchId } : {}), ...(payment !== 'all' ? { payment } : {}) }).toString();
   const preview = useQuery({ queryKey: ['report-preview', qs], enabled: !!from && !!to && from <= to, queryFn: () => api<{ count: number; total: number; paid: number; unpaid: number }>(`/reports/preview?${qs}`) });
   const list = useQuery({
     queryKey: ['reports'], queryFn: () => api<{ reports: Report[] }>('/reports'),
     refetchInterval: (q) => (q.state.data?.reports.some((r) => r.status === 'pending') ? 1500 : false),
   });
   const gen = useMutation({
-    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, transactionType: type || null, encoderId: personId ? Number(personId) : null, payment } }),
+    mutationFn: () => api<{ report: { id: number } }>('/reports', { method: 'POST', body: { from, to, format, transactionType: type || null, encoderId: personId ? Number(personId) : null, batchId: batchId ? Number(batchId) : null, payment } }),
     onSuccess: (d) => { toast('Report created.'); qc.invalidateQueries({ queryKey: ['reports'] }); nav(`/reports/${d.report.id}`); },
     onError: (e) => toast(errMsg(e), 'bad'),
   });
@@ -52,6 +54,9 @@ export function ReportsPage() {
               {(people.data?.people.length ?? 0) > 1 && (
                 <Field label="Person" className="full"><select value={personId} onChange={(e) => setPersonId(e.target.value)}><option value="">Everyone</option>{people.data!.people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
               )}
+              {(batches.data?.batches.length ?? 0) > 0 && (
+                <Field label="Batch" className="full"><select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Any batch or none</option>{batches.data!.batches.map((b) => <option key={b.id} value={b.id}>{batchLabel(b)}</option>)}</select></Field>
+              )}
               <Field label="Product or service"><select value={type} onChange={(e) => setType(e.target.value)}><option value="">Product and service</option><option value="product">Product</option><option value="service">Service</option></select></Field>
               <Field label="Payment"><select aria-label="Payment" value={payment} onChange={(e) => setPayment(e.target.value as typeof payment)}>{PAYMENT_FILTERS.map((k) => <option key={k} value={k}>{PAYMENT_FILTER_LABEL[k]}</option>)}</select></Field>
               <div className="f"><span>Format</span><div className="seg">{(['pdf', 'xlsx', 'csv'] as const).map((k) => <button key={k} type="button" className={format === k ? 'on' : ''} onClick={() => setFormat(k)}>{k.toUpperCase()}</button>)}</div></div>
@@ -69,7 +74,7 @@ export function ReportsPage() {
           {shown.map((r) => (
             <div className="rep-row" key={r.id}>
               <div style={{ minWidth: 0 }}>
-                <b>{r.format.toUpperCase()} · {fmtDate(r.from)} to {fmtDate(r.to)}</b>{(r.person || r.category) && <span className="pill s-chk" style={{ marginLeft: 8 }}>{[r.person, r.category].filter(Boolean).join(' · ')}</span>}<br />
+                <b>{r.format.toUpperCase()} · {fmtDate(r.from)} to {fmtDate(r.to)}</b>{(r.person || r.category || r.batch) && <span className="pill s-chk" style={{ marginLeft: 8 }}>{[r.person, r.category, r.batch].filter(Boolean).join(' · ')}</span>}<br />
                 <small className="muted">
                   {r.status === 'ready' ? `${r.rowCount} record${r.rowCount === 1 ? '' : 's'} · ${money(r.total ?? 0)} · ` : r.status === 'failed' ? 'Failed · ' : 'Building… · '}
                   {fmtDateTime(r.createdAt)}{r.requestedBy ? ` · ${r.requestedBy}` : ''}

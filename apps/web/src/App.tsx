@@ -1,4 +1,5 @@
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { canViewBatches } from '@reimsys/shared';
 import { useAuth } from './auth';
 import { NotificationBell } from './components/Notifications';
 import { LiveLight, useLive } from './live';
@@ -22,6 +23,8 @@ const ProfilePage = lazy(() => import('./pages/Profile').then((m) => ({ default:
 const ReceiptFormPage = lazy(() => import('./pages/ReceiptForm').then((m) => ({ default: m.ReceiptFormPage })));
 const ReportsPage = lazy(() => import('./pages/Reports').then((m) => ({ default: m.ReportsPage })));
 const ReadyToPayPage = lazy(() => import('./pages/ReadyToPay').then((m) => ({ default: m.ReadyToPayPage })));
+const BatchesPage = lazy(() => import('./pages/Batches').then((m) => ({ default: m.BatchesPage })));
+const BatchDetailPage = lazy(() => import('./pages/BatchDetail').then((m) => ({ default: m.BatchDetailPage })));
 const ReportViewPage = lazy(() => import('./pages/ReportView').then((m) => ({ default: m.ReportViewPage })));
 import { Logo } from './components/Logo';
 import { Avatar, Icon } from './ui';
@@ -33,8 +36,9 @@ function titleFor(path: string) {
   if (path === '/receipts/new') return 'New receipt';
   if (path === '/receipts/import') return 'Import receipts';
   if (path.startsWith('/reports/')) return 'Report';
+  if (path.startsWith('/batches/')) return 'Batch';
   if (path.startsWith('/receipts/')) return path.endsWith('/edit') ? 'Edit receipt' : 'Receipt';
-  return ({ '/receipts': 'Receipts', '/pay': 'Ready to pay', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile', '/help': 'Help' } as Record<string, string>)[path] ?? 'REIMSYS';
+  return ({ '/receipts': 'Receipts', '/pay': 'Ready to pay', '/batches': 'Batches', '/reports': 'Reports', '/access': 'Access control', '/audit': 'Audit log', '/profile': 'Profile', '/help': 'Help' } as Record<string, string>)[path] ?? 'REIMSYS';
 }
 
 function Shell() {
@@ -48,6 +52,7 @@ function Shell() {
     { to: '/', label: 'Dashboard', icon: 'home', show: true },
     { to: '/receipts', label: own ? 'My receipts' : 'Receipts', icon: 'file', show: can('receipt.create') || can('receipt.view_all') || can('review.decide') || can('payment.mark') },
     { to: '/pay', label: 'Ready to pay', icon: 'wallet', show: can('payment.mark') },
+    { to: '/batches', label: 'Batches', icon: 'batch', show: canViewBatches(can) },
     { to: '/receipts/new', label: 'New receipt', icon: 'plus', show: can('receipt.create') },
     { to: '/reports', label: 'Reports', icon: 'chart', show: can('report.generate') },
     { to: '/access', label: 'Access', icon: 'shield', show: can('user.manage') || can('role.manage') },
@@ -55,7 +60,7 @@ function Shell() {
   ].filter((i) => i.show);
 
   const link = (i: (typeof items)[number]) => (
-    <NavLink key={i.to} to={i.to} end className={({ isActive }) => (isActive || (i.to === '/receipts' && /^\/receipts\/(\d+)/.test(loc.pathname)) || (i.to === '/receipts' && loc.pathname === '/receipts/import') ? 'on' : '')}>
+    <NavLink key={i.to} to={i.to} end className={({ isActive }) => (isActive || (i.to === '/receipts' && /^\/receipts\/(\d+)/.test(loc.pathname)) || (i.to === '/receipts' && loc.pathname === '/receipts/import') || (i.to === '/batches' && loc.pathname.startsWith('/batches/')) ? 'on' : '')}>
       <Icon name={i.icon} />
       <span>{i.label}</span>
     </NavLink>
@@ -82,7 +87,7 @@ function Shell() {
           <button className="iconbtn" onClick={() => signOut()} aria-label="Sign out"><Icon name="logout" /></button>
         </header>
         <SessionGuard />
-        <main className={`page ${['/receipts', '/pay', '/audit', '/access'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${loc.pathname === '/reports' ? 'rfit' : ''} ${isForm(loc.pathname) ? 'narrow' : ''} ${loc.pathname === '/tax-impact' ? 'wide' : ''}`}>
+        <main className={`page ${['/receipts', '/pay', '/audit', '/access', '/batches'].includes(loc.pathname) || loc.pathname.startsWith('/reports/') ? 'fit' : ''} ${loc.pathname === '/' ? 'dash' : ''} ${loc.pathname === '/reports' ? 'rfit' : ''} ${isForm(loc.pathname) ? 'narrow' : ''} ${loc.pathname === '/tax-impact' ? 'wide' : ''}`}>
           <Suspense fallback={<div className="empty">Loading…</div>}>
           <Routes>
             <Route path="/" element={<DashboardPage />} />
@@ -93,6 +98,8 @@ function Shell() {
             <Route path="/receipts/:id" element={<ReceiptDetailPage />} />
             <Route path="/receipts/:id/edit" element={<ReceiptFormPage />} />
             <Route path="/pay" element={can('payment.mark') ? <ReadyToPayPage /> : <Navigate to="/" replace />} />
+            <Route path="/batches" element={canViewBatches(can) ? <BatchesPage /> : <Navigate to="/" replace />} />
+            <Route path="/batches/:id" element={canViewBatches(can) ? <BatchDetailPage /> : <Navigate to="/" replace />} />
             <Route path="/reports/:id" element={can('report.generate') ? <ReportViewPage /> : <Navigate to="/" replace />} />
             <Route path="/reports" element={can('report.generate') ? <ReportsPage /> : <Navigate to="/" replace />} />
             <Route path="/profile" element={<ProfilePage />} />

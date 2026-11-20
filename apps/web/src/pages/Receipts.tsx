@@ -12,12 +12,12 @@ interface ListData { total: number; totalAmount?: number; page: number; pageSize
 /** More than two days waiting for the next person. */
 const late = (iso: string) => Date.now() - new Date(iso).getTime() > 2 * 86_400_000;
 
-export function ReceiptRow({ r, showEncoder, pick }: { r: ReceiptBrief; showEncoder: boolean; pick?: { on: boolean; toggle: () => void } }) {
+export function ReceiptRow({ r, showEncoder, pick, hideBatch }: { r: ReceiptBrief; showEncoder: boolean; pick?: { on: boolean; toggle: () => void }; hideBatch?: boolean }) {
   return (
     <Link className={`row ${pick?.on ? 'picked' : ''}`} to={`/receipts/${r.id}`}>
       <span className={`c-main ${pick ? 'withbox' : ''}`}>
         {pick && <input type="checkbox" checked={pick.on} aria-label={`Select ${r.refNo}`} onClick={(e) => { e.stopPropagation(); }} onChange={pick.toggle} />}
-        <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}</small></span>
+        <span><b>{r.payee}</b><small>{r.refNo}{showEncoder ? ` · ${r.encoder.name}` : ''}{r.batch && !hideBatch ? ` · ${r.batch.code}` : ''}</small></span>
       </span>
       <span className="c-cat" title={[r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name, r.invoiceNo].filter(Boolean).join(" · ")}>{r.transactionType ? TRANSACTION_LABEL[r.transactionType] : r.category?.name ?? (r.invoiceNo ? null : <span className="nodata">—</span>)}{r.invoiceNo ? `${r.transactionType || r.category ? ' · ' : ''}${r.invoiceNo}` : ''}<span className="mdate"> · {fmtDate(r.receiptDate)}</span></span>
       <span className="c-date">{fmtDate(r.receiptDate)}</span>
@@ -56,6 +56,7 @@ export function ReceiptsPage() {
   const [sp] = useSearchParams();
   const [status, setStatus] = useState<ReceiptStatus | ''>(() => { const s = sp.get('status'); return (RECEIPT_STATUSES as readonly string[]).includes(s ?? '') ? (s as ReceiptStatus) : ''; });
   const [q, setQ] = useState('');
+  const [batchId, setBatchId] = useState(() => (/^\d+$/.test(sp.get('batchId') ?? '') ? sp.get('batchId')! : ''));
   const [type, setType] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -66,11 +67,12 @@ export function ReceiptsPage() {
   const params = new URLSearchParams({ page: String(page), pageSize: '20' });
   if (status) params.set('status', status);
   if (q) params.set('q', q);
+  if (batchId) params.set('batchId', batchId);
   if (type) params.set('transactionType', type);
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   if (sort !== 'updated') params.set('sort', sort);
-  const filtered = !!(status || q || type || from || to);
+  const filtered = !!(status || q || type || from || to || batchId);
   const data = useQuery({ queryKey: ['receipts', params.toString()], queryFn: () => api<ListData>(`/receipts?${params}`), placeholderData: (p) => p, refetchInterval: 30_000 });
   const pages = data.data ? Math.max(1, Math.ceil(data.data.total / data.data.pageSize)) : 1;
   const counts = data.data?.counts ?? {};
@@ -121,10 +123,11 @@ export function ReceiptsPage() {
           <option value="updated">Recently changed</option><option value="newest">Newest receipt date</option><option value="oldest">Oldest receipt date</option>
           <option value="amount_high">Amount, high to low</option><option value="amount_low">Amount, low to high</option>
         </select>
-        {filtered && <button className="btn sm ghost" onClick={() => { setStatus(''); setQ(''); setType(''); setFrom(''); setTo(''); setPage(1); }}><Icon name="x" size={16} />Clear filters</button>}
+        {filtered && <button className="btn sm ghost" onClick={() => { setStatus(''); setQ(''); setType(''); setFrom(''); setTo(''); setBatchId(''); setPage(1); }}><Icon name="x" size={16} />Clear filters</button>}
         </div>
       </div>
       <div className="chips" style={{ marginTop: 10 }}>
+        {batchId && <button className="chip on" onClick={() => { setBatchId(''); reset(); }} aria-label="Stop showing only this batch">In batch {data.data?.items[0]?.batch?.code ?? ''}<Icon name="x" size={14} /></button>}
         <button className={`chip ${status === '' ? 'on' : ''}`} onClick={() => { setStatus(''); reset(); }}>All<span className="n">{all}</span></button>
         {RECEIPT_STATUSES.filter((s) => counts[s]).map((s) => (
           <button key={s} className={`chip ${status === s ? 'on' : ''}`} onClick={() => { setStatus(s); reset(); }}>{STATUS_LABEL[s]}<span className="n">{counts[s]}</span></button>

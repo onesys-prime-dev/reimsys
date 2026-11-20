@@ -156,7 +156,7 @@ Source: the client's current "REIMBURSEMENT FORM" (11 screenshots in `REIMSIS SY
 1. Database fields and shared validation (with unit tests). 2. Wizard form. 3. Checker view. 4. PDF, reports, import/export, emails. 5. Browser tests and docs.
 
 ### Decisions (from the client)
-- **Reimbursement code:** not needed. The client uses it only because Google Forms cannot show past reimbursements. REIMSYS already has history, search and a reference number (the "code") on every receipt, so the question is dropped and no claim grouping is built. One receipt = one reference number.
+- **Reimbursement code:** not needed as a claim number (the client used it only because Google Forms cannot show past reimbursements). One receipt = one reference number. *Superseded on 2026-11-20 for processing:* see **Batches** at the end of this plan.
 - **No BIR invoice:** allowed. The company check is skipped and a written reason is required; the Checker decides.
 - **VAT / withholding maths:** warn only.
 - **Categories:** replaced by Product / Service.
@@ -490,3 +490,33 @@ All items ticked, every browser test green on a clean run, `docs/PLAN.md` and th
 - Rebuilt after the other session's versions were reverted (by choice): **12** `RATE_LIMIT_OFF=1` (development only, ignored in production); **2** Remove photo (file deleted, audit entry, Add/Change/Remove buttons); **3** the retention period, contact and version of the privacy notice are Settings fields (`/api/auth/privacy-info` is public; raising the version makes everyone accept again). Each has API and browser tests, and every test puts back what it changes (the privacy tests restore the settings and the accepting accounts, so they pass when run again and again).
 - `pnpm test:all` (`e2e/run-all.mjs`) runs typecheck, unit tests and every API and browser check in turn. Start the API with `RATE_LIMIT_OFF=1` first.
 - Still open: **I** the live scanner outline (needs the original ticket photo); **H phase 2** archiving old records (needs the rule); **J** Ready to pay was left as it is.
+
+## Batches (2026-11-20)
+
+A **batch** is a code (B-2026-000004, generated) that groups receipts so they can be found and worked on together. It is a label, not a second workflow: each receipt keeps its own status and every rule of the single-receipt steps still applies.
+
+### Decisions
+- **Who makes batches:** Accounting and both admin roles (new permission `batch.manage`). Checkers, Approvers and Accounting open batches to work on them. Med Refs only see the code on their receipt.
+- **People per batch:** one person or several. Paying a batch records **one payment per person**, all with the same date, method and proof file.
+- **Code:** generated, with an optional name (up to 80 characters).
+- **One bad receipt:** does not hold up the rest. A returned or disapproved receipt simply stays behind.
+- **What can go in:** submitted, returned, checked, reserved and approved receipts, in no other batch, up to 300 per batch. Drafts are private to the Med Ref. Paid and disapproved receipts are finished.
+- **Taking out:** allowed until paid. A paid receipt stays, so the batch is a true record of what was paid together. Only an empty batch can be deleted.
+- **Closing:** stops more receipts being added; the receipts carry on as usual. It can be reopened.
+
+### What it does
+- **Check / Approve a batch** runs the normal step on every receipt of the batch waiting for that person. The evidence must still have been opened (and the company details confirmed for BIR invoices), so anything not ready is skipped and listed with its reason.
+- **Pay a batch** checks every receipt first, then records everything in one transaction or nothing.
+- **Notices:** one summary per person (in the bell and by the new editable `batch_update` email) instead of one per receipt. Payments still send the usual one email per payment.
+- **Where it shows:** Batches page (find by code, open/closed), batch page (progress by status, grouped by person, what is waiting for you), Ready to pay (batches with receipts to pay), dashboard (batches waiting for you), receipt page and lists (the code), receipts list (filter `?batchId=`, search by code), exports (Batch column), liquidation reports (batch filter), Help (a Batches guide), audit log (every add, remove, close, check, approve and payment).
+
+### Not done, on purpose
+- **The code is not printed on the reimbursement PDF.** The PDF is made once, at approval, and a receipt can join or leave a batch after that, so a printed code could be wrong.
+- **No batch column in import.** Import makes drafts, and drafts cannot be in a batch.
+
+### Database
+Migration `20261120010000_batches` adds the `batch` table and `receipt.batchId`, `notification.batchId` (additive; rollback in `docs/rollback-batches.sql`). The new table needs the app login's rights: `node scripts/grant-app-user.mjs --yes --admin root` (or the line in `docs/db-grants.sql`). Re-running the seed grants `batch.manage` once.
+
+### Tests
+`packages/shared/test/batches.test.ts`, `e2e/batch-flow.mjs` (API, every role) and `e2e/batch-ui.mjs` (Chrome, computer and phone), both in `e2e/run-all.mjs`.
+

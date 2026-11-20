@@ -211,6 +211,7 @@ export const reportRequestSchema = z.object({
   categoryId: z.number().int().positive().nullish(),
   transactionType: z.enum(TRANSACTION_TYPES).nullish(),
   encoderId: z.number().int().positive().nullish(),
+  batchId: z.number().int().positive().max(2_147_483_647).nullish(),
   payment: z.enum(PAYMENT_FILTERS).default('all'),
   format: z.enum(['pdf', 'xlsx', 'csv']),
 });
@@ -222,6 +223,7 @@ export const listQuerySchema = z.object({
   transactionType: z.enum(TRANSACTION_TYPES).optional(),
   vatType: z.enum(VAT_TYPES).optional(),
   encoderId: z.coerce.number().int().positive().optional(),
+  batchId: z.coerce.number().int().positive().max(2_147_483_647).optional(),
   from: dateString.optional(),
   to: dateString.optional(),
   sort: z.enum(['updated', 'newest', 'oldest', 'amount_high', 'amount_low']).default('updated'),

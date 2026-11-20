@@ -5,7 +5,7 @@ import { api, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { Empty, Icon } from '../ui';
 
 interface Data {
-  report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; payment: 'all' | 'paid' | 'unpaid'; createdAt: string; requestedBy: string };
+  report: { id: number; format: string; status: string; from: string; to: string; person: string | null; category: string | null; batch: string | null; payment: 'all' | 'paid' | 'unpaid'; createdAt: string; requestedBy: string };
   rows: { docNo: string; refNo: string; date: string; invoiceNo: string; payee: string; category: string; vatType: string; vat: number; wht: number; encoder: string; approvedAt: string; amount: number; paid: boolean; paidAmount: number; paidOn: string; method: string }[];
   total: number;
   totals: { gross: number; vatable: number; vat: number; wht: number; paid: number; unpaid: number };
@@ -27,7 +27,7 @@ export function ReportViewPage() {
       <div className="dh">
         <div className="ttl">
           <h1>Liquidation report{r.person ? ` · ${r.person}` : ''}</h1>
-          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}{r.category ? ` · ${r.category}` : ''}{r.payment !== 'all' ? ` · ${PAYMENT_FILTER_LABEL[r.payment]}` : ''}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
+          <div className="meta"><span className="muted">{fmtDate(r.from)} to {fmtDate(r.to)}{r.category ? ` · ${r.category}` : ''}{r.batch ? ` · Batch ${r.batch}` : ''}{r.payment !== 'all' ? ` · ${PAYMENT_FILTER_LABEL[r.payment]}` : ''}</span><span className="muted">· generated {fmtDateTime(r.createdAt)}{r.requestedBy ? ` by ${r.requestedBy}` : ''}</span></div>
         </div>
         <div className="actionbar">
           {ready && <a className="btn" href={`/api/reports/${r.id}/file`}><Icon name="download" size={18} />Download {r.format.toUpperCase()}</a>}

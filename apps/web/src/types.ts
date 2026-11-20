@@ -1,4 +1,4 @@
-import type { ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
+import type { BatchStep, ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;
@@ -18,6 +18,7 @@ export interface ReceiptBrief {
   checkedAt: string | null;
   updatedAt: string;
   docNo: string | null;
+  batch: { id: number; code: string; name: string | null } | null;
 }
 
 export interface EvidenceFile { id: number; fileName: string; mime: string; size: number; createdAt: string }
@@ -70,5 +71,19 @@ export interface PaymentInfo {
 }
 export interface PaymentQueue {
   groups: { payee: { id: number; name: string; branch: string | null }; count: number; total: number; receipts: ReceiptBrief[] }[];
+  batches: { id: number; code: string; name: string | null; count: number; people: number; total: number }[];
   totals: { count: number; total: number };
+}
+
+export type { BatchStep };
+interface BatchHead { id: number; code: string; name: string | null; closed: boolean; closedAt: string | null; createdAt: string; createdBy: { id: number; name: string }; count: number; total: number; counts: Record<string, number> }
+export interface BatchSummary extends BatchHead { waiting: Partial<Record<BatchStep, number>> }
+export interface BatchDetail extends BatchHead {
+  /** Receipts in the batch at a step this person cannot see. */
+  hidden: number;
+  canManage: boolean;
+  steps: BatchStep[];
+  ready: Partial<Record<BatchStep, number>>;
+  receipts: (ReceiptBrief & { readyFor: BatchStep | null; canRemove: boolean })[];
+  payable: { id: number; refNo: string; vendor: string; amount: number; version: number; person: string; personId: number }[];
 }

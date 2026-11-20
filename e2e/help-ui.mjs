@@ -4,13 +4,13 @@ import { chromium } from 'playwright';
 const WEB = process.env.WEB ?? 'http://localhost:5173';
 let failed = 0;
 const ok = (n, c, x = '') => { console.log(c ? '  ok  ' : '  FAIL', n, c ? '' : x); if (!c) failed++; };
-const GUIDES = { medref: 'Med Ref: sending in a receipt', checker: 'Checker: verifying receipts', approver: 'Approver: deciding', accounting: 'Accounting: paying', admin: 'Super Admin: running the system' };
+const GUIDES = { medref: 'Med Ref: sending in a receipt', checker: 'Checker: verifying receipts', approver: 'Approver: deciding', accounting: 'Accounting: paying', batches: 'Batches: working on a group', admin: 'Super Admin: running the system' };
 const WHO = [
   ['Med Ref', 'ana.reyes@example.com', ['medref']],
-  ['Checker', 'liza.santos@example.com', ['checker']],
-  ['Approver', 'paolo.v@example.com', ['approver']],
-  ['Accounting', 'accounting@example.com', ['accounting']],
-  ['Super Admin', 'admin@example.com', ['admin']],
+  ['Checker', 'liza.santos@example.com', ['checker', 'batches']],
+  ['Approver', 'paolo.v@example.com', ['approver', 'batches']],
+  ['Accounting', 'accounting@example.com', ['accounting', 'batches']],
+  ['Super Admin', 'admin@example.com', ['admin', 'batches']],
 ];
 const b = await chromium.launch({ channel: 'chrome' });
 for (const [label, size] of [['computer', { width: 1280, height: 860 }], ['phone', { width: 390, height: 780 }]]) {

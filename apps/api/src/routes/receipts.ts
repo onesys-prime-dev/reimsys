@@ -86,8 +86,8 @@ receiptsRouter.get('/export', async (req, res) => {
   const q = listQuerySchema.parse({ ...req.query, page: 1, pageSize: 100 });
   const where: Prisma.ReceiptWhereInput = { AND: [visibleWhere(req.auth!), filterWhere(q)] };
   const rows = await prisma.receipt.findMany({ where, include: receiptInclude, orderBy: { id: 'asc' }, take: 20000 });
-  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Tax withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)', 'VAT-exempt amount', 'Discount', 'Where to charge'];
-  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount), num(r.vatExemptAmount), num(r.discountAmount), r.chargeLocation?.name ?? '']);
+  const head = ['Reference', 'Status', 'Invoice date', 'Invoice no.', 'Vendor', 'Vendor TIN', 'Vendor address', 'Type', 'BIR invoice', 'Gross amount (PHP)', 'VAT type', 'Vatable amount', 'VAT amount', 'Tax withheld', 'Withholding rate %', 'Withholding amount', 'Classification', 'Reason for spending', 'Description', 'Encoded by', 'Document no.', 'Payment no.', 'Paid on', 'Amount paid (PHP)', 'VAT-exempt amount', 'Discount', 'Where to charge', 'Batch'];
+  const data = rows.map((r) => [r.refNo, r.status, dateOnly(r.receiptDate), r.invoiceNo ?? '', r.payee, r.vendorTin ?? '', r.vendorAddress ?? '', typeLabel(r), yn(r.birInvoice), Number(r.amount), r.vatType ? VAT_LABEL[r.vatType as keyof typeof VAT_LABEL] ?? r.vatType : '', num(r.vatableAmount), num(r.vatAmount), yn(r.withheld), num(r.whtRate), num(r.whtAmount), classificationText(r.classification, r.classificationOther), r.reasonForSpending ?? '', r.description ?? '', r.encoder.name, r.document?.docNo ?? '', r.payment?.paymentNo ?? '', r.payment ? dateOnly(r.payment.paidOn) : '', num(r.paidAmount), num(r.vatExemptAmount), num(r.discountAmount), r.chargeLocation?.name ?? '', r.batch?.code ?? '']);
   await audit(req, { action: 'receipt.exported', entityType: 'export', summary: `exported ${rows.length} receipt${rows.length === 1 ? '' : 's'} as ${format.toUpperCase()}` });
   const stamp = new Date().toISOString().slice(0, 10);
   if (format === 'csv') {
@@ -278,7 +278,8 @@ const SUMMARY: Record<ReceiptAction, string> = {
   undo: 'took back the decision', request: 'asked for more proof', approve: 'approved the record', disapprove: 'disapproved the record', reserve: 'put the record on hold', release: 'released the reservation',
 };
 
-async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body) {
+/** One workflow step on one receipt, with every rule checked. `quiet` skips the notices: a batch sends one summary instead. */
+export async function runAction(req: import('express').Request, action: ReceiptAction, receiptId: number = idParam(req.params.id), rawBody: unknown = req.body, opts: { quiet?: boolean } = {}) {
   const auth = req.auth!;
   const t = transitionFor(action)!;
   if (action === 'pay') throw badRequest('Use the payment form to mark receipts as paid.', 'USE_PAYMENT_FORM');
@@ -382,6 +383,8 @@ async function runAction(req: import('express').Request, action: ReceiptAction, 
     action: action === 'reverse_payment' ? 'payment.reversed' : `receipt.${action}`, entityType: 'receipt', entityId: r.id, summary: SUMMARY[action],
     before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(reason ? { note: reason } : {}), ...(issues.length ? { issues } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
+
+  if (opts.quiet) return null;
 
   /* notifications */
   const who = auth.user.name;

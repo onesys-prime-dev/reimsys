@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { canViewBatches } from '@reimsys/shared';
 import { ago, api } from '../api';
+import { useAuth } from '../auth';
 import { Icon } from '../ui';
 
-interface Data { unread: number; items: { id: number; text: string; receiptId: number | null; read: boolean; createdAt: string }[] }
+interface Data { unread: number; items: { id: number; text: string; receiptId: number | null; batchId: number | null; read: boolean; createdAt: string }[] }
 
 const BELL = 'M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 21a2 2 0 0 0 3.4 0';
 
@@ -12,6 +14,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const nav = useNavigate();
+  const { can } = useAuth();
   const box = useRef<HTMLDivElement>(null);
   const q = useQuery({ queryKey: ['notifications'], queryFn: () => api<Data>('/notifications'), refetchInterval: 20_000 });
   const read = useMutation({
@@ -39,7 +42,7 @@ export function NotificationBell() {
         <div className="panel" role="dialog" aria-label="Notifications">
           <div className="card-h"><h3>Notifications</h3><button className="btn sm ghost" disabled={!unread} onClick={() => read.mutate(undefined)}><Icon name="check" size={16} />Mark all read</button></div>
           {q.data?.items.length ? q.data.items.map((n) => (
-            <button key={n.id} className={`note ${n.read ? 'rd' : 'un'}`} onClick={() => { read.mutate([n.id]); setOpen(false); if (n.receiptId) nav(`/receipts/${n.receiptId}`); }}>
+            <button key={n.id} className={`note ${n.read ? 'rd' : 'un'}`} onClick={() => { read.mutate([n.id]); setOpen(false); if (n.receiptId) nav(`/receipts/${n.receiptId}`); else if (n.batchId) nav(canViewBatches(can) ? `/batches/${n.batchId}` : '/receipts'); }}>
               <span className="dotp" />
               <span style={{ flex: 1, minWidth: 0 }}>{n.text}<br /><small>{ago(n.createdAt)}</small></span>
             </button>

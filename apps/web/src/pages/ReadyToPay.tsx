@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { totalOf } from '@reimsys/shared';
+import { Link } from 'react-router-dom';
 import { api, money } from '../api';
 import { PayDialog } from '../components/PayDialog';
 import type { PaymentQueue } from '../types';
@@ -52,6 +53,17 @@ export function ReadyToPayPage() {
         {q.data && <div className="muted" style={{ textAlign: 'right' }}><b style={{ display: 'block', fontSize: '1.3rem', color: 'var(--ink)' }}>{money(q.data.totals.total)}</b>{q.data.totals.count} receipt{q.data.totals.count === 1 ? '' : 's'}</div>}
       </div>
       <ExportPayments />
+      {(q.data?.batches.length ?? 0) > 0 && (
+        <section className="card" style={{ marginBottom: 16 }} aria-label="Batches to pay">
+          <div className="card-h"><h2>Batches</h2><small>Pay every approved receipt of a batch at once, one payment per person</small></div>
+          {q.data!.batches.map((b) => (
+            <Link key={b.id} className="rep-row" to={`/batches/${b.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+              <span><b>{b.code}</b>{b.name ? ` · ${b.name}` : ''}<small className="muted" style={{ display: 'block' }}>{b.count} receipt{b.count === 1 ? '' : 's'} · {b.people} {b.people === 1 ? 'person' : 'people'}</small></span>
+              <span><b>{money(b.total)}</b> <span className="btn sm" style={{ marginLeft: 8 }}><Icon name="wallet" size={16} />Open</span></span>
+            </Link>
+          ))}
+        </section>
+      )}
       {!q.data && <div className="empty">Loading…</div>}
       {q.data && !groups.length && <Empty title="Nothing to pay">Every approved receipt has been paid.</Empty>}
       {groups.length > 0 && (

@@ -24,3 +24,9 @@ export async function nextPaymentNo(tx?: Tx) {
   const y = new Date().getFullYear();
   return formatNumber('PAY', await nextSequence(`payment-${y}`, tx), y);
 }
+
+/** B-2026-000004: the code people type or say to find a batch. */
+export async function nextBatchCode(tx?: Tx) {
+  const y = new Date().getFullYear();
+  return formatNumber('B', await nextSequence(`batch-${y}`, tx), y);
+}
