@@ -571,6 +571,46 @@ Walks forward day by day in the schedule's time zone (up to 400 days) and return
 - **Deleting a schedule's current batch** is refused: "Pause or delete the schedule instead."
 - **Hand-made batch with a cutoff:** set it when making the batch or later; change or remove it until it has run.
 
+### Late additions
+A receipt that missed the cutoff but should still be in that run (approved at 5:20 PM for a 5:00 PM cutoff, say) can be **added late**.
+
+**Decisions**
+- **How:** an **Add late** button on the batch. The batch stays closed, and each receipt is marked **Late** with its reason.
+- **Until when:** while the batch still has an unfinished receipt (submitted, returned, checked, reserved or approved). Once everything in it is paid or disapproved, the batch is final.
+- **Who:** `batch.manage` (Accounting and both admins). **A reason is required** (up to 300 characters).
+- **Already in another batch:** it is moved in the same step, but only out of a batch that is still open and whose cutoff has not run. The move is recorded on both batches. A receipt in a closed or cut-off batch has to be taken out there first.
+
+**When an addition counts as late.** An addition is late when the batch is closed **or** its cutoff has already run. Both checks are in the one add route, so **reopening a batch is no way around it**: once its cutoff has run, every later addition needs a reason, is marked Late and follows the time limit, open or not. A batch that never had a cutoff and was reopened takes plain additions, as today.
+
+**Rules for each receipt** (the same as adding by hand, plus the late ones):
+- It must be visible to the person and in a status that can be added: submitted, returned, checked, reserved or approved.
+- It must not break the 300 limit. If the batch is full, the message points to its next part or the next run.
+- It is not checked against the batch's fill rule, as with adding by hand. The picker only shows a note, for example "Not approved yet, unlike the rest of this run".
+- Each receipt passes or fails on its own, with its reason, so one bad receipt does not block the others.
+- A receipt added late to a batch that was already paid gets its own payment when it is paid. The pay form shows it as usual.
+
+**Database:** on `receipt`, `batchLateAt` (when it was added late) and `batchLateNote` (the reason). Like `batchId`, these are not part of the receipt's content, so they do not change its version. Both are cleared whenever the receipt leaves the batch (removed, moved, withdrawn).
+
+**API:** `POST /batches/:id/receipts` takes `lateReason`.
+- For a late batch: no reason → `LATE_REASON_REQUIRED`; nothing unfinished left in the batch → `BATCH_FINAL` ("Everything in this batch is paid or finished, so it is final. Add it to the next run.").
+- Closed batches no longer answer `BATCH_CLOSED` when a reason is given.
+- `move: true` allows taking a receipt out of an open, not-yet-cut-off batch in the same transaction.
+- Both batch rows are locked, lower id first, so two moves at once cannot deadlock.
+- `GET /:id` returns `canAddLate`, the late count, and each receipt's late time and reason.
+
+**Recording and telling people:**
+- Audit `batch.receipt_added_late` on the receipt and on the batch, with the reason. A move also writes `batch.receipt_moved` on both batches.
+- One bell note to everyone with `batch.manage` or `payment.mark`, except the person who did it: "2 receipts were added late to B-2026-000031 by Ana: approved 20 minutes after the cutoff."
+- No email; the cutoff summary already went out.
+
+**Screens:**
+- On the batch page, **Add late** shows on a closed or cut-off batch while it still has something unfinished. It opens the same receipt picker as adding, plus:
+  - a required reason box
+  - receipts in an open batch shown with "In B-…, will be moved here"
+- A **Late** chip on each such receipt, with the reason on tap. The batch summary line shows "2 added late".
+- Receipt page: "Batch B-2026-000031 (added late: reason)". Exports: an "Added late" column next to Batch.
+- Help: a "Late additions" paragraph in the Batches guide.
+
 ### Overlap
 Two switched-on schedules overlap when their statuses meet and their charge-location and people filters meet (an empty filter means all). It is allowed, since a receipt can only be in one batch and the earlier cutoff takes it, but the schedule list shows "Overlaps with: ..." so it is never a surprise.
 
@@ -594,14 +634,26 @@ Two switched-on schedules overlap when their statuses meet and their charge-loca
 ### Tests
 - `packages/shared/test/cutoffs.test.ts`: `nextCutoff` (one and several weekdays, same day before and after the time, 15th and last day, 31st in a 30-day month and in February, leap year, year end, New York daylight-saving days), rule schema and defaults, plain words, overlap, which rules a person may choose.
 - `e2e/batch-cutoff-flow.mjs` (API): a schedule opens a batch; the preview matches; at the cutoff (set in the past by SQL, run by the worker within a minute and by Run now) it fills, closes, opens the next and tells Accounting once; a latecomer goes to the next run; returned and reserved receipts stay out; a receipt in another batch stays there; reopening does not re-run; closing before the cutoff cancels it; an empty run rolls over; 305 matching receipts make part 1 (300) and part 2 (5); two Run now calls at once give one result; a stale claim re-runs without doubles; pause, resume, edit and delete behave as above; the current batch cannot be deleted; Accounting cannot choose "in progress"; Med Ref and Checker get 403 on schedules; audit rows.
-- `e2e/batch-cutoff-ui.mjs` (Chrome, computer and phone): make a schedule, see the plain words and preview, Run now, see the closed batch and the next one.
+- Late additions, in `e2e/batch-cutoff-flow.mjs`:
+  - no reason → refused; with a reason → added, the batch stays closed, marked Late with the reason
+  - a reopened cut-off batch still needs a reason
+  - a batch with everything paid or disapproved → `BATCH_FINAL`
+  - a full batch → refused with the pointer
+  - a receipt in an open next batch is moved, and the move is recorded on both batches
+  - a receipt in a closed batch is refused
+  - removing or withdrawing it clears the Late mark
+  - two moves of the same receipt at once → it ends up in one batch
+  - Med Ref and Checker → 403
+  - the bell note reaches Accounting once
+  - the Late receipt is payable from the batch, and the export has the column
+- `e2e/batch-cutoff-ui.mjs` (Chrome, computer and phone): make a schedule, see the plain words and preview, Run now, see the closed batch and the next one, add a late receipt with a reason and see the Late chip.
 - `e2e/email-templates.mjs` count 17 to 18; both new tests in `e2e/run-all.mjs`.
 
 ### Build order (each step ends with typecheck and its tests)
 1. Shared: rule schema, `nextCutoff`, plain words, overlap, permission, email template; unit tests.
 2. Migration, rollback SQL, grants, seed.
 3. `lib/cutoffs.ts` worker and its start-up.
-4. API routes; `e2e/batch-cutoff-flow.mjs`.
+4. API routes, including late additions (`batchLateAt` and `batchLateNote` go into step 2's migration); `e2e/batch-cutoff-flow.mjs`.
 5. Screens; `e2e/batch-cutoff-ui.mjs`.
 6. Help, a progress note here, full `run-all` and production build.
 
