@@ -42,39 +42,40 @@ model RolePermission {
 }
 
 model User {
-  id                 Int       @id @default(autoincrement())
-  formDrafts         FormDraft[]
-  email              String    @unique @db.VarChar(160)
-  name               String    @db.VarChar(100)
-  passwordHash       String    @db.VarChar(255)
-  roleId             Int
-  role               Role      @relation(fields: [roleId], references: [id])
-  isActive           Boolean   @default(true)
-  mustChangePassword Boolean   @default(true)
-  failedAttempts     Int       @default(0)
-  lockedUntil        DateTime?
-  lastLoginAt        DateTime?
-  phone              String?   @db.VarChar(30)
-  branch             String?   @db.VarChar(100)
-  photoFile          String?   @db.VarChar(120)
-  theme              String    @default("light") @db.VarChar(10)
+  id                     Int             @id @default(autoincrement())
+  formDrafts             FormDraft[]
+  email                  String          @unique @db.VarChar(160)
+  name                   String          @db.VarChar(100)
+  passwordHash           String          @db.VarChar(255)
+  roleId                 Int
+  role                   Role            @relation(fields: [roleId], references: [id])
+  isActive               Boolean         @default(true)
+  mustChangePassword     Boolean         @default(true)
+  failedAttempts         Int             @default(0)
+  lockedUntil            DateTime?
+  lastLoginAt            DateTime?
+  phone                  String?         @db.VarChar(30)
+  branch                 String?         @db.VarChar(100)
+  photoFile              String?         @db.VarChar(120)
+  theme                  String          @default("light") @db.VarChar(10)
   /// Text size, spacing and accent colour (JSON text). Empty = the defaults.
-  appearance         String?   @db.VarChar(200)
-  dailyDigest        Boolean   @default(true)
-  reservationReleased Boolean  @default(false)
+  appearance             String?         @db.VarChar(200)
+  dailyDigest            Boolean         @default(true)
+  reservationReleased    Boolean         @default(false)
   privacyAcceptedVersion Int?
-  privacyAcceptedAt  DateTime?
-  sessions           Session[]
-  auditLogs          AuditLog[]
-  receipts           Receipt[]          @relation("Encoder")
-  paymentsReceived   Payment[]          @relation("PaymentPayee")
-  paymentsRecorded   Payment[]          @relation("PaymentRecorder")
-  notifications      Notification[]
-  comments           Comment[]          @relation("CommentAuthor")
-  passwordTokens     PasswordToken[]    @relation("PasswordTokens")
-  batchesCreated     Batch[]            @relation("BatchCreator")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  privacyAcceptedAt      DateTime?
+  sessions               Session[]
+  auditLogs              AuditLog[]
+  receipts               Receipt[]       @relation("Encoder")
+  paymentsReceived       Payment[]       @relation("PaymentPayee")
+  paymentsRecorded       Payment[]       @relation("PaymentRecorder")
+  notifications          Notification[]
+  comments               Comment[]       @relation("CommentAuthor")
+  passwordTokens         PasswordToken[] @relation("PasswordTokens")
+  batchesCreated         Batch[]         @relation("BatchCreator")
+  batchSchedules         BatchSchedule[] @relation("BatchScheduleCreator")
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
 
   @@index([roleId])
   @@map("user")
@@ -187,71 +188,74 @@ model ChargeLocation {
 }
 
 model Receipt {
-  id           Int                      @id @default(autoincrement())
-  refNo        String                   @unique @db.VarChar(30)
-  encoderId    Int
-  encoder      User                     @relation("Encoder", fields: [encoderId], references: [id])
-  payee        String                   @db.VarChar(160)
-  receiptDate  DateTime                 @db.Date
-  amount       Decimal                  @db.Decimal(12, 2)
-  categoryId   Int?
-  category     Category?                @relation(fields: [categoryId], references: [id])
-  description  String?                  @db.VarChar(500)
+  id                  Int                    @id @default(autoincrement())
+  refNo               String                 @unique @db.VarChar(30)
+  encoderId           Int
+  encoder             User                   @relation("Encoder", fields: [encoderId], references: [id])
+  payee               String                 @db.VarChar(160)
+  receiptDate         DateTime               @db.Date
+  amount              Decimal                @db.Decimal(12, 2)
+  categoryId          Int?
+  category            Category?              @relation(fields: [categoryId], references: [id])
+  description         String?                @db.VarChar(500)
   // Client form (phase 2). All optional so receipts made before it still load.
-  birInvoice      Boolean?
+  birInvoice          Boolean?
   invoiceUnderCompany Boolean?
-  reasonForSpending   String?                  @db.VarChar(300)
-  classification      String?                  @db.VarChar(30)
-  classificationOther String?                  @db.VarChar(100)
-  seenCompany     Boolean?
-  seenTin         Boolean?
-  seenAddress     Boolean?
-  noBirReason     String?                  @db.VarChar(500)
-  invoiceNo       String?                  @db.VarChar(60)
-  vendorAddress   String?                  @db.VarChar(300)
-  vendorTin       String?                  @db.VarChar(30)
-  transactionType String?                  @db.VarChar(10)
-  vatType         String?                  @db.VarChar(12)
-  vatableAmount   Decimal?                 @db.Decimal(12, 2)
-  vatAmount       Decimal?                 @db.Decimal(12, 2)
-  vatExemptAmount Decimal?                 @db.Decimal(12, 2)
-  discountAmount  Decimal?                 @db.Decimal(12, 2)
-  withheld        Boolean?
-  whtRate         Decimal?                 @db.Decimal(5, 2)
-  whtAmount       Decimal?                 @db.Decimal(12, 2)
+  reasonForSpending   String?                @db.VarChar(300)
+  classification      String?                @db.VarChar(30)
+  classificationOther String?                @db.VarChar(100)
+  seenCompany         Boolean?
+  seenTin             Boolean?
+  seenAddress         Boolean?
+  noBirReason         String?                @db.VarChar(500)
+  invoiceNo           String?                @db.VarChar(60)
+  vendorAddress       String?                @db.VarChar(300)
+  vendorTin           String?                @db.VarChar(30)
+  transactionType     String?                @db.VarChar(10)
+  vatType             String?                @db.VarChar(12)
+  vatableAmount       Decimal?               @db.Decimal(12, 2)
+  vatAmount           Decimal?               @db.Decimal(12, 2)
+  vatExemptAmount     Decimal?               @db.Decimal(12, 2)
+  discountAmount      Decimal?               @db.Decimal(12, 2)
+  withheld            Boolean?
+  whtRate             Decimal?               @db.Decimal(5, 2)
+  whtAmount           Decimal?               @db.Decimal(12, 2)
   // Last page of the form: where to charge.
-  chargeLocationId     Int?
-  chargeLocation       ChargeLocation?          @relation(fields: [chargeLocationId], references: [id])
-  formDrafts           FormDraft[]
-  ckCompany       Boolean?
-  ckTin           Boolean?
-  ckAddress       Boolean?
-  status       String                   @default("draft") @db.VarChar(20)
-  version      Int                      @default(0)
-  submittedAt  DateTime?
-  checkedById  Int?
-  checkedAt    DateTime?
-  checkNote    String?                  @db.VarChar(1000)
-  decidedById  Int?
-  decidedAt    DateTime?
-  decisionNote String?                  @db.VarChar(1000)
-  lastNote     String?                  @db.VarChar(1000)
+  chargeLocationId    Int?
+  chargeLocation      ChargeLocation?        @relation(fields: [chargeLocationId], references: [id])
+  formDrafts          FormDraft[]
+  ckCompany           Boolean?
+  ckTin               Boolean?
+  ckAddress           Boolean?
+  status              String                 @default("draft") @db.VarChar(20)
+  version             Int                    @default(0)
+  submittedAt         DateTime?
+  checkedById         Int?
+  checkedAt           DateTime?
+  checkNote           String?                @db.VarChar(1000)
+  decidedById         Int?
+  decidedAt           DateTime?
+  decisionNote        String?                @db.VarChar(1000)
+  lastNote            String?                @db.VarChar(1000)
   // The problems ticked when the receipt was sent back (codes joined by commas, see packages/shared/src/returnIssues.ts). Cleared when it leaves "Returned".
-  returnIssues String?                  @db.VarChar(300)
+  returnIssues        String?                @db.VarChar(300)
   // Payment step. Filled while the receipt is Paid and cleared again when the payment is reversed.
   // The batch it is grouped in, if any (see Batch). Not part of the receipt's content, so it does not change the version.
-  batchId         Int?
-  batch           Batch?                   @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  paymentId       Int?
-  payment         Payment?                 @relation(fields: [paymentId], references: [id])
-  paidAmount      Decimal?                 @db.Decimal(12, 2)
-  paidShortReason String?                  @db.VarChar(300)
-  paidAt          DateTime?
-  evidence     ReceiptEvidence[]
-  document     ReimbursementDocument?
-  comments     Comment[]
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  batchId             Int?
+  batch               Batch?                 @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  // Set when the receipt went into its batch after the batch closed or its cutoff ran (a late addition), with the reason. Cleared when it leaves the batch.
+  batchLateAt         DateTime?
+  batchLateNote       String?                @db.VarChar(300)
+  paymentId           Int?
+  payment             Payment?               @relation(fields: [paymentId], references: [id])
+  paidAmount          Decimal?               @db.Decimal(12, 2)
+  paidShortReason     String?                @db.VarChar(300)
+  paidAt              DateTime?
+  evidence            ReceiptEvidence[]
+  document            ReimbursementDocument?
+  comments            Comment[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   @@index([status])
   @@index([encoderId])
@@ -297,19 +301,62 @@ model ReimbursementDocument {
 /// A code that groups receipts so they can be found and worked on together (checked, approved, paid). Made by Accounting or an admin.
 /// It is a label, not a second workflow: every receipt keeps its own status and rules. A receipt is in at most one batch.
 model Batch {
+  id              Int            @id @default(autoincrement())
+  code            String         @unique @db.VarChar(30)
+  name            String?        @db.VarChar(80)
+  createdById     Int
+  createdBy       User           @relation("BatchCreator", fields: [createdById], references: [id])
+  /// Closed: nothing more can be added (except late, with a reason). The receipts already in it carry on as usual.
+  closedAt        DateTime?
+  /// When the batch fills itself with the receipts that match cutoffRule (JSON, see packages/shared/src/cutoffs.ts) and closes.
+  cutoffAt        DateTime?
+  cutoffRule      String?        @db.Text
+  /// Set when the cutoff ran (or, with no cutoffAt, was cancelled by closing the batch by hand first). A batch is due only while this is empty.
+  cutoffDoneAt    DateTime?
+  /// A run in progress. One older than ten minutes is taken over, so a crash never leaves a cutoff stuck.
+  cutoffClaimedAt DateTime?
+  /// The repeating schedule that made it, if any.
+  scheduleId      Int?
+  schedule        BatchSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  /// 2, 3 ... when a run had more receipts than one batch holds; partOfId is then the first batch of that run.
+  part            Int            @default(1)
+  partOfId        Int?
+  partOf          Batch?         @relation("BatchParts", fields: [partOfId], references: [id], onDelete: SetNull)
+  parts           Batch[]        @relation("BatchParts")
+  receipts        Receipt[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([scheduleId, cutoffAt, part])
+  @@index([closedAt])
+  @@index([cutoffAt])
+  @@map("batch")
+}
+
+/// A repeating cutoff ("every Friday at 5:00 PM"): it keeps one open batch with the next cutoff, and opens the next batch when that one runs.
+model BatchSchedule {
   id          Int       @id @default(autoincrement())
-  code        String    @unique @db.VarChar(30)
-  name        String?   @db.VarChar(80)
+  name        String    @db.VarChar(60)
+  isOn        Boolean   @default(true)
+  /// weekly (days 0-6, 0 = Sunday) or monthly (days 1-31 and L for the last day), joined by commas.
+  repeat      String    @db.VarChar(10)
+  days        String    @db.VarChar(100)
+  time        String    @db.VarChar(5)
+  timeZone    String    @db.VarChar(60)
+  /// Which receipts it takes (JSON, see packages/shared/src/cutoffs.ts).
+  rule        String    @db.Text
+  /// The last cutoff time that was run or skipped, so a change of time never re-runs or loses a slot.
+  lastSlotAt  DateTime?
+  lastRunAt   DateTime?
+  lastBatchId Int?
+  lastCount   Int       @default(0)
   createdById Int
-  createdBy   User      @relation("BatchCreator", fields: [createdById], references: [id])
-  /// Closed: nothing more can be added. The receipts already in it carry on as usual.
-  closedAt    DateTime?
-  receipts    Receipt[]
+  createdBy   User      @relation("BatchScheduleCreator", fields: [createdById], references: [id])
+  batches     Batch[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@index([closedAt])
-  @@map("batch")
+  @@map("batchschedule")
 }
 
 /// One payment made by Accounting to one Med Ref. It can cover several receipts. Rows are never edited or deleted.

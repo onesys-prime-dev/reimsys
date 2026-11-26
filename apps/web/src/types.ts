@@ -1,4 +1,4 @@
-import type { BatchStep, ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
+import type { BatchStep, CutoffRule, CutoffState, ReceiptAction, ReceiptStatus, ReturnIssueCode, TaxImpact } from '@reimsys/shared';
 
 export interface ReceiptBrief {
   id: number;
@@ -18,7 +18,11 @@ export interface ReceiptBrief {
   checkedAt: string | null;
   updatedAt: string;
   docNo: string | null;
-  batch: { id: number; code: string; name: string | null } | null;
+  /** closedAt, cutoffAt and cutoffDoneAt say whether a late addition could move it out of that batch. */
+  batch: { id: number; code: string; name: string | null; closedAt?: string | null; cutoffAt?: string | null; cutoffDoneAt?: string | null } | null;
+  /** Added to its batch after the batch closed or its cutoff ran, and why. */
+  batchLateAt: string | null;
+  batchLateNote: string | null;
 }
 
 export interface EvidenceFile { id: number; fileName: string; mime: string; size: number; createdAt: string }
@@ -76,7 +80,14 @@ export interface PaymentQueue {
 }
 
 export type { BatchStep };
-interface BatchHead { id: number; code: string; name: string | null; closed: boolean; closedAt: string | null; createdAt: string; createdBy: { id: number; name: string }; count: number; total: number; counts: Record<string, number> }
+interface BatchHead {
+  id: number; code: string; name: string | null; closed: boolean; closedAt: string | null; createdAt: string; createdBy: { id: number; name: string }; count: number; total: number; counts: Record<string, number>;
+  cutoffAt: string | null; cutoffState: CutoffState; timeZone: string; schedule: { id: number; name: string; isOn: boolean } | null; part: number;
+}
+export interface BatchCutoff {
+  at: string | null; state: CutoffState; timeZone: string; running: boolean; doneAt: string | null; rule: CutoffRule | null; ruleText: string | null;
+  canChange: boolean; canRemove: boolean; canRun: boolean;
+}
 export interface BatchSummary extends BatchHead { waiting: Partial<Record<BatchStep, number>> }
 export interface BatchDetail extends BatchHead {
   /** Receipts in the batch at a step this person cannot see. */
@@ -86,4 +97,15 @@ export interface BatchDetail extends BatchHead {
   ready: Partial<Record<BatchStep, number>>;
   receipts: (ReceiptBrief & { readyFor: BatchStep | null; canRemove: boolean })[];
   payable: { id: number; refNo: string; vendor: string; amount: number; version: number; person: string; personId: number }[];
+  cutoff: BatchCutoff | null;
+  canSetCutoff: boolean;
+  canUseInProgress: boolean;
+  /** What the cutoff would take if it ran now; hidden = how many of those are at steps this person does not see. */
+  wouldAdd: { count: number; total: number; hidden: number } | null;
+  /** Closed or cut off: what is added now is late. */
+  late: boolean;
+  lateCount: number;
+  canAddLate: boolean;
+  parts: { id: number; code: string }[];
+  partOf: { id: number; code: string } | null;
 }

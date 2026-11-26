@@ -29,6 +29,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'review.decide', label: 'Approve, disapprove, reserve, release', group: 'Review' },
   { code: 'payment.mark', label: 'Mark approved receipts as paid', group: 'Payments' },
   { code: 'batch.manage', label: 'Make batches and choose the receipts in them', group: 'Payments' },
+  { code: 'batch.schedule', label: 'Set up repeating batch cutoffs', group: 'Payments' },
   { code: 'report.generate', label: 'Generate liquidation reports', group: 'Reports' },
   { code: 'user.manage', label: 'Manage users', group: 'Administration' },
   { code: 'role.manage', label: 'Manage roles and permissions', group: 'Administration' },
@@ -51,6 +52,7 @@ export const DEFAULT_GRANTS: Record<string, RoleCode[]> = {
   'review.decide': ['approver'],
   'payment.mark': ['accounting'],
   'batch.manage': ['accounting', 'manager', 'admin'],
+  'batch.schedule': ['manager', 'admin'],
   'report.generate': ALL,
   'user.manage': ['manager', 'admin'],
   'role.manage': ['admin'],
@@ -174,6 +176,7 @@ export interface SessionInfo {
 export * from './receipts';
 export * from './payments';
 export * from './batches';
+export * from './cutoffs';
 export * from './returnIssues';
 export * from './privacy';
 export * from './text';

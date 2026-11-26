@@ -32,6 +32,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.chargelocation       TO 'reimsys
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.formdraft            TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.emailschedule        TO 'reimsys_app'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.batch                TO 'reimsys_app'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON reimsys.batchschedule        TO 'reimsys_app'@'localhost';
 
 -- Audit log: read and append only.
 GRANT SELECT, INSERT ON reimsys.auditlog TO 'reimsys_app'@'localhost';

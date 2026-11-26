@@ -99,7 +99,7 @@ export function ReceiptDetailPage() {
       <div className="dh">
         <div className="ttl">
           <h1>{r.payee}</h1>
-          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span>{r.batch && (canViewBatches(can) ? <Link className="pill s-chk" to={`/batches/${r.batch.id}`} title="Open the batch" style={{ textDecoration: 'none' }}>Batch {r.batch.code}</Link> : <span className="muted">Batch {r.batch.code}</span>)}<span className="amt-big">{money(r.amount)}</span></div>
+          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span>{r.batch && (canViewBatches(can) ? <Link className="pill s-chk" to={`/batches/${r.batch.id}`} title="Open the batch" style={{ textDecoration: 'none' }}>Batch {r.batch.code}</Link> : <span className="muted">Batch {r.batch.code}</span>)}{r.batch && r.batchLateAt && <span className="pill late" title={'Added late: ' + (r.batchLateNote ?? '')} data-testid="late-pill">Added late: {r.batchLateNote}</span>}<span className="amt-big">{money(r.amount)}</span></div>
         </div>
         <div className="actionbar">
           {r.canEdit && <Link className="btn" to={`/receipts/${r.id}/edit`}><Icon name="edit" size={18} />Edit</Link>}

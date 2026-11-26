@@ -14,8 +14,8 @@ import { config } from '../src/config.js';
 const confirmIdx = process.argv.indexOf('--confirm');
 const typed = confirmIdx > 0 ? process.argv[confirmIdx + 1] : undefined;
 const dbName = new URL(process.env.DATABASE_URL ?? '').pathname.slice(1);
-// Tables holding receipts and what hangs off them. User-facing setup tables are not in this list.
-const TABLES = ['comment', 'notification', 'emaillog', 'job', 'importjob', 'liquidationreport', 'payment', 'reimbursementdocument', 'receiptevidence', 'receipt', 'auditlog', 'session', 'passwordtoken', 'sequence'];
+// Tables holding receipts and what hangs off them (batches too: the counters are reset, so old codes must go). User-facing setup tables, cutoff schedules among them, are not in this list.
+const TABLES = ['comment', 'notification', 'emaillog', 'job', 'importjob', 'liquidationreport', 'payment', 'reimbursementdocument', 'receiptevidence', 'receipt', 'batch', 'auditlog', 'session', 'passwordtoken', 'sequence'];
 const FOLDERS = ['evidence', 'documents', 'proofs', 'reports'];
 
 async function main() {
@@ -28,6 +28,8 @@ async function main() {
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS=0');
     for (const t of TABLES) await tx.$executeRawUnsafe(`TRUNCATE TABLE \`${t}\``);
+    // Cutoff schedules stay; their batches are gone, so each opens a new one on the next minute.
+    await tx.$executeRawUnsafe('UPDATE `batchschedule` SET lastBatchId = NULL, lastRunAt = NULL, lastCount = 0');
     await tx.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS=1');
   });
   const root = config.storageDir;

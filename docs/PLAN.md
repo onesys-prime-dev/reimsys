@@ -566,7 +566,7 @@ Walks forward day by day in the schedule's time zone (up to 400 days) and return
 - **Run cutoff now** (on the batch, `batch.manage`): steps 2 to 9 at once, recorded as that person. It **uses up that slot**: the next batch gets the slot after the original cutoff, not tomorrow.
 - **Change this cutoff** (one batch only, e.g. a holiday): a new time and/or rule. A time already past asks "Run it now?" and runs only when confirmed.
 - **Editing a schedule** updates its current batch's cutoff and rule (the form says so). A new time already past asks the same question. Closed batches never change.
-- **Pausing a schedule** removes the cutoff from its current batch, which becomes an ordinary batch. Switching it on again puts the next cutoff back.
+- **Pausing a schedule** removes the cutoff from its current batch, which then works as an ordinary batch (it stays linked to the schedule). Switching it on again puts the next cutoff back.
 - **Deleting a schedule:** its current batch is deleted if empty, otherwise it keeps its receipts as an ordinary batch without a cutoff. Past batches keep their history (the schedule link becomes empty).
 - **Deleting a schedule's current batch** is refused: "Pause or delete the schedule instead."
 - **Hand-made batch with a cutoff:** set it when making the batch or later; change or remove it until it has run.
@@ -656,4 +656,23 @@ Two switched-on schedules overlap when their statuses meet and their charge-loca
 4. API routes, including late additions (`batchLateAt` and `batchLateNote` go into step 2's migration); `e2e/batch-cutoff-flow.mjs`.
 5. Screens; `e2e/batch-cutoff-ui.mjs`.
 6. Help, a progress note here, full `run-all` and production build.
+
+### Built (2026-11-20)
+All six steps are done. Code: `packages/shared/src/cutoffs.ts`, `apps/api/src/lib/cutoffs.ts` (worker, started in `server.ts`), `apps/api/src/routes/batchSchedules.ts`, cutoff and late-addition parts of `apps/api/src/routes/batches.ts`, `apps/web/src/components/Cutoffs.tsx`, `apps/web/src/pages/BatchSchedules.tsx`, and the Batches and batch pages. Tests: `packages/shared/test/cutoffs.test.ts` (24), `e2e/batch-cutoff-flow.mjs` (97 checks), `e2e/batch-cutoff-ui.mjs` (computer and phone).
+
+Details settled while building:
+- **Paused schedule:** its open batch stays linked to it, without a cutoff. While paused, the batch can be added to like any batch, or deleted. Switching the schedule on gives the batch its next cutoff back, or opens a new batch if that one was deleted. Slots missed while paused are skipped.
+- **A slot is never used twice.** `lastSlotAt` only moves forward, so switching on or editing after an early **Run now** never reuses the slot that run used up.
+- **Changing a schedule** works out this run's cutoff from the last slot used. If that time has passed, the answer is `CUTOFF_PAST` and nothing is saved until the person picks **Run it now** or **Skip to the next one**.
+- **Change this cutoff** can change the rule as well as the time. A schedule's batch keeps its date-based name in step, unless someone renamed it.
+- **Closing a schedule's batch before its cutoff** cancels that cutoff for good (`cutoffAt` empty, `cutoffDoneAt` set) and the schedule opens its next batch at once. Closing a hand-made batch early just removes its cutoff.
+- **Parts** point at the first batch of their run (`partOfId`). A batch with parts is never deleted.
+- **Times** in the forms are read in the system time zone (Settings), whatever the computer's clock says.
+
+Found and fixed on the way:
+- `data:clear` reset the code counters without emptying the batch table, so the next batch after a clear would have reused an old code. It now clears batches too and keeps the cutoff schedules.
+- On MySQL, deleting a batch while checking for its parts in the same statement fails. The check is now done first.
+- On a phone, the tags beside a receipt on the batch page squeezed its details. They now sit on their own line.
+- The "If it ran now" count showed the old number for a moment after the rule changed. It now says "Counting…" until the new number is in.
+- Inputs of type time, search and date-and-time had no styling; they now look like the other inputs.
 

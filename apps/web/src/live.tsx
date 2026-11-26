@@ -5,7 +5,7 @@ export type LiveState = 'connecting' | 'live' | 'offline';
 
 /** Which screens' data to refresh when the server says an area changed. */
 const REFRESH: Record<string, string[]> = {
-  receipts: ['receipts', 'receipt', 'dashboard', 'history', 'comments', 'encoders', 'report-preview', 'report-data', 'batches', 'batch', 'payments-queue'],
+  receipts: ['receipts', 'receipt', 'dashboard', 'history', 'comments', 'encoders', 'report-preview', 'report-data', 'batches', 'batch', 'batch-schedules', 'payments-queue'],
   notifications: ['notifications'],
   reports: ['reports', 'report-data'],
   access: ['users', 'roles', 'permissions', 'user-sessions', 'dashboard'],

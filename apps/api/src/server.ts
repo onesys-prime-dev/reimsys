@@ -30,6 +30,8 @@ import { receiptsRouter } from './routes/receipts.js';
 import { documentsRouter, reportsRouter } from './routes/reports.js';
 import { paymentsRouter } from './routes/payments.js';
 import { batchesRouter } from './routes/batches.js';
+import { batchSchedulesRouter } from './routes/batchSchedules.js';
+import { startCutoffs } from './lib/cutoffs.js';
 import { tlsOptions } from './lib/tls.js';
 import './lib/documents.js';
 import './lib/reports.js';
@@ -96,6 +98,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/batch-schedules', batchSchedulesRouter);
 app.use('/api/batches', batchesRouter);
 app.use('/api/imports', importsRouter);
 app.use('/api/email-log', emailLogRouter);
@@ -122,6 +125,7 @@ void startWorker();
 startDigest();
 startReminders();
 startEmailSchedules();
+startCutoffs();
 
 // Every half minute, close live connections that belong to sessions which have ended, so a timed-out or signed-out browser cannot keep listening.
 setInterval(async () => {

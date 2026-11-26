@@ -2,14 +2,17 @@ import { Router, type Request } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import type { Prisma } from '@prisma/client';
+import { Prisma as P } from '@prisma/client';
 import {
-  BATCHABLE_STATUSES, BATCH_ACTION_PERMISSION, BATCH_MAX, EVIDENCE_MAX_BYTES, STATUS_LABEL,
-  batchActionSchema, batchAddSchema, batchCreateSchema, batchDoneText, batchLabel, batchListQuerySchema, batchPaySchema, batchUpdateSchema,
-  canAddToBatch, canRemoveFromBatch, canViewBatches, cleanDeep, type BatchAction, type ReceiptStatus,
+  BATCHABLE_STATUSES, BATCH_ACTION_PERMISSION, BATCH_MAX, CUTOFF_CLAIM_MS, EVIDENCE_MAX_BYTES, STATUS_LABEL,
+  batchActionSchema, batchAddSchema, batchCreateWithCutoffSchema, batchCutoffSchema, batchDoneText, batchLabel, batchListQuerySchema, batchPaySchema, batchUpdateSchema,
+  canAddToBatch, canRemoveFromBatch, canUseCutoffRule, canViewBatches, cleanDeep, cutoffBatchName, cutoffRuleSchema, cutoffState, describeCutoffRule, fmtCutoff, isLateBatch, lateAddSchema,
+  type BatchAction, type CutoffRule, type ReceiptStatus,
 } from '@reimsys/shared';
 import { config } from '../config.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
+import { ensureCurrent, preview, ruleOf, ruleWhere, runCutoff, zoneOf, type Actor } from '../lib/cutoffs.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
 import { notify, usersWithPermission } from '../lib/notify.js';
 import { recordPayments } from '../lib/payments.js';
@@ -54,13 +57,32 @@ const isReady = (auth: AuthContext, step: Step, r: { status: string; encoderId: 
 };
 const stepsFor = (auth: AuthContext) => STEPS.filter((s) => auth.permissions.has(BATCH_ACTION_PERMISSION[s]));
 
+const batchIncludes = { createdBy: { select: { id: true, name: true } }, schedule: true } satisfies P.BatchInclude;
 async function loadBatch(id: number) {
-  const b = await prisma.batch.findUnique({ where: { id }, include: { createdBy: { select: { id: true, name: true } } } });
+  const b = await prisma.batch.findUnique({ where: { id }, include: batchIncludes });
   if (!b) throw notFound('Batch not found.');
   return b;
 }
 type BatchRow = Awaited<ReturnType<typeof loadBatch>>;
-const batchHead = (b: BatchRow) => ({ id: b.id, code: b.code, name: b.name, closed: !!b.closedAt, closedAt: b.closedAt, createdAt: b.createdAt, createdBy: b.createdBy });
+const batchHead = (b: BatchRow) => ({
+  id: b.id, code: b.code, name: b.name, closed: !!b.closedAt, closedAt: b.closedAt, createdAt: b.createdAt, createdBy: b.createdBy,
+  cutoffAt: b.cutoffAt, cutoffState: cutoffState(b), timeZone: zoneOf(b), schedule: b.schedule ? { id: b.schedule.id, name: b.schedule.name, isOn: b.schedule.isOn } : null, part: b.part,
+});
+/** A cutoff run holds the batch for a moment; a claim older than the limit belongs to a run that died and is taken over. */
+const isRunning = (b: { cutoffClaimedAt: Date | null }) => !!b.cutoffClaimedAt && Date.now() - b.cutoffClaimedAt.getTime() < CUTOFF_CLAIM_MS;
+const actorOf = (req: Request): Actor => ({ id: req.auth!.user.id, name: req.auth!.user.name });
+const isUnique = (e: unknown) => e instanceof P.PrismaClientKnownRequestError && e.code === 'P2002';
+const DEFAULT_RULE: CutoffRule = cutoffRuleSchema.parse({ statuses: 'approved' });
+const ruleNotAllowed = () => forbidden('Only people who can see every receipt can take receipts that are still in progress. Choose approved receipts only.', 'RULE_NOT_ALLOWED');
+
+/** Names for the places and people a rule names, so it can be said in plain words. */
+export async function ruleText(rule: CutoffRule) {
+  const [locations, people] = await Promise.all([
+    rule.chargeLocationIds.length ? prisma.chargeLocation.findMany({ where: { id: { in: rule.chargeLocationIds } }, select: { name: true }, orderBy: { name: 'asc' } }) : [],
+    rule.encoderIds.length ? prisma.user.findMany({ where: { id: { in: rule.encoderIds } }, select: { name: true }, orderBy: { name: 'asc' } }) : [],
+  ]);
+  return describeCutoffRule(rule, { locations: locations.map((l) => l.name), people: people.map((p) => p.name) });
+}
 const php = (n: number) => 'PHP ' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /* ---------- list and find ---------- */
@@ -74,7 +96,7 @@ batchesRouter.get('/', async (req, res) => {
       q.q ? { OR: [{ code: { contains: q.q } }, { name: { contains: q.q } }] } : {},
     ],
   };
-  const batches = await prisma.batch.findMany({ where, include: { createdBy: { select: { id: true, name: true } } }, orderBy: { id: 'desc' }, take: 100 });
+  const batches = await prisma.batch.findMany({ where, include: batchIncludes, orderBy: { id: 'desc' }, take: 100 });
   const ids = batches.map((b) => b.id);
   // Counts and totals are of the receipts this person can see, the same as everywhere else.
   const grouped = ids.length ? await prisma.receipt.groupBy({ by: ['batchId', 'status'], where: { AND: [visibleWhere(auth), { batchId: { in: ids } }] }, _count: { _all: true }, _sum: { amount: true } }) : [];
@@ -86,6 +108,8 @@ batchesRouter.get('/', async (req, res) => {
   }
   res.json({
     canManage: auth.permissions.has('batch.manage'),
+    // The time zone cutoffs are read in when a batch has no schedule of its own (Settings).
+    timeZone: zoneOf({}),
     batches: batches.map((b) => {
       const mine = grouped.filter((g) => g.batchId === b.id);
       const counts: Record<string, number> = {};
@@ -123,15 +147,44 @@ batchesRouter.get('/:id', async (req, res) => {
   const readyFor = (r: (typeof rows)[number]) => steps.find((s) => isReady(auth, s, r)) ?? null;
   const counts: Record<string, number> = {};
   for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
+  const canManage = auth.permissions.has('batch.manage');
+  const state = cutoffState(b);
+  const tz = zoneOf(b);
+  const rule = b.cutoffRule ? ruleOf(b.cutoffRule) : null;
+  const late = isLateBatch(b);
+  const [unfinished, parts, partOf, would, lateCount] = await Promise.all([
+    late ? prisma.receipt.count({ where: { batchId: b.id, status: { in: [...BATCHABLE_STATUSES] } } }) : Promise.resolve(0),
+    prisma.batch.findMany({ where: { partOfId: b.id }, select: { id: true, code: true }, orderBy: { part: 'asc' } }),
+    b.partOfId ? prisma.batch.findUnique({ where: { id: b.partOfId }, select: { id: true, code: true } }) : Promise.resolve(null),
+    // What the cutoff would take if it ran now, and how much of that this person can see.
+    state === 'pending' && rule && canManage
+      ? Promise.all([preview(rule, tz), prisma.receipt.count({ where: { AND: [visibleWhere(auth), ruleWhere(rule, new Date(), tz)] } })]).then(([p, seen]) => ({ ...p, hidden: p.count - seen }))
+      : Promise.resolve(null),
+    prisma.receipt.count({ where: { batchId: b.id, batchLateAt: { not: null } } }),
+  ]);
   res.json({
     batch: {
       ...batchHead(b),
+      cutoff: b.cutoffAt || state !== 'none' ? {
+        at: b.cutoffAt, state, timeZone: tz, running: isRunning(b), doneAt: b.cutoffDoneAt,
+        rule, ruleText: rule ? await ruleText(rule) : null,
+        // A schedule's batch moves its cutoff ("Change this cutoff") but cannot drop it: the schedule is paused for that.
+        canChange: canManage && !b.closedAt && state === 'pending',
+        canRemove: canManage && !b.closedAt && state === 'pending' && !b.scheduleId,
+        canRun: canManage && !b.closedAt && state === 'pending' && !isRunning(b),
+      } : null,
+      canSetCutoff: canManage && !b.closedAt && state === 'none' && !b.scheduleId,
+      canUseInProgress: auth.permissions.has('receipt.view_all'),
+      wouldAdd: would,
+      late, lateCount,
+      canAddLate: canManage && late && unfinished > 0,
+      parts, partOf,
       count: rows.length,
       total: rows.reduce((s, r) => s + Math.round(Number(r.amount) * 100), 0) / 100,
       counts,
       // Receipts in the batch at a step this person cannot see (a Checker's batch may hold receipts Accounting cannot see yet).
       hidden: all - rows.length,
-      canManage: auth.permissions.has('batch.manage'),
+      canManage,
       steps,
       ready: Object.fromEntries(steps.map((s) => [s, rows.filter((r) => isReady(auth, s, r)).length])),
       receipts: rows.map((r) => ({ ...receiptBrief(r), readyFor: readyFor(r), canRemove: canRemoveFromBatch(r.status) })),
@@ -141,48 +194,98 @@ batchesRouter.get('/:id', async (req, res) => {
   });
 });
 
-/** Adds receipts one by one, each with its reason when it cannot go in. The batch row is locked meanwhile, so it is never overfilled or filled after closing. */
-async function addReceipts(req: Request, batchId: number, receiptIds: number[]) {
+/**
+ * Adds receipts one by one, each with its reason when it cannot go in. The batch row (and, for a move, the batch it comes from) is
+ * locked meanwhile, lower id first, so it is never overfilled and two moves at once cannot deadlock.
+ * Once the batch is closed or its cutoff has run, an addition is late: it needs a reason, is marked, and is only possible while the
+ * batch still has something unfinished. A late receipt may be moved out of another batch that is still open and not yet cut off.
+ */
+async function addReceipts(req: Request, batchId: number, receiptIds: number[], opts: { lateReason?: string | null; move?: boolean } = {}) {
   const auth = req.auth!;
   const unique = [...new Set(receiptIds)];
   const rows = await prisma.receipt.findMany({ where: { AND: [{ id: { in: unique } }, visibleWhere(auth)] }, select: { id: true, refNo: true, status: true, batchId: true, batch: { select: { code: true } } } });
+  const sources = opts.move ? [...new Set(rows.map((r) => r.batchId).filter((x): x is number => !!x && x !== batchId))] : [];
   const results: { id: number; refNo: string | null; ok: boolean; message: string }[] = [];
-  const added: { id: number; refNo: string }[] = [];
-  const code = await prisma.$transaction(async (tx) => {
-    // Touching the row locks it until the end of the transaction.
-    const touched = await tx.batch.updateMany({ where: { id: batchId }, data: { updatedAt: new Date() } });
-    const b = touched.count ? await tx.batch.findUnique({ where: { id: batchId } }) : null;
+  const added: { id: number; refNo: string; from: string | null }[] = [];
+  const out = await prisma.$transaction(async (tx) => {
+    // Touching the rows locks them until the end of the transaction.
+    for (const id of [batchId, ...sources].sort((x, y) => x - y)) await tx.batch.updateMany({ where: { id }, data: { updatedAt: new Date() } });
+    const b = await tx.batch.findUnique({ where: { id: batchId } });
     if (!b) throw notFound('Batch not found.');
-    if (b.closedAt) throw conflict('This batch is closed. Reopen it to add receipts.', 'BATCH_CLOSED');
+    const late = isLateBatch(b);
+    const reason = late ? opts.lateReason?.trim() || null : null;
+    if (late && !reason) {
+      if (b.closedAt) throw conflict('This batch is closed. To add a receipt late, give the reason.', 'BATCH_CLOSED');
+      throw badRequest('This batch’s cutoff has run, so a receipt added now is late. Give the reason.', 'LATE_REASON_REQUIRED');
+    }
+    if (late && !(await tx.receipt.count({ where: { batchId, status: { in: [...BATCHABLE_STATUSES] } } }))) {
+      throw conflict('Everything in this batch is paid or finished, so it is final. Add the receipt to the next run.', 'BATCH_FINAL');
+    }
+    const from = new Map((await tx.batch.findMany({ where: { id: { in: sources } } })).map((x) => [x.id, x]));
     let room = BATCH_MAX - (await tx.receipt.count({ where: { batchId } }));
+    const mark = late ? { batchLateAt: new Date(), batchLateNote: reason } : { batchLateAt: null, batchLateNote: null };
     for (const id of unique) {
       const r = rows.find((x) => x.id === id);
       if (!r) { results.push({ id, refNo: null, ok: false, message: 'Not found.' }); continue; }
       const fail = (message: string) => results.push({ id, refNo: r.refNo, ok: false, message });
       if (r.batchId === batchId) { results.push({ id, refNo: r.refNo, ok: true, message: 'Already in this batch.' }); continue; }
-      if (r.batchId) { fail(`Already in batch ${r.batch?.code ?? ''}. Remove it from there first.`); continue; }
+      const src = r.batchId ? from.get(r.batchId) : undefined;
+      if (r.batchId && !(late && opts.move)) { fail(`Already in batch ${r.batch?.code ?? ''}. Remove it from there first.`); continue; }
+      if (r.batchId && src && (src.closedAt || cutoffState(src) === 'ran')) { fail(`It is in batch ${src.code}, which is closed or already cut off. Take it out there first.`); continue; }
+      if (r.batchId && src && isRunning(src)) { fail(`Batch ${src.code} is running its cutoff right now. Try again in a minute.`); continue; }
+      if (r.batchId && !src) { fail('It changed meanwhile. Reload and try again.'); continue; }
       if (r.status === 'draft') { fail('A draft can be added once the Med Ref submits it.'); continue; }
       if (!canAddToBatch(r.status)) { fail(`It is ${STATUS_LABEL[r.status as ReceiptStatus].toLowerCase()}, so it is finished and cannot be added.`); continue; }
-      if (room <= 0) { fail(`The batch is full (${BATCH_MAX} receipts).`); continue; }
-      const done = await tx.receipt.updateMany({ where: { id, batchId: null, status: { in: [...BATCHABLE_STATUSES] } }, data: { batchId } });
+      if (room <= 0) { fail(`The batch is full (${BATCH_MAX} receipts).${late ? ' Add it to the next run.' : ''}`); continue; }
+      const done = await tx.receipt.updateMany({ where: { id, batchId: r.batchId ?? null, status: { in: [...BATCHABLE_STATUSES] } }, data: { batchId, ...mark } });
       if (!done.count) { fail('It changed meanwhile. Reload and try again.'); continue; }
       room--;
-      added.push({ id, refNo: r.refNo });
-      results.push({ id, refNo: r.refNo, ok: true, message: 'Added.' });
+      added.push({ id, refNo: r.refNo, from: src?.code ?? null });
+      results.push({ id, refNo: r.refNo, ok: true, message: src ? `Moved here from ${src.code}.` : late ? 'Added late.' : 'Added.' });
     }
-    return b.code;
+    return { code: b.code, label: batchLabel(b), late, reason, fromIds: new Map([...from.values()].map((x) => [x.code, x.id])) };
   }, { timeout: 60_000 });
-  for (const a of added) await audit(req, { action: 'batch.receipt_added', entityType: 'receipt', entityId: a.id, summary: `added to batch ${code}`, after: { batch: code } });
-  if (added.length) await audit(req, { action: 'batch.receipts_added', entityType: 'batch', entityId: batchId, summary: `added ${added.length} receipt${added.length === 1 ? '' : 's'} to batch ${code}`, after: { receipts: added.map((a) => a.refNo) } });
-  return { results, added: added.length, skipped: results.filter((r) => !r.ok).length };
+  const { code, late, reason } = out;
+  for (const a of added) {
+    if (a.from) {
+      await audit(req, { action: 'batch.receipt_moved', entityType: 'receipt', entityId: a.id, summary: `moved from batch ${a.from} to ${code}`, before: { batch: a.from }, after: { batch: code } });
+      await audit(req, { action: 'batch.receipt_moved', entityType: 'batch', entityId: out.fromIds.get(a.from)!, summary: `${a.refNo} moved from batch ${a.from} to ${code}`, after: { receipt: a.refNo, to: code } });
+    }
+    if (late) await audit(req, { action: 'batch.receipt_added_late', entityType: 'receipt', entityId: a.id, summary: `added late to batch ${code}: ${reason}`, after: { batch: code, reason } });
+    else await audit(req, { action: 'batch.receipt_added', entityType: 'receipt', entityId: a.id, summary: `added to batch ${code}`, after: { batch: code } });
+  }
+  if (added.length) {
+    const n = `${added.length} receipt${added.length === 1 ? '' : 's'}`;
+    await audit(req, late
+      ? { action: 'batch.receipts_added_late', entityType: 'batch', entityId: batchId, summary: `added ${n} late to batch ${code}: ${reason}`, after: { receipts: added.map((a) => a.refNo), reason } }
+      : { action: 'batch.receipts_added', entityType: 'batch', entityId: batchId, summary: `added ${n} to batch ${code}`, after: { receipts: added.map((a) => a.refNo) } });
+    if (late) {
+      const who = [...new Set([...(await usersWithPermission('batch.manage')), ...(await usersWithPermission('payment.mark'))])].filter((id) => id !== auth.user.id);
+      await notify({ userIds: who, type: 'batch.added_late', batchId, text: `${n} ${added.length === 1 ? 'was' : 'were'} added late to ${out.label} by ${auth.user.name}: ${reason}` });
+    }
+  }
+  return { results, added: added.length, skipped: results.filter((r) => !r.ok).length, late };
 }
 
 batchesRouter.post('/', requirePerm('batch.manage'), async (req, res) => {
-  const body = batchCreateSchema.parse(req.body);
-  const b = await prisma.$transaction(async (tx) => tx.batch.create({ data: { code: await nextBatchCode(tx), name: body.name, createdById: req.auth!.user.id } }));
-  await audit(req, { action: 'batch.created', entityType: 'batch', entityId: b.id, summary: `created batch ${batchLabel(b)}`, after: { code: b.code, name: b.name } });
+  const body = batchCreateWithCutoffSchema.parse(req.body);
+  const rule = body.cutoffAt ? body.cutoffRule ?? DEFAULT_RULE : null;
+  if (rule && !canUseCutoffRule(req.auth!.permissions, rule)) throw ruleNotAllowed();
+  if (body.cutoffAt && body.cutoffAt.getTime() <= Date.now()) throw badRequest('Choose a cutoff time that is still to come.', 'CUTOFF_PAST');
+  const b = await prisma.$transaction(async (tx) => tx.batch.create({
+    data: { code: await nextBatchCode(tx), name: body.name, createdById: req.auth!.user.id, ...(body.cutoffAt ? { cutoffAt: body.cutoffAt, cutoffRule: JSON.stringify(rule) } : {}) },
+  }));
+  await audit(req, { action: 'batch.created', entityType: 'batch', entityId: b.id, summary: `created batch ${batchLabel(b)}${body.cutoffAt ? ` with a cutoff at ${fmtCutoff(body.cutoffAt, zoneOf({}))}` : ''}`, after: { code: b.code, name: b.name, ...(rule ? { cutoffAt: body.cutoffAt, rule } : {}) } });
   const added = body.receiptIds ? await addReceipts(req, b.id, body.receiptIds) : null;
   res.status(201).json({ batch: { id: b.id, code: b.code, name: b.name }, ...(added ? { added } : {}) });
+});
+
+/** What a fill rule would take if it ran now (for the forms, before anything is saved). */
+batchesRouter.post('/cutoff-preview', requirePerm('batch.manage'), async (req, res) => {
+  const rule = cutoffRuleSchema.parse(req.body?.rule);
+  // Counting receipts at steps this person does not see would show them what the rule hides from them.
+  if (!canUseCutoffRule(req.auth!.permissions, rule)) throw ruleNotAllowed();
+  res.json(await preview(rule, zoneOf({})));
 });
 
 batchesRouter.patch('/:id', requirePerm('batch.manage'), async (req, res) => {
@@ -191,16 +294,77 @@ batchesRouter.patch('/:id', requirePerm('batch.manage'), async (req, res) => {
   const data: Prisma.BatchUpdateInput = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.closed !== undefined) data.closedAt = body.closed ? b.closedAt ?? new Date() : null;
-  const u = await prisma.batch.update({ where: { id: b.id }, data, include: { createdBy: { select: { id: true, name: true } } } });
+  // Closing a batch before its cutoff cancels the cutoff: nothing is added. A schedule's batch is then done, so the schedule opens its next one.
+  const cancels = body.closed === true && !b.closedAt && cutoffState(b) === 'pending';
+  if (cancels && isRunning(b)) throw conflict('Its cutoff is running right now. Try again in a minute.', 'CUTOFF_RUNNING');
+  if (cancels) Object.assign(data, b.scheduleId ? { cutoffAt: null, cutoffDoneAt: new Date() } : { cutoffAt: null, cutoffRule: null });
+  const u = await prisma.batch.update({ where: { id: b.id }, data, include: batchIncludes });
   const what = body.closed === true && !b.closedAt ? 'closed' : body.closed === false && b.closedAt ? 'reopened' : 'renamed';
-  await audit(req, { action: `batch.${what}`, entityType: 'batch', entityId: b.id, summary: `${what} batch ${u.code}`, before: { name: b.name, closed: !!b.closedAt }, after: { name: u.name, closed: !!u.closedAt } });
+  await audit(req, { action: `batch.${what}`, entityType: 'batch', entityId: b.id, summary: `${what} batch ${u.code}${cancels ? ' before its cutoff, so the cutoff is cancelled' : ''}`, before: { name: b.name, closed: !!b.closedAt, ...(cancels ? { cutoffAt: b.cutoffAt } : {}) }, after: { name: u.name, closed: !!u.closedAt } });
+  if (cancels && b.schedule) await ensureCurrent(b.schedule);
   res.json({ batch: batchHead(u) });
 });
 
-/** Only an empty batch can be deleted, so no record of what was grouped is lost. */
+/**
+ * Sets, moves or removes one batch's cutoff. A time already past runs the cutoff at once, only when `runNow` confirms it.
+ * A schedule's batch can be moved (a holiday, say) but not left without a cutoff: the schedule is paused for that.
+ */
+batchesRouter.put('/:id/cutoff', requirePerm('batch.manage'), async (req, res) => {
+  const auth = req.auth!;
+  const b = await loadBatch(idParam(req.params.id));
+  const body = batchCutoffSchema.parse(req.body);
+  const state = cutoffState(b);
+  const s = b.schedule;
+  const tz = zoneOf(b);
+  if (b.closedAt) throw conflict('This batch is closed. Reopen it to give it a cutoff.', 'BATCH_CLOSED');
+  if (state === 'ran') throw conflict('This batch’s cutoff has already run.', 'CUTOFF_RAN');
+  if (state === 'cancelled' || (b.scheduleId && !s)) throw conflict('This batch’s cutoff was cancelled when it was closed early, and its schedule has moved on to the next batch.', 'CUTOFF_RAN');
+  if (isRunning(b)) throw conflict('Its cutoff is running right now. Try again in a minute.', 'CUTOFF_RUNNING');
+  if (body.cutoffAt === null) {
+    if (s) throw conflict(`This batch belongs to the cutoff schedule “${s.name}”. Pause or change the schedule instead.`, 'SCHEDULE_BATCH');
+    if (state === 'pending') {
+      await prisma.batch.update({ where: { id: b.id }, data: { cutoffAt: null, cutoffRule: null } });
+      await audit(req, { action: 'batch.cutoff_removed', entityType: 'batch', entityId: b.id, summary: `removed the cutoff of batch ${b.code}`, before: { cutoffAt: b.cutoffAt, rule: ruleOf(b.cutoffRule) } });
+    }
+    return res.json({ ok: true });
+  }
+  if (s && !s.isOn) throw conflict(`The schedule “${s.name}” is paused. Switch it on to give this batch its cutoff again.`, 'SCHEDULE_PAUSED');
+  const rule = body.cutoffRule ?? (b.cutoffRule ? ruleOf(b.cutoffRule) : DEFAULT_RULE);
+  if (!canUseCutoffRule(auth.permissions, rule)) throw ruleNotAllowed();
+  const past = body.cutoffAt.getTime() <= Date.now();
+  if (past && !body.runNow) throw conflict(`${fmtCutoff(body.cutoffAt, tz)} has already passed. Run the cutoff now, or choose a later time.`, 'CUTOFF_PAST');
+  // A schedule's batch is named after its cutoff date; it follows the move unless someone renamed it.
+  const name = s && b.cutoffAt && b.name === cutoffBatchName(s.name, b.cutoffAt, tz) ? cutoffBatchName(s.name, body.cutoffAt, tz) : b.name;
+  try {
+    const done = await prisma.batch.updateMany({ where: { id: b.id, closedAt: null, cutoffDoneAt: null, OR: [{ cutoffClaimedAt: null }, { cutoffClaimedAt: { lt: new Date(Date.now() - CUTOFF_CLAIM_MS) } }] }, data: { cutoffAt: body.cutoffAt, cutoffRule: JSON.stringify(rule), name } });
+    if (!done.count) throw conflict('It changed meanwhile. Reload and try again.', 'RECORD_CHANGED');
+  } catch (e) {
+    if (isUnique(e)) throw conflict('Another batch of this schedule already has that cutoff time. Choose another.', 'CUTOFF_TAKEN');
+    throw e;
+  }
+  await audit(req, { action: state === 'pending' ? 'batch.cutoff_changed' : 'batch.cutoff_set', entityType: 'batch', entityId: b.id, summary: `${state === 'pending' ? 'moved' : 'set'} the cutoff of batch ${b.code} to ${fmtCutoff(body.cutoffAt, tz)}`, before: state === 'pending' ? { cutoffAt: b.cutoffAt, rule: ruleOf(b.cutoffRule) } : undefined, after: { cutoffAt: body.cutoffAt, rule } });
+  if (past) return res.json({ ran: await runCutoff(b.id, actorOf(req)) });
+  res.json({ ok: true });
+});
+
+/** Runs the cutoff now. Early, it uses up that slot: a schedule's next batch gets the slot after the planned one, not the next hour. */
+batchesRouter.post('/:id/cutoff/run', requirePerm('batch.manage'), async (req, res) => {
+  const b = await loadBatch(idParam(req.params.id));
+  if (b.closedAt) throw conflict('This batch is closed.', 'BATCH_CLOSED');
+  if (cutoffState(b) !== 'pending') throw conflict('This batch has no cutoff waiting.', 'NO_CUTOFF');
+  const ran = await runCutoff(b.id, actorOf(req));
+  if (!ran) throw conflict('Its cutoff is running right now. Try again in a minute.', 'CUTOFF_RUNNING');
+  res.json({ ran });
+});
+
+/** Only an empty batch can be deleted, so no record of what was grouped is lost. A switched-on schedule's open batch stays: pause or delete the schedule. */
 batchesRouter.delete('/:id', requirePerm('batch.manage'), async (req, res) => {
   const b = await loadBatch(idParam(req.params.id));
-  const done = await prisma.batch.deleteMany({ where: { id: b.id, receipts: { none: {} } } });
+  if (b.schedule?.isOn && b.part === 1 && !b.cutoffDoneAt) throw conflict(`This is the open batch of the cutoff schedule “${b.schedule.name}”. Pause or delete the schedule instead.`, 'SCHEDULE_BATCH');
+  if (isRunning(b)) throw conflict('Its cutoff is running right now. Try again in a minute.', 'CUTOFF_RUNNING');
+  // A run's later parts point at their first batch, which then stays (MySQL cannot check that inside the delete itself).
+  const hasParts = await prisma.batch.count({ where: { partOfId: b.id } });
+  const done = hasParts ? { count: 0 } : await prisma.batch.deleteMany({ where: { id: b.id, receipts: { none: {} } } });
   if (!done.count) throw conflict('Remove its receipts first. A batch with paid receipts is kept for the record.', 'BATCH_NOT_EMPTY');
   await audit(req, { action: 'batch.deleted', entityType: 'batch', entityId: b.id, summary: `deleted the empty batch ${b.code}`, before: { code: b.code, name: b.name } });
   res.json({ ok: true });
@@ -209,7 +373,8 @@ batchesRouter.delete('/:id', requirePerm('batch.manage'), async (req, res) => {
 batchesRouter.post('/:id/receipts', requirePerm('batch.manage'), async (req, res) => {
   const b = await loadBatch(idParam(req.params.id));
   const body = batchAddSchema.parse(req.body);
-  res.json(await addReceipts(req, b.id, body.receiptIds));
+  const late = lateAddSchema.parse(req.body ?? {});
+  res.json(await addReceipts(req, b.id, body.receiptIds, late));
 });
 
 batchesRouter.delete('/:id/receipts/:rid', requirePerm('batch.manage'), async (req, res) => {
@@ -218,7 +383,7 @@ batchesRouter.delete('/:id/receipts/:rid', requirePerm('batch.manage'), async (r
   const r = await prisma.receipt.findFirst({ where: { AND: [{ id: rid, batchId: b.id }, visibleWhere(req.auth!)] }, select: { id: true, refNo: true, status: true } });
   if (!r) throw notFound('That receipt is not in this batch.');
   if (!canRemoveFromBatch(r.status)) throw conflict('A paid receipt stays in its batch, so the batch shows what was paid together.', 'PAID_IN_BATCH');
-  const done = await prisma.receipt.updateMany({ where: { id: r.id, batchId: b.id, status: { not: 'paid' } }, data: { batchId: null } });
+  const done = await prisma.receipt.updateMany({ where: { id: r.id, batchId: b.id, status: { not: 'paid' } }, data: { batchId: null, batchLateAt: null, batchLateNote: null } });
   if (!done.count) throw conflict('It changed meanwhile. Reload and try again.', 'RECORD_CHANGED');
   await audit(req, { action: 'batch.receipt_removed', entityType: 'receipt', entityId: r.id, summary: `removed from batch ${b.code}`, before: { batch: b.code } });
   res.json({ ok: true });

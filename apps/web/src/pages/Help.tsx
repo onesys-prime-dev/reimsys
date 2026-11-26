@@ -140,6 +140,22 @@ export function HelpPage() {
       ]} />
       <p>People hear about a batch once, in a summary, instead of once per receipt. A returned or disapproved receipt does not hold up the rest.</p>
       {can('batch.manage') && <p><b>Close</b> a batch when it is complete so nothing more is added; its receipts carry on as usual. A receipt can be taken out until it is paid. Only an empty batch can be deleted. <b>Export</b> on the batch page downloads its receipts, and Reports can be limited to one batch.</p>}
+      <h3 id="cutoffs">Cutoffs</h3>
+      <p>A batch can have a <b>cutoff</b>: a time at which it takes every matching receipt that is in no other batch, then closes. After that it is worked on like any batch.</p>
+      <ul>
+        {can('batch.schedule') && <li><b>Repeating:</b> under <Link to="/batches?tab=schedules">Batches → Cutoff schedules</Link>, set the days (weekly, or days of the month such as the 15th and the last day), the time, and which receipts it takes. Each schedule keeps one open batch; when it runs, the next one opens by itself.</li>}
+        {can('batch.manage') && <li><b>One batch:</b> tick “Fill and close it automatically” when making a batch, or press <b>Set a cutoff</b> on its page.</li>}
+        <li><b>Which receipts:</b> approved only, or anything in progress (submitted, checked or approved), with the date that counts (approved, submitted, or the receipt date) and, if wanted, only some places or people. Returned and on-hold receipts are never taken.</li>
+        <li><b>Latecomers</b> stay out and go to the next run. <b>Run cutoff now</b> runs it early; that uses up the slot, so a schedule’s next batch gets the following one. <b>Change this cutoff</b> moves one run, for a holiday say.</li>
+        <li>Closing a batch before its cutoff cancels the cutoff. When nothing matched, the batch is not closed empty: a schedule’s batch waits for its next slot.</li>
+        <li>Everyone who makes batches is told once when a cutoff runs, in the bell and by email.</li>
+      </ul>
+      {can('batch.manage') && (
+        <>
+          <h3 id="late">Adding late</h3>
+          <p>A receipt that missed the cutoff can still join that run with <b>Add late</b> on the batch page. A reason is required, the batch stays closed, and the receipt is marked <b>Late</b> with the reason (on the batch, the receipt and in exports). It works while the batch still has something unpaid; once everything in it is paid or disapproved, the batch is final. A receipt sitting in another open batch whose cutoff has not run is moved over in the same step.</p>
+        </>
+      )}
     </Guide>,
   );
 

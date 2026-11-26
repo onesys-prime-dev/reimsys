@@ -150,11 +150,12 @@ small,.muted{color:var(--muted)}
 .search{position:relative;flex:1 1 220px;max-width:340px}
 .search .ic{position:absolute;left:11px;top:10px;color:var(--muted);width:18px;height:18px}
 .search input{padding-left:36px}
-input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=tel],select,textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 12px;min-height:42px}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=tel],input[type=time],input[type=search],input[type=datetime-local],select,textarea{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:9px 12px;min-height:42px}
 textarea{min-height:92px;resize:vertical}
 input:disabled{background:var(--soft);color:var(--muted)}
-label.f{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.84rem;min-width:0}
-label.f .hint{font-weight:400;color:var(--muted)}
+label.f,div.cut-f{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:.84rem;min-width:0}
+label.f .hint,div.cut-f .hint{font-weight:400;color:var(--muted)}
+.cut-rule small,.cut-f small{font-weight:400}
 .err{color:var(--bad);font-size:.8rem;font-weight:500}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:5px 12px;font-size:.84rem;font-weight:500;color:var(--muted)}
@@ -652,7 +653,7 @@ a.chip:hover{border-color:var(--accent);color:var(--ink)}
 .btn.pri,.btn.ok{color:var(--accent-ink)}
 .btn.bad{color:var(--bad)}.btn.hold{color:var(--hold)}.btn.ghost{color:var(--muted)}
 /* iPhone date boxes have a built-in width and stuck out of the card. */
-input[type=date],input[type=time]{display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+input[type=date],input[type=time],input[type=datetime-local]{display:block;min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
 input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
 .form>*,.f,.field{min-width:0}
 /* The scan editor: the whole photo stays on the screen, so all four corner dots can be reached (a tall photo used to push the bottom ones off-screen). */
@@ -944,3 +945,19 @@ tr.ev-flag td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 }
 .ev-r .ev-calc{grid-column:1/-1;white-space:normal;overflow:visible;font-size:.8rem;line-height:1.4}
 .ev-r .ev-calc b{display:inline;color:var(--ink)}
+/* batch cutoffs: the rule fields, the cutoff panel on a batch, and the schedule cards */
+.cut-rule{display:grid;gap:14px}
+.cut-rule .seg{flex-wrap:wrap;width:fit-content;max-width:100%}
+.cut-panel{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;justify-content:space-between}
+.cut-panel .cut-when{display:grid;gap:4px;min-width:0;flex:1 1 260px}
+.cut-panel .btns{display:flex;gap:8px;flex-wrap:wrap}
+.pill.late{background:var(--warn-soft);color:var(--warn);border:0;cursor:pointer;font:inherit;font-size:.78rem;font-weight:700}
+.sched-days{display:flex;gap:6px;flex-wrap:wrap}
+.sched-days .btn{min-width:44px;justify-content:center}
+span.pill.late{white-space:normal;max-width:100%;overflow-wrap:anywhere}
+/* a receipt on the batch page: its tags (late, waiting for you) and the remove button sit beside it, or under it on a phone */
+.bat-line{display:flex;align-items:center}
+.bat-main{flex:1;min-width:0}
+.bat-tags{display:flex;align-items:center;gap:6px;padding-right:8px;flex-shrink:0}
+.bat-tags:empty{display:none}
+@media(max-width:600px){.bat-line{flex-wrap:wrap}.bat-main{flex-basis:100%}.bat-tags{width:100%;justify-content:flex-end;padding:0 12px 10px;margin-top:-4px}}

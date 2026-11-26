@@ -23,7 +23,7 @@ export const receiptInclude = {
   encoder: { select: { id: true, name: true } },
   document: true,
   chargeLocation: { select: { id: true, name: true } },
-  batch: { select: { id: true, code: true, name: true } },
+  batch: { select: { id: true, code: true, name: true, closedAt: true, cutoffAt: true, cutoffDoneAt: true } },
   payment: { include: { recordedBy: { select: { id: true, name: true } } } },
 } satisfies Prisma.ReceiptInclude;
 
@@ -68,6 +68,8 @@ export function receiptBrief(r: ReceiptRow) {
     updatedAt: r.updatedAt,
     docNo: r.document?.docNo ?? null,
     batch: r.batch,
+    batchLateAt: r.batchLateAt,
+    batchLateNote: r.batchLateNote,
   };
 }
 

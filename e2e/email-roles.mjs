@@ -48,7 +48,7 @@ try {
   await call(U.manager, 'DELETE', '/settings/email-templates/approved'); // back to the default
   ok('and it can be reset to the default', (await call(U.manager, 'GET', '/settings/email-templates')).s === 200);
   ok('the mail password is never shown', !JSON.stringify(mail).includes('pass":"') && mail.hasPassword !== undefined);
-  ok('there are seventeen templates', (tpl.templates ?? tpl).length === 17, String((tpl.templates ?? tpl).length));
+  ok('there are eighteen templates', (tpl.templates ?? tpl).length === 18, String((tpl.templates ?? tpl).length));
   ok('nobody signed out can reach any of it', (await call('', 'GET', '/email-schedules')).s === 401 && (await call('', 'GET', '/email-log')).s === 401 && (await call('', 'GET', '/settings/mail')).s === 401);
 } finally {
   for (const id of made) await call(U.admin, 'DELETE', `/email-schedules/${id}`);
