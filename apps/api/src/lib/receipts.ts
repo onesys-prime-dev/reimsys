@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { availableActions, canEditReceipt, receiptWarnings, taxImpact, incompleteReasons, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
+import { amountTerm, dateTerm, labelMatches, likeSafe, searchTerms, availableActions, canEditReceipt, receiptWarnings, taxImpact, incompleteReasons, parseIssues, TRANSACTION_LABEL, CLASSIFICATION_LABEL, type ReceiptStatus } from '@reimsys/shared';
 import { prisma } from '../db.js';
 import { forbidden, notFound } from './errors.js';
 import { getSettings } from './appSettings.js';
@@ -24,6 +24,7 @@ export const receiptInclude = {
   document: true,
   chargeLocation: { select: { id: true, name: true } },
   batch: { select: { id: true, code: true, name: true, closedAt: true, cutoffAt: true, cutoffDoneAt: true } },
+  wantBatch: { select: { id: true, code: true, name: true } },
   payment: { include: { recordedBy: { select: { id: true, name: true } } } },
 } satisfies Prisma.ReceiptInclude;
 
@@ -70,6 +71,8 @@ export function receiptBrief(r: ReceiptRow) {
     batch: r.batch,
     batchLateAt: r.batchLateAt,
     batchLateNote: r.batchLateNote,
+    // A draft's chosen batch: it joins when submitted.
+    wantBatch: r.wantBatch,
   };
 }
 
@@ -140,6 +143,27 @@ export function filterWhere(q: { status?: string; q?: string; categoryId?: numbe
     if (q.from) w.receiptDate.gte = new Date(q.from + 'T00:00:00Z');
     if (q.to) w.receiptDate.lte = new Date(q.to + 'T00:00:00Z');
   }
-  if (q.q) w.OR = [{ payee: { contains: q.q } }, { refNo: { contains: q.q } }, { description: { contains: q.q } }, { invoiceNo: { contains: q.q } }, { vendorTin: { contains: q.q } }, { encoder: { name: { contains: q.q } } }, { batch: { code: { contains: q.q } } }];
+  const terms = searchTerms(q.q);
+  if (terms.length) w.AND = terms.map(termWhere);
   return w;
+}
+
+/** One searched word: found anywhere on the receipt that people can read. Every word must be found (see searchTerms). */
+function termWhere(t: string): Prisma.ReceiptWhereInput {
+  const c = { contains: likeSafe(t) };
+  const or: Prisma.ReceiptWhereInput[] = [
+    { payee: c }, { refNo: c }, { description: c }, { invoiceNo: c }, { vendorTin: c }, { vendorAddress: c }, { reasonForSpending: c }, { classificationOther: c },
+    { checkNote: c }, { decisionNote: c }, { lastNote: c }, { paidShortReason: c }, { batchLateNote: c },
+    { encoder: { name: c } }, { chargeLocation: { name: c } }, { category: { name: c } },
+    { batch: { OR: [{ code: c }, { name: c }] } }, { document: { docNo: c } }, { payment: { paymentNo: c } }, { comments: { some: { body: c } } },
+  ];
+  const amount = amountTerm(t);
+  if (amount) or.push({ amount: amount }, { paidAmount: amount });
+  const date = dateTerm(t);
+  if (date) or.push({ receiptDate: new Date(`${date}T00:00:00Z`) });
+  const labels = labelMatches(t);
+  if (labels.statuses.length) or.push({ status: { in: labels.statuses } });
+  if (labels.classifications.length) or.push({ classification: { in: labels.classifications } });
+  if (labels.types.length) or.push({ transactionType: { in: labels.types } });
+  return { OR: or };
 }

@@ -242,7 +242,10 @@ model Receipt {
   // Payment step. Filled while the receipt is Paid and cleared again when the payment is reversed.
   // The batch it is grouped in, if any (see Batch). Not part of the receipt's content, so it does not change the version.
   batchId             Int?
-  batch               Batch?                 @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  batch               Batch?                 @relation("InBatch", fields: [batchId], references: [id], onDelete: SetNull)
+  /// The batch the Med Ref chose while it is still a draft (drafts are private, so it is not in the batch yet). It joins when submitted.
+  wantBatchId         Int?
+  wantBatch           Batch?                 @relation("WantBatch", fields: [wantBatchId], references: [id], onDelete: SetNull)
   // Set when the receipt went into its batch after the batch closed or its cutoff ran (a late addition), with the reason. Cleared when it leaves the batch.
   batchLateAt         DateTime?
   batchLateNote       String?                @db.VarChar(300)
@@ -264,6 +267,7 @@ model Receipt {
   @@index([vendorTin, invoiceNo])
   @@index([paymentId])
   @@index([batchId])
+  @@index([wantBatchId])
   @@map("receipt")
 }
 
@@ -323,7 +327,9 @@ model Batch {
   partOfId        Int?
   partOf          Batch?         @relation("BatchParts", fields: [partOfId], references: [id], onDelete: SetNull)
   parts           Batch[]        @relation("BatchParts")
-  receipts        Receipt[]
+  receipts        Receipt[]      @relation("InBatch")
+  /// Drafts whose Med Ref chose this batch; they join when submitted.
+  wantedBy        Receipt[]      @relation("WantBatch")
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 

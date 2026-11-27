@@ -7,7 +7,10 @@ import {
   EVIDENCE_MAX_BYTES, EVIDENCE_MAX_FILES, TRANSITIONS, actionBodySchema, listQuerySchema, makeReceiptSchema, vatChecks, isCompleteTin,
   type ReceiptAction, type ReceiptStatus, canEditReceipt, transitionFor, bulkSchema, commentSchema,
   cleanFormData, VAT_LABEL, classificationText, issuesText, issuesFor, joinIssues, fixStepFor, RETURN_ISSUE_CODES, type ReturnIssueCode,
+  batchChoiceSchema, canAddToBatch, isLateBatch,
 } from '@reimsys/shared';
+import { checkChoosable, isChoosable, moveOwnReceipt } from '../lib/batchChoice.js';
+import { zoneOf } from '../lib/cutoffs.js';
 import { prisma } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../lib/errors.js';
@@ -79,6 +82,37 @@ receiptsRouter.get('/', async (req, res) => {
 receiptsRouter.get('/encoders', async (req, res) => {
   const rows = await prisma.receipt.findMany({ where: visibleWhere(req.auth!), distinct: ['encoderId'], select: { encoder: { select: { id: true, name: true } } } });
   res.json({ people: rows.map((r) => r.encoder).sort((a, b) => a.name.localeCompare(b.name)) });
+});
+
+/** The batches a Med Ref can put their own receipt in: still open, cutoff not run yet. */
+receiptsRouter.get('/batch-choices', requirePerm('receipt.create'), async (_req, res) => {
+  const rows = await prisma.batch.findMany({ where: { closedAt: null }, include: { schedule: { select: { timeZone: true } } }, orderBy: { id: 'desc' }, take: 200 });
+  res.json({ batches: rows.filter(isChoosable).slice(0, 100).map((b) => ({ id: b.id, code: b.code, name: b.name, cutoffAt: b.cutoffAt, timeZone: zoneOf(b) })) });
+});
+
+/**
+ * The Med Ref puts their own receipt in a batch, moves it to another, or takes it out (batchId null). A draft only remembers the
+ * choice and joins when it is submitted. Only open batches whose cutoff has not run can be chosen or left.
+ */
+receiptsRouter.put('/:id/batch', requirePerm('receipt.create'), async (req, res) => {
+  const auth = req.auth!;
+  const { batchId } = batchChoiceSchema.parse(req.body);
+  const r = await loadVisible(auth, idParam(req.params.id));
+  assertOwner(auth, r);
+  if (r.status === 'draft') {
+    if (batchId !== r.wantBatchId) {
+      const b = batchId ? await checkChoosable(batchId) : null;
+      await prisma.receipt.updateMany({ where: { id: r.id, status: 'draft' }, data: { wantBatchId: batchId } });
+      await audit(req, { action: 'receipt.batch_chosen', entityType: 'receipt', entityId: r.id, summary: b ? `chose batch ${b.code}; it joins when submitted` : 'cleared the batch it was to join', before: { batch: r.wantBatch?.code ?? null }, after: { batch: b?.code ?? null } });
+    }
+  } else if (batchId !== r.batchId) {
+    if (!canAddToBatch(r.status)) throw conflict('It is paid or disapproved, so its batch cannot change now.', 'FINISHED');
+    const { from, to } = await moveOwnReceipt(r.id, r.batchId, batchId);
+    if (from) await audit(req, { action: 'batch.receipt_removed', entityType: 'receipt', entityId: r.id, summary: `taken out of batch ${from.code} by its Med Ref`, before: { batch: from.code } });
+    if (to) await audit(req, { action: 'batch.receipt_added', entityType: 'receipt', entityId: r.id, summary: `added to batch ${to.code} by its Med Ref`, after: { batch: to.code } });
+  }
+  const fresh = await prisma.receipt.findUniqueOrThrow({ where: { id: r.id }, include: receiptInclude });
+  res.json({ receipt: await receiptDetail(auth, fresh) });
 });
 
 receiptsRouter.get('/export', async (req, res) => {
@@ -353,7 +387,10 @@ export async function runAction(req: import('express').Request, action: ReceiptA
 
   const data: Prisma.ReceiptUncheckedUpdateManyInput = { status: t.to, version: { increment: 1 } };
   // A draft is private to its Med Ref, so a withdrawn receipt leaves its batch (nobody else could take it out).
-  if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null, batchId: null, batchLateAt: null, batchLateNote: null });
+  // The Med Ref's chosen batch is kept as the draft's choice while that batch is still open, so it rejoins when sent again.
+  const rejoin = action === 'withdraw' && r.batch && !isLateBatch(r.batch) ? r.batchId : null;
+  if (action === 'withdraw') Object.assign(data, { submittedAt: null, lastNote: null, batchId: null, batchLateAt: null, batchLateNote: null, wantBatchId: rejoin });
+  if (action !== 'withdraw' && action !== 'submit' && r.wantBatchId) data.wantBatchId = null;
   if (action === 'submit') Object.assign(data, { submittedAt: now, checkedById: null, checkedAt: null, checkNote: null, lastNote: null, ckCompany: null, ckTin: null, ckAddress: null });
   if (action === 'check') Object.assign(data, { checkedById: auth.user.id, checkedAt: now, checkNote: note, ckCompany: body.seen?.company ?? null, ckTin: body.seen?.tin ?? null, ckAddress: body.seen?.address ?? null });
   if (action === 'return' || action === 'reserve' || action === 'request') data.lastNote = note;
@@ -385,7 +422,20 @@ export async function runAction(req: import('express').Request, action: ReceiptA
     before: { status: r.status, ...(action === 'reverse_payment' && r.payment ? { paymentNo: r.payment.paymentNo, amount: Number(r.paidAmount) } : {}) }, after: { status: t.to, ...(reason ? { note: reason } : {}), ...(issues.length ? { issues } : {}), ...(docNo ? { docNo } : {}), ...(action === 'check' && body.seen ? { seen: body.seen } : {}) },
   });
 
-  if (action === 'withdraw' && r.batch) await audit(req, { action: 'batch.receipt_removed', entityType: 'receipt', entityId: r.id, summary: `removed from batch ${r.batch.code} (withdrawn)`, before: { batch: r.batch.code } });
+  if (action === 'withdraw' && r.batch) await audit(req, { action: 'batch.receipt_removed', entityType: 'receipt', entityId: r.id, summary: `removed from batch ${r.batch.code} (withdrawn${rejoin ? '; it rejoins when sent again' : ''})`, before: { batch: r.batch.code } });
+
+  // A draft whose Med Ref chose a batch joins it now. If that batch closed or filled meanwhile, the receipt is still submitted and they are told.
+  // (Only when it is not in a batch yet: a returned receipt sent again is usually still in its batch.)
+  if (action === 'submit' && r.wantBatchId && !r.batchId) {
+    const code = r.wantBatch?.code ?? 'the chosen batch';
+    try {
+      const { to } = await moveOwnReceipt(r.id, null, r.wantBatchId);
+      await audit(req, { action: 'batch.receipt_added', entityType: 'receipt', entityId: r.id, summary: `added to batch ${to!.code} on submitting, as its Med Ref chose`, after: { batch: to!.code } });
+    } catch (e) {
+      await prisma.receipt.updateMany({ where: { id: r.id }, data: { wantBatchId: null } });
+      await notify({ userIds: [r.encoderId], type: 'receipt.batch_missed', receiptId: r.id, text: `${r.refNo} was submitted but did not join ${code}. ${e instanceof HttpError ? e.message : 'It could not be added.'}` });
+    }
+  }
 
   if (opts.quiet) return null;
 

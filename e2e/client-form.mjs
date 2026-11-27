@@ -121,7 +121,7 @@ const ff = new FormData(); ff.append('file', new Blob([fullCsv], { type: 'text/c
 const fpv = await ana.req('POST', '/imports', ff);
 check('two rows are valid and the incomplete one is rejected with reasons', fpv.status === 201 && fpv.data.validRows === 2 && fpv.data.errorCount === 1 && /vendor_tin|company_check/.test(fpv.data.errors[0].message), JSON.stringify(fpv.data));
 await ana.post(`/imports/${fpv.data.id}/confirm`);
-const imported = (await ana.get(`/receipts?q=${encodeURIComponent('Form Test Import A ' + stamp)}`)).data.items[0];
+const imported = (await ana.get(`/receipts?q=${encodeURIComponent('"Form Test Import A ' + stamp + '"')}`)).data.items[0];
 check('imported rows keep their invoice answers', imported?.invoiceNo === 'IMP-1' && imported.birInvoice === true && imported.transactionType === 'product');
 const importedFull = imported ? (await ana.get('/receipts/' + imported.id)).data.receipt : null;
 check('an imported "Other: ..." classification keeps its words', importedFull?.form?.classification === 'other' && importedFull.form.classificationOther === 'Clinic supplies', JSON.stringify(importedFull?.form));

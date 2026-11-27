@@ -676,3 +676,23 @@ Found and fixed on the way:
 - The "If it ran now" count showed the old number for a moment after the rule changed. It now says "Counting…" until the new number is in.
 - Inputs of type time, search and date-and-time had no styling; they now look like the other inputs.
 
+
+## Client requests (2026-11-27)
+
+### A Med Ref chooses the batch of their receipt
+Asked for: when going back to an encoded receipt, put it in the intended batch.
+- **Where:** a **Batch** field on the form (Reason for spending step) and **Choose batch / Change batch** on the receipt page, for the Med Ref who encoded it, until it is paid or disapproved.
+- **Which batches:** open ones whose cutoff has not run and is not running (`GET /receipts/batch-choices`). Accounting and the admins still make the batches.
+- **A draft** keeps the choice in `receipt.wantBatchId` (drafts are private, so it is not in the batch yet) and joins on submit. If the batch closed or filled meanwhile, the receipt is still submitted, and the Med Ref gets a bell notice saying it did not join and why. The batch page shows Accounting how many drafts are waiting to join.
+- **A submitted receipt** moves at once (`PUT /receipts/:id/batch`), with both batch rows locked as in late additions. Once its batch is closed or cut off, only Accounting can move it.
+- **Withdrawing** keeps the batch as the draft's choice while that batch is still open, so it rejoins when sent again.
+- Migration `20261127010000_batch_choice` (additive; rollback in `docs/rollback-batch-choice.sql`).
+
+### Search with any word
+Asked for: open a specific reimbursement from any hint or word.
+- Every word typed must be found somewhere on the receipt; "quoted words" stay together (`packages/shared/src/search.ts`).
+- **Searched:** vendor, reference, description, invoice no., TIN, vendor address, reason for spending, the "other" classification, notes (check, decision, return, short payment, late reason), comments, encoder, where to charge, category, batch code and name, REIM- and PAY- numbers. Also status, type and classification words; an amount (1,284.50 exactly, 1284 for the whole peso); and a date (2026-11-20).
+- The list, its export and the reports share it, always within what the person may see (drafts stay private).
+
+### Tests
+`packages/shared/test/search.test.ts`, `e2e/search-batch-choice-flow.mjs` (API), `e2e/search-batch-choice-ui.mjs` (Chrome, computer and phone), both in `run-all`. Help and the Word guide (Section 2 "Finding your way", Section 4 "Which batch", Start here) are updated.

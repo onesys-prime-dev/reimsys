@@ -23,6 +23,8 @@ export interface ReceiptBrief {
   /** Added to its batch after the batch closed or its cutoff ran, and why. */
   batchLateAt: string | null;
   batchLateNote: string | null;
+  /** A draft's chosen batch: it joins when submitted. */
+  wantBatch: { id: number; code: string; name: string | null } | null;
 }
 
 export interface EvidenceFile { id: number; fileName: string; mime: string; size: number; createdAt: string }
@@ -106,6 +108,8 @@ export interface BatchDetail extends BatchHead {
   late: boolean;
   lateCount: number;
   canAddLate: boolean;
+  /** Drafts whose Med Ref chose this batch; they join when submitted. */
+  waitingDrafts: number;
   parts: { id: number; code: string }[];
   partOf: { id: number; code: string } | null;
 }

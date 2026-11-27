@@ -6,7 +6,7 @@ import { Prisma as P } from '@prisma/client';
 import {
   BATCHABLE_STATUSES, BATCH_ACTION_PERMISSION, BATCH_MAX, CUTOFF_CLAIM_MS, EVIDENCE_MAX_BYTES, STATUS_LABEL,
   batchActionSchema, batchAddSchema, batchCreateWithCutoffSchema, batchCutoffSchema, batchDoneText, batchLabel, batchListQuerySchema, batchPaySchema, batchUpdateSchema,
-  canAddToBatch, canRemoveFromBatch, canUseCutoffRule, canViewBatches, cleanDeep, cutoffBatchName, cutoffRuleSchema, cutoffState, describeCutoffRule, fmtCutoff, isLateBatch, lateAddSchema,
+  canAddToBatch, canRemoveFromBatch, canUseCutoffRule, canViewBatches, cleanDeep, likeSafe, cutoffBatchName, cutoffRuleSchema, cutoffState, describeCutoffRule, fmtCutoff, isLateBatch, lateAddSchema,
   type BatchAction, type CutoffRule, type ReceiptStatus,
 } from '@reimsys/shared';
 import { config } from '../config.js';
@@ -93,7 +93,7 @@ batchesRouter.get('/', async (req, res) => {
   const where: Prisma.BatchWhereInput = {
     AND: [
       q.state === 'open' ? { closedAt: null } : q.state === 'closed' ? { closedAt: { not: null } } : {},
-      q.q ? { OR: [{ code: { contains: q.q } }, { name: { contains: q.q } }] } : {},
+      q.q ? { OR: [{ code: { contains: likeSafe(q.q) } }, { name: { contains: likeSafe(q.q) } }] } : {},
     ],
   };
   const batches = await prisma.batch.findMany({ where, include: batchIncludes, orderBy: { id: 'desc' }, take: 100 });
@@ -179,6 +179,8 @@ batchesRouter.get('/:id', async (req, res) => {
       late, lateCount,
       canAddLate: canManage && late && unfinished > 0,
       parts, partOf,
+      // Drafts whose Med Ref chose this batch: they join when submitted (their details stay private until then).
+      waitingDrafts: await prisma.receipt.count({ where: { wantBatchId: b.id, status: 'draft' } }),
       count: rows.length,
       total: rows.reduce((s, r) => s + Math.round(Number(r.amount) * 100), 0) / 100,
       counts,

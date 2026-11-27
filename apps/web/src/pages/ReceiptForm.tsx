@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 import { FieldGuide } from '../components/FieldGuide';
 import { TinInput } from '../components/TinInput';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, taxImpact, vatChecks, type FormCheck, type AppSettings, type Company } from '@reimsys/shared';
+import { fmtCutoff, FIX_STEPS, issueLabel, resolveFixStep, type FixStep, CLASSIFICATIONS, CLASSIFICATION_LABEL, classificationText, DEFAULT_COMPANY, DEFAULT_SETTINGS, TRANSACTION_LABEL, VAT_LABEL, makeReceiptSchema, peso, receiptProblems, receiptWarnings, taxImpact, vatChecks, type FormCheck, type AppSettings, type Company } from '@reimsys/shared';
+import { useAuth } from '../auth';
 import { api, errMsg, fmtDateTime, money as pesoMoney, todayIso } from '../api';
 import type { ReceiptDetail } from '../types';
 import { FilePreview } from '../components/FilePreview';
@@ -138,6 +139,17 @@ export function ReceiptFormPage() {
   const charges = useQuery({ queryKey: ['charge-locations'], queryFn: () => api<{ locations: { id: number; name: string }[] }>('/charge-locations') });
   const existing = useQuery({ queryKey: ['receipt', id], enabled: id !== null, queryFn: () => api<{ receipt: ReceiptDetail }>(`/receipts/${id}`) });
   const rec = existing.data?.receipt;
+  // The batch Accounting will process this receipt with. A draft keeps the choice and joins when it is submitted.
+  const { can } = useAuth();
+  const encodes = can('receipt.create');
+  const batchChoices = useQuery({ queryKey: ['batch-choices'], enabled: encodes, queryFn: () => api<{ batches: { id: number; code: string; name: string | null; cutoffAt: string | null; timeZone: string }[] }>('/receipts/batch-choices') });
+  const choosable = batchChoices.data?.batches ?? [];
+  const batchNow = rec ? String(rec.wantBatch?.id ?? rec.batch?.id ?? '') : '';
+  const [batchPick, setBatchPick] = useState<string | null>(null);
+  const batchValue = batchPick ?? batchNow;
+  // In a batch that is closed or cut off: only Accounting can move it now.
+  const stuckIn = rec?.batch && batchChoices.data && !choosable.some((b) => b.id === rec.batch!.id) ? rec.batch : null;
+  const wantGone = rec?.wantBatch && batchChoices.data && !choosable.some((b) => b.id === rec.wantBatch!.id) ? rec.wantBatch : null;
 
   const untouched = useMemo(() => (rec ? fromReceipt(rec) : EMPTY), [rec]);
   // What is typed is saved on the server as it goes, even half filled, so a wrong exit loses nothing.
@@ -326,9 +338,15 @@ export function ReceiptFormPage() {
         current = up.receipt;
         up.warnings.forEach((w) => toast(w));
       }
+      // The chosen batch is saved before submitting, so a draft joins it as it is sent.
+      if (batchPick !== null && batchPick !== batchNow) {
+        try { current = (await api<{ receipt: ReceiptDetail }>(`/receipts/${current!.id}/batch`, { method: 'PUT', body: { batchId: batchPick ? Number(batchPick) : null } })).receipt; }
+        catch (err) { toast(`The batch was not changed: ${errMsg(err)}`, 'bad'); }
+      }
       if (andSubmit) current = (await api<{ receipt: ReceiptDetail }>(`/receipts/${current!.id}/submit`, { method: 'POST', body: { version: current!.version } })).receipt;
       setDone(true); await sync.discard(); qc.invalidateQueries({ queryKey: ['form-drafts'] });
-      toast(andSubmit ? 'Submitted. Checkers have been notified.' : 'Draft saved.');
+      toast(andSubmit ? (current!.batch ? `Submitted into batch ${current!.batch.code}. Checkers have been notified.` : 'Submitted. Checkers have been notified.') : 'Draft saved.');
+      qc.invalidateQueries({ queryKey: ['batch-choices'] });
       qc.invalidateQueries({ queryKey: ['receipts'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.setQueryData(['receipt', current!.id], { receipt: current });
@@ -497,6 +515,20 @@ export function ReceiptFormPage() {
                   {rec?.form.chargeLocation && !(charges.data?.locations ?? []).some((c) => c.id === rec.form.chargeLocation!.id) && <option value={rec.form.chargeLocation.id}>{rec.form.chargeLocation.name}</option>}
                 </select>
               </Field>
+              {!encodes ? null : stuckIn ? (
+                <Field label="Batch" className="full">
+                  <span className="muted" data-testid="batch-stuck">In batch {stuckIn.code}{stuckIn.name ? ` · ${stuckIn.name}` : ''}, which is closed or already cut off. Ask Accounting if it should move.</span>
+                </Field>
+              ) : (
+                <Field label="Batch" hint="Optional" className="full">
+                  <select value={batchValue} disabled={!batchChoices.data} aria-label="Batch" onChange={(ev) => setBatchPick(ev.target.value)}>
+                    <option value="">No batch</option>
+                    {choosable.map((b) => <option key={b.id} value={b.id}>{b.code}{b.name ? ` · ${b.name}` : ''}{b.cutoffAt ? ` (cutoff ${fmtCutoff(b.cutoffAt, b.timeZone)})` : ''}</option>)}
+                    {wantGone && <option value={wantGone.id} disabled>{wantGone.code} (closed now: choose another)</option>}
+                  </select>
+                  <small className="muted">The batch Accounting will process it with.{batchValue ? (rec && rec.status !== 'draft' ? ' It moves there when you save.' : ' It joins the batch when you submit.') : ''}</small>
+                </Field>
+              )}
             </div>
           )}
 

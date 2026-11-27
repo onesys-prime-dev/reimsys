@@ -68,10 +68,12 @@ export function HelpPage() {
         <><b>Reimbursement details:</b> say whether the invoice is BIR-registered. If it is not, only the date, vendor, address and amount are needed.</>,
         <><b>Invoice details:</b> copy what is on the invoice. Beside the questions that have one, press the small <b>i</b> button to see a sample invoice with the place to look marked. Press outside the picture or <b>Close</b> to go back. The vendor TIN takes numbers only; the dashes are put in for you.</>,
         <><b>VAT details:</b> say whether the invoice is vatable, then the vatable amount, VAT, VAT-exempt amount and discount (write 0 when there is none). Then answer <b>Tax withheld?</b>. With <b>Yes</b> the amounts must add up and you add the withholding rate and amount on the next step. With <b>No</b> the form shows a potential loss in yellow: it is an estimate, not a verified figure.</>,
-        <><b>Reason for spending:</b> say why the money was spent, pick what it was for, and choose where to charge it.</>,
+        <><b>Reason for spending:</b> say why the money was spent, pick what it was for, and choose where to charge it. If Accounting groups receipts into batches, pick the <b>Batch</b> this one belongs to (optional).</>,
         <><b>Proof and review:</b> add the photo or PDF. Press <b>Scan receipt</b> to take the picture with the camera: lay the receipt flat in good light, keep all four corners in view, and wait for the green outline. You can drag the four dots in the editor if the outline is off. Check the summary, then <b>Submit</b>.</>,
       ]} />
       <p>You do not have to finish in one go. What you type is saved as you go, even half filled, so a wrong click or a closed page loses nothing. Come back from <b>New receipt</b> or from the note on <b>Receipts</b> and press <b>Continue</b>; it works from another device too. Photos and PDFs are not part of that and are added again. <b>Start over</b> throws the unfinished form away. You can also press <b>Save draft</b> on the last step. Changed your mind after sending it? Press <b>Withdraw</b> while it is still waiting; it goes back to Draft.</p>
+      <h3>Which batch</h3>
+      <p>Accounting pays receipts in <b>batches</b> (for example one per week or per branch). Choose the batch on the form, or press <b>Choose batch</b> on the receipt. A draft joins it when you submit; a receipt already sent moves straight away. Only open batches whose cutoff has not passed are offered. Once the batch has closed, only Accounting can move the receipt; if it closed before you submitted, your receipt is still sent and you are told.</p>
       <h3>If it comes back</h3>
       <p>A <b>Returned</b> receipt shows what to fix. Each problem has a <b>Fix</b> button that opens the form on the right step. Fix it and send it again. You get a notice and an email whenever something happens to your receipt.</p>
       <h3>Make it look the way you like</h3>
@@ -199,7 +201,7 @@ export function HelpPage() {
           <h3>Finding your way</h3>
           <ul>
             <li>The <b>Dashboard</b> shows what needs you first. The highlighted box is your queue.</li>
-            <li><b>Receipts</b> lists receipts. Use the search, the status buttons and the filters. The footer shows how many there are and their total.</li>
+            <li><b>Receipts</b> lists receipts. Type any words in the search: the vendor, a word from the reason or a comment, the amount (1,284.50 or 1284), a name, the date (2026-11-20), the status, the batch, or a REIM- or PAY- number. Every word must be on the receipt; put words in quotes to keep them together. The status buttons and filters narrow it further. The footer shows how many there are and their total.</li>
             <li>The <b>bell</b> shows what happened. Tap one to open that receipt.</li>
             <li>Photos open in a viewer: scroll or pinch to zoom, drag to move, double-tap to jump in and out.</li>
           </ul>

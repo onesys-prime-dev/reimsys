@@ -122,8 +122,8 @@ ok('the schedule opened its next batch, with the next Friday', B2 && B2.id !== B
 ok('and remembers the run', sNow.lastBatch?.id === B1.id && sNow.lastCount === 2);
 const ricaNew = (await since(U.rica, ricaBefore)).filter((n) => n.batchId === B1.id);
 ok('Accounting is told once', ricaNew.length === 1 && /closed at cutoff/.test(ricaNew[0].text) && /2 receipts were added/.test(ricaNew[0].text), JSON.stringify(ricaNew));
-const mails = (await call(U.admin, 'GET', '/email-log')).d.items.filter((e) => e.subject.includes(b1.code));
-ok('and emailed with the cutoff template', mails.some((e) => e.to === 'accounting@example.com' && e.template === 'batch_cutoff'), JSON.stringify(mails.map((e) => [e.to, e.template])));
+// Read from the database: the email log page shows the newest 25, and a cutoff emails everyone who makes batches.
+ok('and emailed with the cutoff template', sql(`SELECT COUNT(*) FROM emaillog WHERE template = 'batch_cutoff' AND toEmail = 'accounting@example.com' AND subject LIKE '%${b1.code}%'`) === '1');
 ok('the run is in the history as the system', sql(`SELECT actorName FROM auditlog WHERE action = 'batch.cutoff_run' AND entityId = '${B1.id}'`) === `System (cutoff schedule ${base.name})`);
 ok('each receipt has its line in the history', Number(sql(`SELECT COUNT(*) FROM auditlog WHERE action = 'batch.receipt_added' AND entityType = 'receipt' AND entityId IN ('${A1.id}', '${A2.id}') AND summary LIKE '%at its cutoff'`)) === 2);
 

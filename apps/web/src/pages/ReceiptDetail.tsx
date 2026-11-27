@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { canViewBatches, classificationText, cleanText, fixStepFor, issueLabel, issuesFor, STATUS_LABEL, TRANSACTION_LABEL, VAT_LABEL, type ReceiptAction, type ReturnIssueCode } from '@reimsys/shared';
 import { api, errMsg, fmtDate, fmtDateTime, money, printUrl } from '../api';
 import { useAuth } from '../auth';
+import { BatchPicker } from '../components/BatchPicker';
 import { Comments } from '../components/Comments';
 import { EvidenceViewer } from '../components/EvidenceViewer';
 import { PayDialog } from '../components/PayDialog';
@@ -38,6 +39,7 @@ export function ReceiptDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [allHistory, setAllHistory] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [pickBatch, setPickBatch] = useState(false);
 
   const q = useQuery({
     queryKey: ['receipt', id],
@@ -92,6 +94,8 @@ export function ReceiptDetailPage() {
   const fixUrl = (step: string | null) => `/receipts/${r.id}/edit${step ? `?step=${step}` : ''}`;
   const firstStep = r.returnIssues.map(fixStepFor).find((s) => s) ?? null;
   const modalCfg = modal ? COPY[modal] : null;
+  // The Med Ref chooses the batch of their own receipt until it is paid or disapproved.
+  const canPickBatch = r.encoder.id === me.id && can('receipt.create') && r.status !== 'paid' && r.status !== 'disapproved';
 
   return (
     <>
@@ -99,7 +103,7 @@ export function ReceiptDetailPage() {
       <div className="dh">
         <div className="ttl">
           <h1>{r.payee}</h1>
-          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span>{r.batch && (canViewBatches(can) ? <Link className="pill s-chk" to={`/batches/${r.batch.id}`} title="Open the batch" style={{ textDecoration: 'none' }}>Batch {r.batch.code}</Link> : <span className="muted">Batch {r.batch.code}</span>)}{r.batch && r.batchLateAt && <span className="pill late" title={'Added late: ' + (r.batchLateNote ?? '')} data-testid="late-pill">Added late: {r.batchLateNote}</span>}<span className="amt-big">{money(r.amount)}</span></div>
+          <div className="meta"><StatusPill status={r.status} /><span className="muted">{r.refNo}</span>{r.batch && (canViewBatches(can) ? <Link className="pill s-chk" to={`/batches/${r.batch.id}`} title="Open the batch" style={{ textDecoration: 'none' }}>Batch {r.batch.code}</Link> : <span className="muted">Batch {r.batch.code}</span>)}{r.batch && r.batchLateAt && <span className="pill late" title={'Added late: ' + (r.batchLateNote ?? '')} data-testid="late-pill">Added late: {r.batchLateNote}</span>}{r.wantBatch && <span className="pill s-draft" data-testid="want-batch">Joins {r.wantBatch.code} when submitted</span>}{canPickBatch && <button type="button" className="btn sm ghost" onClick={() => setPickBatch(true)} data-testid="pick-batch">{r.batch || r.wantBatch ? 'Change batch' : 'Choose batch'}</button>}<span className="amt-big">{money(r.amount)}</span></div>
         </div>
         <div className="actionbar">
           {r.canEdit && <Link className="btn" to={`/receipts/${r.id}/edit`}><Icon name="edit" size={18} />Edit</Link>}
@@ -269,6 +273,7 @@ export function ReceiptDetailPage() {
         </section>
       </div>
 
+      {pickBatch && <BatchPicker r={r} onClose={() => setPickBatch(false)} />}
       {confirmDelete && (
         <Modal title="Delete this draft?" onClose={() => setConfirmDelete(false)}>
           <p>{r.refNo} and its attached files will be removed for good. This cannot be undone.</p>

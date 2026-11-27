@@ -62,3 +62,6 @@ export const BATCH_STEP_LABEL: Record<BatchStep, string> = { check: 'to check', 
 /** "3 to check · 2 to pay": what is waiting for this person in a batch. Empty when nothing is. */
 export const batchWaitingText = (w: Partial<Record<BatchStep, number>>) =>
   (Object.entries(w) as [BatchStep, number][]).filter(([, n]) => n > 0).map(([s, n]) => `${n} ${BATCH_STEP_LABEL[s]}`).join(' · ');
+
+/** A Med Ref choosing the batch their own receipt belongs to (null = no batch). A draft keeps the choice and joins when submitted. */
+export const batchChoiceSchema = z.object({ batchId: z.number().int().positive().max(2_147_483_647).nullable() });

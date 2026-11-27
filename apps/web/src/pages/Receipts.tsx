@@ -111,7 +111,7 @@ export function ReceiptsPage() {
       <section className="card tcard">
       <div className="panel-bar">
       <div className="tools">
-        <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => { setQ(e.target.value); reset(); }} placeholder="Search vendor, invoice no., TIN, reference, name" aria-label="Search receipts" /></div>
+        <div className="search"><Icon name="search" size={18} /><input type="text" value={q} onChange={(e) => { setQ(e.target.value); reset(); }} placeholder="Search anything: vendor, reason, amount, name, batch, REIM or PAY no." aria-label="Search receipts" /></div>
         <button type="button" className="btn only-m" aria-expanded={fopen} onClick={() => setFopen((o) => !o)}><Icon name="list" size={18} />Filters{filtered ? ' •' : ''}</button>
         <div className={`fgroup ${fopen ? 'open' : ''}`}>
         <select style={{ width: 'auto' }} value={type} aria-label="Product or service" onChange={(e) => { setType(e.target.value); reset(); }}>

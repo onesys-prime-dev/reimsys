@@ -177,6 +177,7 @@ export * from './receipts';
 export * from './payments';
 export * from './batches';
 export * from './cutoffs';
+export * from './search';
 export * from './returnIssues';
 export * from './privacy';
 export * from './text';

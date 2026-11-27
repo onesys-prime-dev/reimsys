@@ -202,6 +202,7 @@ export function BatchDetailPage() {
       </div>
 
       <CutoffPanel b={b} canSchedule={can('batch.schedule')} onRun={() => setConfirmRun(true)} onChange={() => setCutting(true)} onRemove={() => dropCutoff.mutate()} busy={runNow.isPending || dropCutoff.isPending} />
+      {b.canManage && b.waitingDrafts > 0 && <div className="callout" data-testid="waiting-drafts"><Icon name="info" /><div><b>{b.waitingDrafts} draft{b.waitingDrafts === 1 ? ' is' : 's are'} waiting to join</b><span>Their Med Refs chose this batch. Each joins when it is submitted.</span></div></div>}
       {b.hidden > 0 && <div className="callout ok"><Icon name="info" /><div><b>{b.hidden} more receipt{b.hidden === 1 ? ' is' : 's are'} in this batch</b><span>at a step you do not see. They appear here when they reach you.</span></div></div>}
       {b.steps.length > 0 && !b.steps.some((s) => (b.ready[s] ?? 0) > 0) && b.count > 0 && <div className="callout ok"><Icon name="check" /><div><b>Nothing in this batch is waiting for you</b></div></div>}
 
