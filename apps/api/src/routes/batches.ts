@@ -180,7 +180,7 @@ batchesRouter.get('/:id', async (req, res) => {
       canAddLate: canManage && late && unfinished > 0,
       parts, partOf,
       // Drafts whose Med Ref chose this batch: they join when submitted (their details stay private until then).
-      waitingDrafts: await prisma.receipt.count({ where: { wantBatchId: b.id, status: 'draft' } }),
+      waitingDrafts: canManage ? await prisma.receipt.count({ where: { wantBatchId: b.id, status: 'draft' } }) : 0,
       count: rows.length,
       total: rows.reduce((s, r) => s + Math.round(Number(r.amount) * 100), 0) / 100,
       counts,
