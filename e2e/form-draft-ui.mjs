@@ -53,7 +53,8 @@ const draftUrl = p.url();
 
 console.log('Refreshing or closing the page by mistake');
 await p.reload(); await p.waitForSelector('.steps');
-ok('the same form is back, on the same step, with the notice', (await title()) === 'Invoice details' && (await p.getByLabel('Vendor complete name').inputValue()) === 'Draft Corner ' + stamp && (await p.getByTestId('draft-restored').count()) === 1);
+const back = { title: await title(), vendor: await p.getByLabel('Vendor complete name').inputValue().catch(() => null), notice: await p.getByTestId('draft-restored').count() };
+ok('the same form is back, on the same step, with the notice', back.title === 'Invoice details' && back.vendor === 'Draft Corner ' + stamp && back.notice === 1, JSON.stringify(back));
 ok('and the amount', (await p.getByLabel(/Amount paid to vendor/).inputValue()) === '350');
 
 console.log('Typing and leaving at once');

@@ -2,11 +2,12 @@
 // Needs the API (4000) and web app (5173) running. Start the API with RATE_LIMIT_OFF=1 (development only) so repeated sign-ins are not refused;
 // the two checks that look for the rate limit itself (password-links, security) are skipped in this run, and pass when you run them alone on a normal API.
 // It adds some test records and test users while it runs, so use it on a development copy, never on live data.
-// Usage: node e2e/run-all.mjs [--quick]   (--quick skips the slowest browser checks)
+// Usage: node e2e/run-all.mjs [--quick] [--part N/M]   (--quick skips the slowest browser checks; --part 2/3 runs only the second third)
 import { spawnSync } from 'node:child_process';
 
 const quick = process.argv.includes('--quick');
-const STEPS = [
+const [part, parts] = (process.argv.find((a) => /^--part=?\d+\/\d+$/.test(a) || /^\d+\/\d+$/.test(a)) ?? '1/1').replace('--part', '').replace('=', '').split('/').map(Number);
+const ALL = [
   ['typecheck', 'pnpm', ['typecheck']],
   ['unit tests', 'pnpm', ['test']],
   // API
@@ -14,6 +15,8 @@ const STEPS = [
   // browser
   ...['ui-flow', 'blank-ui', 'error-toast', 'evidence-loading', 'guide-loading', 'privacy-ui', 'privacy-scroll', 'privacy-settings-ui', 'profile-ui', 'password-eye', 'access-tabs', 'help-ui', 'payment-ui', 'batch-ui', 'batch-cutoff-ui', 'search-batch-choice-ui', 'new-features-roles', 'return-ui', 'scan-ui', 'scan-live', 'zoom-ui', 'scan-scroll', 'phone-fixes', 'settings-input', 'profile-photo', 'role-sweep', ...(quick ? [] : ['dark-sweep', 'appearance', 'email-schedules', 'all-emails', 'client-form-ui', 'tax-dashboard-ui', 'form-errors-ui', 'form-draft-ui', 'tax-form-ui', 'more-proof-ui', 'guide-ui'])].map((n) => [n, 'node', [`e2e/${n}.mjs`]]),
 ];
+const size = Math.ceil(ALL.length / parts);
+const STEPS = ALL.slice((part - 1) * size, part * size);
 const results = [];
 for (const [name, cmd, args] of STEPS) {
   const t0 = Date.now();

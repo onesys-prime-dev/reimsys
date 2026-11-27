@@ -88,19 +88,24 @@ export function byEmployee(rows: ImpactRow[]) {
 
 /** Each listed employee, month by month (the last 12 months that have receipts, newest first). The month is the invoice date's month. */
 export function byEmployeeMonth(rows: ImpactRow[], listed: { employeeId: number; employee: string }[]) {
-  const months = [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse().slice(0, 12);
-  const keep = new Set(months);
+  // Every month each person has receipts in, so their months always add up to their whole period (no month is left out).
+  const months = [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse();
+  const groups = new Map<string, ImpactRow[]>();
+  for (const r of rows) {
+    const k = `${r.employeeId}|${r.date.slice(0, 7)}`;
+    const g = groups.get(k);
+    if (g) g.push(r); else groups.set(k, [r]);
+  }
   return {
     months,
     employees: listed.map((e) => {
       const cells: Record<string, { receipts: number; answeredNo: number; incomplete: number; potentialLoss: number; potentialSavings: number }> = {};
       for (const m of months) {
-        const g = rows.filter((r) => r.employeeId === e.employeeId && r.date.slice(0, 7) === m);
-        if (!g.length) continue;
+        const g = groups.get(`${e.employeeId}|${m}`);
+        if (!g) continue;
         const t = totalsOf(g);
         cells[m] = { receipts: t.receipts, answeredNo: t.answeredNo, incomplete: t.incomplete, potentialLoss: t.potentialLoss, potentialSavings: t.potentialSavings };
       }
-      void keep;
       return { employeeId: e.employeeId, employee: e.employee, cells };
     }),
   };

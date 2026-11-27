@@ -127,7 +127,7 @@ export function ReceiptFormPage() {
   const [queued, setQueued] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  // When editing, the form stays hidden until the saved values are in it, so nothing flashes empty and nothing typed early gets overwritten.
+  // When editing, or opening an unfinished form, the form stays hidden until the saved values are in it, so nothing flashes empty and nothing typed early gets overwritten.
   const [ready, setReady] = useState(id === null && !draftParam);
 
   const company = useQuery({ queryKey: ['company'], queryFn: () => api<{ company: Company }>('/company') });
@@ -361,7 +361,8 @@ export function ReceiptFormPage() {
   }
 
   if (id && existing.isError) return <div className="empty"><b>Receipt not found</b></div>;
-  if (id && !ready && !(rec && !rec.canEdit)) return <div className="empty">Loading…</div>;
+  // Also an unfinished form being opened: nothing shows until its answers are in, so no empty first step flashes and nothing typed early is overwritten.
+  if ((id || draftParam) && !ready && !(rec && !rec.canEdit)) return <div className="empty">Loading…</div>;
   if (id && rec && !rec.canEdit) return <div className="empty"><b>This receipt can no longer be edited</b><Link to={`/receipts/${id}`} style={{ color: 'var(--accent)' }}>Open it</Link></div>;
 
   const last = stepIx >= steps.length - 1;

@@ -23,7 +23,10 @@ ok('and the button works', await p.locator('input[type=email]').first().waitFor(
 console.log('A first-time reader (the version is raised so Ana must accept it again)');
 const admin = await login('admin@example.com');
 const cur = (await call(admin, 'GET', '/app-settings')).d.settings;
-await call(admin, 'PUT', '/app-settings', { ...cur, privacyVersion: cur.privacyVersion + 1 });
+// Above what Ana last agreed to: each run leaves her one version ahead once the setting is put back, so a plain +1 would ask her nothing the second time.
+const anaSaw = (await call(admin, 'GET', '/users')).d.users.find((u) => u.email === 'ana.reyes@example.com')?.privacyAcceptedVersion ?? 0;
+const raised = await call(admin, 'PUT', '/app-settings', { ...cur, privacyVersion: Math.max(cur.privacyVersion, anaSaw) + 1 });
+if (raised.s !== 200) throw new Error('could not raise the privacy version: ' + raised.s + ' ' + JSON.stringify(raised.d));
 try {
   const q = await (await b.newContext({ viewport: { width: 1280, height: 520 }, baseURL: WEB })).newPage();
   await q.goto('/'); await q.fill('input[type=email]', 'ana.reyes@example.com'); await q.fill('input[type=password]', 'Reimsys#2026'); await q.click('button[type=submit]');
